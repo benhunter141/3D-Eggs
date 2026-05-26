@@ -28,5 +28,37 @@ public partial class Player : CharacterBody3D
 		// Flat ground for now — no gravity/vertical motion.
 		Velocity = new Vector3(horizontal.X, 0f, horizontal.Z);
 		MoveAndSlide();
+
+		AimAtMouse();
+	}
+
+	// Rotate the player to face the mouse cursor. We shoot a ray from the camera
+	// through the cursor and intersect it with the horizontal plane at the player's
+	// height, then LookAt that point (the player's forward is -Z).
+	private void AimAtMouse()
+	{
+		Camera3D cam = GetViewport().GetCamera3D();
+		if (cam == null)
+			return;
+
+		Vector2 mousePos = GetViewport().GetMousePosition();
+		Vector3 from = cam.ProjectRayOrigin(mousePos);
+		Vector3 dir = cam.ProjectRayNormal(mousePos);
+
+		if (Mathf.IsZeroApprox(dir.Y))   // ray parallel to ground — no hit
+			return;
+
+		float t = (GlobalPosition.Y - from.Y) / dir.Y;
+		if (t < 0f)                      // plane is behind the camera
+			return;
+
+		Vector3 hit = from + dir * t;
+		Vector3 target = new Vector3(hit.X, GlobalPosition.Y, hit.Z);
+
+		// Skip degenerate look-at when the cursor is right on top of us.
+		if (GlobalPosition.DistanceSquaredTo(target) < 0.0025f)
+			return;
+
+		LookAt(target, Vector3.Up);
 	}
 }

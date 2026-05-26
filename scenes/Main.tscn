@@ -1,6 +1,7 @@
-[gd_scene load_steps=11 format=3 uid="uid://b3degg0main01"]
+[gd_scene load_steps=14 format=3 uid="uid://b3degg0main01"]
 
 [ext_resource type="Script" path="res://scripts/Player.cs" id="1_player"]
+[ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="2_camera"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat_1"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -35,6 +36,12 @@ albedo_color = Color(0.95, 0.86, 0.66, 1)
 radius = 0.5
 height = 2.0
 
+[sub_resource type="BoxMesh" id="BoxMesh_marker"]
+size = Vector3(0.2, 0.2, 0.7)
+
+[sub_resource type="StandardMaterial3D" id="Mat_marker"]
+albedo_color = Color(0.9, 0.2, 0.2, 1)
+
 [node name="Main" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
@@ -65,5 +72,13 @@ surface_material_override/0 = SubResource("Mat_player")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Player"]
 shape = SubResource("CapsuleShape_player")
 
+[node name="FacingMarker" type="MeshInstance3D" parent="Player"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -0.75)
+mesh = SubResource("BoxMesh_marker")
+surface_material_override/0 = SubResource("Mat_marker")
+
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 14, 14)
+script = ExtResource("2_camera")
+Target = NodePath("../Player")
+Offset = Vector3(0, 13, 14)
