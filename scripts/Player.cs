@@ -11,10 +11,11 @@ public partial class Player : CharacterBody3D
 	[Export] public float Friction = 50.0f;     // how fast we slow to a stop
 
 	// --- Sword swing ---
-	[Export] public float SwingArcDegrees = 150.0f;  // total left-to-right sweep
+	[Export] public float SwingArcDegrees = 150.0f;  // total right-to-left sweep
 	[Export] public float SwingDuration = 0.2f;      // seconds the blade is sweeping
 	[Export] public float SwingCooldown = 0.35f;     // delay after a swing before the next
-	[Export] public float SwordRestDegrees = -55.0f; // idle angle of the blade (held to the side)
+	[Export] public float SwordRestDegrees = -55.0f; // idle angle (negative = player's right side)
+	[Export] public float SwordReturnLerp = 7.0f;    // how fast the blade eases back to rest
 
 	private Node3D _swordPivot;
 	private Area3D _hitbox;
@@ -72,12 +73,18 @@ public partial class Player : CharacterBody3D
 			StartSwing();
 
 		if (!_swinging)
+		{
+			// Idle / post-swing: ease the blade back to its rest pose on the right.
+			float current = _swordPivot.RotationDegrees.Y;
+			float t2 = 1f - Mathf.Exp(-SwordReturnLerp * dt);
+			SetSwordAngle(Mathf.Lerp(current, SwordRestDegrees, t2));
 			return;
+		}
 
 		_swingTimer += dt;
 		float t = Mathf.Clamp(_swingTimer / SwingDuration, 0f, 1f);
 		float half = SwingArcDegrees * 0.5f;
-		SetSwordAngle(Mathf.Lerp(half, -half, t)); // sweep the player's right side to the left
+		SetSwordAngle(Mathf.Lerp(-half, half, t)); // sweep from the right (-) to the left (+)
 
 		// Poll overlaps each frame — bodies can enter mid-sweep as the box rotates.
 		foreach (Node3D body in _hitbox.GetOverlappingBodies())
@@ -105,7 +112,7 @@ public partial class Player : CharacterBody3D
 		_swinging = false;
 		_cooldownTimer = SwingCooldown;
 		SetHitboxActive(false);
-		SetSwordAngle(SwordRestDegrees);
+		// Angle is left where the swing ended (far left); the idle branch eases it home.
 	}
 
 	private void SetSwordAngle(float degrees)
