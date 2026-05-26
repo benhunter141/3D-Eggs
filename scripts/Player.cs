@@ -34,6 +34,7 @@ public partial class Player : Unit
 	public override void _Ready()
 	{
 		base._Ready();   // init Health from MaxHealth
+		AddToGroup("player");   // allies find their formation anchor through this group
 
 		_swordPivot = GetNode<Node3D>("SwordPivot");
 		_hitbox = GetNode<Area3D>("SwordPivot/Hitbox");

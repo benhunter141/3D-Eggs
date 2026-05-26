@@ -80,8 +80,12 @@ momentum if attempted early.
       hits (Chunk 3 ✓); sword knockback flings skeletons along the hit direction
       (Chunk 4 ✓); skeletons chase the nearest enemy-team unit and melee on contact,
       player has a game-over state on death (Chunk 5 ✓). All headless-tested.
-- [ ] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
+- [~] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
       stones) and return to formation. (§7 Chunks 6–8)
+      Progress: `Ally : Unit` steers to a player-relative formation slot with
+      arrive-slowdown; the slot offset rotates with the player's facing, so the squad
+      turns with you. 4 allies wired into `Main.tscn`, movement only — combat next
+      (Chunk 6 ✓). Headless `UnitTest` verifies follow + slot rotation.
 - [ ] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice &
       tuning. (§7 Chunks 9–10)
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
@@ -164,9 +168,12 @@ works the same for everyone.
   and can kill the player.
 
 ### Phase C — Allies (M3)
-- [ ] **Chunk 6 — Allies + formation (movement only).** `Ally : Unit`; 4 allies steer to
-  formation slots (offsets rotated with the player) with arrive-slowdown. No combat
-  yet. → User confirms they hold formation while moving and turning.
+- [x] **Chunk 6 — Allies + formation (movement only).** `Ally : Unit`; 4 allies steer to
+  formation slots (local offsets rotated by the player's facing via `SlotWorldPosition`)
+  with arrive-slowdown, and face their travel direction. Player joins a `player` group so
+  allies find their anchor. `scenes/Ally.tscn` (blue capsule) ×4 in `Main.tscn`. No combat
+  yet. Headless `UnitTest` adds a follow + slot-rotation check. → User confirms they hold
+  formation while moving and turning.
 - [ ] **Chunk 7 — Ally combat (loose leash) + fists.** Allies attack skeletons within a
   leash radius of their slot, then return when none are near. Fists = damage, no
   knockback. → User confirms they engage nearby skeletons without scattering.

@@ -27,8 +27,9 @@ public partial class UnitTest : Node3D
 		bool knock = TestKnockback();
 		bool hook = TestDeathHook();
 		bool chase = await TestChase();
+		bool formation = await TestFormation();
 
-		GD.Print(death && knock && hook && chase ? "=== ALL PASS ===" : "=== FAIL ===");
+		GD.Print(death && knock && hook && chase && formation ? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
 
@@ -146,6 +147,59 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: skeleton chased into range and dealt damage"
 			: $"FAIL: closed={closed}, damaged={damaged}");
+		return pass;
+	}
+
+	// Chunk 6: an ally marches to its formation slot and holds it, and that slot
+	// rotates with the player — turn the player and the ally chases the new spot.
+	private async Task<bool> TestFormation()
+	{
+		GD.Print("=== UnitTest: ally formation follow ===");
+
+		// Wipe leftover units so nobody chases/shoves the ally during these frames.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// A plain Node3D in the "player" group is all the Ally needs as its anchor.
+		var player = new Node3D();
+		AddChild(player);
+		player.AddToGroup("player");
+		player.GlobalPosition = Vector3.Zero;
+
+		var ally = GD.Load<PackedScene>("res://scenes/Ally.tscn").Instantiate<Ally>();
+		ally.FormationOffset = new Vector3(2f, 0f, 1.5f);
+		AddChild(ally);                                 // _Ready grabs the player from the group
+		ally.GlobalPosition = new Vector3(0f, 0f, 7f);  // start well away from its slot
+
+		Vector3 slot0 = ally.SlotWorldPosition();
+		GD.Print($"slot(yaw 0)={slot0}; ally starts {ally.GlobalPosition.DistanceTo(slot0):0.00} m away");
+
+		// ~2.5 s of physics: long enough to march in and settle.
+		for (int i = 0; i < 150; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float restDist = ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition());
+		bool arrived = restDist < 0.3f;
+		GD.Print($"after follow: {restDist:0.00} m from slot (arrived={arrived})");
+
+		// Turn the player 90°: the slot should swing around and the ally re-form on it.
+		player.Rotation = new Vector3(0f, Mathf.Pi * 0.5f, 0f);
+		Vector3 slot90 = ally.SlotWorldPosition();
+		bool slotMoved = slot0.DistanceTo(slot90) > 0.5f;
+		GD.Print($"slot(yaw 90)={slot90}; moved with player turn={slotMoved}");
+
+		for (int i = 0; i < 150; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float restDist2 = ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition());
+		bool reformed = restDist2 < 0.3f;
+		GD.Print($"after turn: {restDist2:0.00} m from rotated slot (reformed={reformed})");
+
+		bool pass = arrived && slotMoved && reformed;
+		GD.Print(pass
+			? "PASS: ally holds its slot and the formation rotates with the player"
+			: $"FAIL: arrived={arrived}, slotMoved={slotMoved}, reformed={reformed}");
 		return pass;
 	}
 }
