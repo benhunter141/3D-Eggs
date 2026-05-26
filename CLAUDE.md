@@ -6,6 +6,7 @@ Godot exe path: C:\Godot\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono
 > created it will be cleared, so everything needed to continue lives here. When the
 > user says **"go"**, build the **next unchecked chunk** in §7 — follow the WORKFLOW
 > box there. Assume prior chunks already work; the user reports problems if any.
+> Per-chunk implementation detail lives in the **code + git log**, not here.
 
 ---
 
@@ -20,192 +21,132 @@ A **3D twin-stick action game** — **medieval fantasy**, mostly **melee**:
 - Built entirely with **free** tools.
 
 **Near-term target — a vertical slice:** player (sword) + 4 allies (2 fists, 2 stones)
-vs 5 skeletons, **5v5**. Allies stay near the player in formation. See §7 for the
-chunk-by-chunk plan.
+vs 5 skeletons, **5v5**. Allies stay near the player in formation. See §7 for the plan.
 
-Theme: the folder is called "3D Eggs" 🥚 but the game is **medieval fantasy** — the egg
-theme is dropped for now. Use medieval/neutral names (`Player`, `Ally`, `Enemy` /
-`Skeleton`).
+Theme: the folder is "3D Eggs" 🥚 but the game is **medieval fantasy** — egg theme
+dropped. Use medieval/neutral names (`Player`, `Ally`, `Enemy` / `Skeleton`).
 
 ## 2. Locked-In Decisions
 
 | Decision | Choice | Why |
 |---|---|---|
-| Engine | **Godot 4.5.x — the .NET / C# build** | Free & open source; text-based scene files let Claude build & edit scenes directly; first-class headless mode for testing. |
-| Language | **C#** | User has prior C#/Unity experience — it transfers directly. |
-| .NET SDK | **8.0 or newer** (required by Godot 4.4+ for C#) | Godot C# packages target `net8.0`. |
-| Target platform | **Desktop download** (Windows first) | Simplest path; best physics/multiplayer performance. C# desktop export is fully supported. |
-| Controls | **Twin-stick:** WASD = move, mouse = aim, left-click = attack (melee). Gamepad sticks also supported. | Classic desktop twin-stick feel. |
+| Engine | **Godot 4.6.x — .NET / C# build** | Free & OSS; text scene files Claude can edit directly; first-class headless mode. |
+| Language | **C#** | User has C#/Unity experience — transfers directly. |
+| .NET SDK | **8.0+** (required by Godot 4.4+ for C#) | Godot C# packages target `net8.0`. |
+| Target platform | **Desktop download** (Windows first) | Simplest; best physics/multiplayer perf. |
+| Controls | **Twin-stick:** WASD = move, mouse = aim, left-click = attack. Gamepad sticks too. | Classic desktop twin-stick feel. |
 
 ## 3. Developer Profile
 
-- Comfortable with **C#** and has used **Unity** before — but **new to Godot**.
-- So: explain Godot-specific concepts (nodes, scenes, signals, the editor) but don't
-  over-explain general programming or C#.
-- Wants Claude to be **hands-on** — build large chunks (scenes, scripts, tests), not
-  just hand over code to paste.
+- Comfortable with **C#** and **Unity** — but **new to Godot**.
+- Explain Godot-specific concepts (nodes, scenes, signals, editor); don't over-explain
+  general programming or C#.
+- Wants Claude **hands-on** — build large chunks (scenes, scripts, tests), not just code
+  to paste.
 
 ## 4. How Claude Works On This Project
 
-- **Claude CANNOT see the running game.** Visual "feel" (movement, bounce, fun) can
-  only be judged by the user playing. After building something visual, ask the user to
-  run it and describe what they see. Always give exact run instructions.
-- **What Claude CAN test:** logic/numbers (damage, spawn counts, collision events via
-  `GD.Print`), C# compilation (`dotnet build`), and project/scene structure.
-- **Godot files are text** — Claude reads & edits `.tscn` (scenes), `project.godot`,
-  and `.cs` scripts directly.
-- **Headless run/test:** `godot --headless --path . --script res://path/to/test.gd`
-  (or run a scene headless). `GD.Print(...)` output goes to stdout for Claude to read.
-- **Build C# before running:** Godot generates a `.sln` / `.csproj`; compile with
-  `dotnet build` (or let the editor build). The Godot executable path is recorded in
-  §6 once installed.
+- **Claude CANNOT see the running game.** Visual "feel" is judged only by the user
+  playing. After building anything visual, ask the user to run it; always give the exact
+  run command (§8).
+- **What Claude CAN test:** logic/numbers (damage, counts, collision events via
+  `GD.Print`), C# compilation (`dotnet build`), project/scene structure.
+- **Godot files are text** — read & edit `.tscn`, `project.godot`, `.cs` directly.
+- **Headless test:** run a scene with `--headless`; `GD.Print(...)` goes to stdout.
+  `scenes/Tests/UnitTest.tscn` is the logic test harness (damage/death, knockback,
+  ally follow + slot rotation, loose-leash fists, ranged stones).
+- **Build C# before running** with `dotnet build` (or let the editor build).
 - Keep iterations small: build one thing → user runs it → adjust.
 
-## 5. Roadmap (build in layers — single-player fun first, multiplayer LAST)
+## 5. Architecture & Invariants (the durable design law)
 
-Each milestone must be playable before moving on. **Do not start multiplayer until
-1–5 feel great** — networking many physics bodies is the hardest part and kills
-momentum if attempted early.
+**Spine:** a `Unit` base (`CharacterBody3D`: `Team`, `Health`, `TakeDamage`, `Die`,
+knockback-decay, virtual `OnDeath` hook) that `Player`, `Ally`, `Enemy` all extend, so
+combat is uniform.
 
-- [x] **M0 — Setup:** .NET SDK + Godot .NET installed & verified; project created;
-      flat ground + a player capsule visible. ✅ DONE
-- [~] **M1 — Twin-stick melee feel ⭐ (top priority):** WASD move, mouse aim, click to
-      swing a sword. Tune until it *feels good*. (§7 Chunks 1–2)
-      Progress: WASD + mouse aim + follow camera (Chunk 1 ✓); sword swing built (Chunk 2,
-      pending user feel-check).
-- [x] **M2 — Skeletons:** chase the player, take damage, die; sword knockback; player
-      can be hit and die. (§7 Chunks 3–5) ✅ DONE
-      Progress: `Unit` base (Team/Health/TakeDamage/Die + knockback-decay) built;
-      `Player` refactored onto it; sword deals real damage; skeleton dummy dies in 3
-      hits (Chunk 3 ✓); sword knockback flings skeletons along the hit direction
-      (Chunk 4 ✓); skeletons chase the nearest enemy-team unit and melee on contact,
-      player has a game-over state on death (Chunk 5 ✓). All headless-tested.
-- [x] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
-      stones) and return to formation. (§7 Chunks 6–8) ✅ DONE
-      Progress: `Ally : Unit` steers to a player-relative formation slot with
-      arrive-slowdown; the slot offset rotates with the player's facing, so the squad
-      turns with you. 4 allies wired into `Main.tscn` (Chunk 6 ✓). Allies brawl on a
-      loose leash: engage the nearest enemy within `LeashRadius` (6 m) of their slot,
-      chase + punch with fists (8 dmg, no knockback), and re-form when none are near —
-      leash gated on the slot so they don't scatter (Chunk 7 ✓). `Ally.Weapon` now picks
-      Fists or Stones: stone-throwers hold their ground and lob a `Stone` projectile
-      (12 dmg, no knockback) at in-leash targets on a cooldown. Squad = 2 fists + 2 stones
-      in `Main.tscn` (Chunk 8 ✓). Headless `UnitTest` verifies follow + slot rotation +
-      loose-leash fists + ranged stone-throwing.
-- [ ] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice &
-      tuning. (§7 Chunks 9–10)
+**Groups:** all units join `units` (target scanning); player also in `player` (ally
+anchor); win/lose UI is in `victory` / `game_over` (Restart button is in both).
+
+**Match state:** `GameManager` (node in `Main.tscn`) is the single authority — each
+frame it declares LOSE if the player is dead, else WIN once all enemy units are cleared.
+**Lose is checked first** so a late ally kill can't flash VICTORY over GAME OVER. Once
+ended it only listens for the `restart` action (R / gamepad) → `ReloadCurrentScene`.
+
+**Combat rules:**
+- **Only the player's sword knocks back** (`SwordKnockback` ≈ 10 m/s, along hit dir).
+  Fists, thrown stones, and skeleton hits deal damage with **no** knockback.
+- Damage: sword `SwordDamage` (skeleton dies in 3); fists 8; stones 12; skeleton
+  `AttackDamage` on `AttackCooldown` (melee on contact).
+- `Player.OnDeath` → freeze + show `GAME OVER`; `Enemy.OnDeath` → free itself.
+
+**Allies = loose leash (user-locked):**
+- Steer to a player-relative formation **slot**; offset rotates with player facing
+  (`SlotWorldPosition`), so the squad turns with you. Arrive-slowdown on approach.
+- Engage the nearest enemy within `LeashRadius` (6 m) **of the slot** (gating on the
+  slot, not the ally, prevents scattering); else re-form.
+- `Ally.Weapon` = `Fists` | `Stones`. Fists: chase to `AttackRange` and punch. Stones:
+  hold near slot, lob a `Stone` every `ThrowCooldown`, close in only if past `ThrowRange`.
+- `Stone` projectile: aimed straight on launch, proximity-hits enemy-team units, frees
+  on hit or `MaxLifetime`.
+- **Squad:** 2 fists (Ally1/2) + 2 stones (Ally3/4) in `Main.tscn`.
+- Direct player-issued ally commands come later (M7).
+
+**Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `Ally.cs`, `Enemy.cs`, `Stone.cs`,
+`FollowCamera.cs`, `GameManager.cs`, `RestartButton.cs`. `scenes/` — `Main.tscn` (main),
+`Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Tests/UnitTest.tscn`.
+
+## 6. Roadmap (single-player fun first, multiplayer LAST)
+
+Each milestone must be playable before moving on. **Don't start multiplayer until
+M1–M5 feel great** — networking many physics bodies is the hardest part.
+
+- [x] **M0 — Setup:** env verified, project builds, ground + player capsule visible.
+- [~] **M1 — Twin-stick melee feel ⭐:** WASD move, mouse aim, click-swing sword.
+      Chunks 1–2 built; Chunk 2 swing still pending the user's feel-check. Tune til fun.
+- [x] **M2 — Skeletons:** chase, take damage, die; sword knockback; player can die.
+- [x] **M3 — Allies in formation:** loose-leash followers that fight (fists + stones)
+      and re-form.
+- [~] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice.
+      Chunk 9 done (5v5 encounter + win/lose/restart); juice & tuning is Chunk 10.
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
 - [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
-- [ ] **M8 — Multiplayer:** start with 2 players, server-authoritative. Hardest, last.
+- [ ] **M8 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
-## 6. Environment State (update as we go)
+## 7. Build Plan (chunks)  ← start here when user says "go"
 
-- .NET SDK installed: **YES — v10.0.203** (≥ 8.0 ✓)
-- Godot .NET installed: **YES — v4.6.3.stable.mono** ✓
-- Godot executable path: `C:\Godot\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64.exe`
-- Project created: **YES** — `project.godot`, assembly_name=`Eggs`, C# builds clean (`Eggs.dll`)
-- C# solution: `Eggs.sln` / `Eggs.csproj` (Godot.NET.Sdk 4.6.3, net8.0)
-- Renderer: **GL Compatibility (OpenGL3)** — set in `project.godot [rendering]`.
-  ⚠️ Do NOT switch back to Forward+/Vulkan: this machine (NVIDIA 940MX, old driver
-  376.54 → Vulkan 1.0.24) crashes with hundreds of `vkCreateComputePipelines` errors.
-  Compatibility runs fine and suits the hardware.
-- Godot relaunches **detached** on Windows, so launching from a tool returns exit 0
-  instantly with an empty stdout log. To see real output, read the per-run log at:
-  `%APPDATA%\Godot\app_userdata\3D Eggs\logs\godot.log`
-- Project layout: `scenes/Main.tscn` (main scene), `scripts/Player.cs`. Put new
-  scenes in `scenes/`, scripts in `scripts/`. Launch via `play.bat` or editor F5.
-- Git: initialized; commit after each milestone / before risky changes (roll-back net).
-
-## 7. Getting Started Walkthrough  ← start here when user says "go"
-
-Setup (old Phases 0–1, M0) is **DONE**: env verified, project builds clean, and the
-base scene exists — ground + player capsule (`CharacterBody3D`) + angled camera + light
-(§6).
-
-> **WORKFLOW — what "go" means.** Find the **first unchecked `[ ]` chunk** in the list
-> below and build it **completely** (scenes + scripts), assuming all earlier chunks
-> already work. Then:
-> 1. Run `dotnet build` and confirm it compiles (0 errors).
-> 2. **Commit** the chunk (`git add -A && git commit`), so each chunk is a roll-back point.
-> 3. Tick the chunk's box `[x]` here and update the M-progress line in §5.
-> 4. Reply with a one-line summary + the exact run command (§8). Do **not** wait for
->    confirmation before continuing — the user will say if something's off, else "go".
+> **WORKFLOW — what "go" means.** Find the **first unchecked `[ ]` chunk** below and
+> build it **completely** (scenes + scripts), assuming all earlier chunks work. Then:
+> 1. `dotnet build` — confirm 0 errors.
+> 2. **Commit** the chunk (`git add -A && git commit`) as a roll-back point.
+> 3. Tick its box `[x]` and update the M-line in §6.
+> 4. Reply with a one-line summary + the exact run command (§8). Don't wait for
+>    confirmation — the user says if something's off, else "go".
 >
 > Keep chunks self-contained and small. Headless-test logic where possible (§4).
 
-Architecture spine: a `Unit` base (`CharacterBody3D` with `Health`, `Team`,
-`TakeDamage`, knockback-decay) that `Player`, `Ally`, and `Enemy` all extend, so combat
-works the same for everyone.
+**Done (detail in code + git log):**
+- [x] **Chunk 1** — Mouse aim + follow camera.
+- [x] **Chunk 2** — Sword swing (arc hitbox + cooldown). *Pending user feel-check.*
+- [x] **Chunk 3** — `Unit`/health foundation + damage dummy.
+- [x] **Chunk 4** — Sword knockback.
+- [x] **Chunk 5** — Skeleton AI (chase + melee) + player can die.
+- [x] **Chunk 6** — Allies + formation (movement only).
+- [x] **Chunk 7** — Ally combat (loose leash) + fists.
+- [x] **Chunk 8** — Stone-throwing allies.
+- [x] **Chunk 9** — 5v5 encounter + win/lose. `GameManager` owns match state (LOSE if
+  player dies, WIN once all skeletons cleared; lose-first so a late ally kill can't show
+  VICTORY over GAME OVER). 5 skeletons in `Main.tscn`; VICTORY/GAME OVER labels; Restart
+  button + `restart` key (R / gamepad).
 
-**Locked design choices (from the user):**
-- **Allies = loose leash:** stay near their formation slot; chase enemies only within a
-  radius, then return. (Direct player-issued ally commands come later — M7.)
-- **Only the player's sword knocks back.** Fists, thrown stones, and skeleton hits deal
-  damage with **no** knockback for now.
-- **Slice team:** player + 4 allies (2 fists, 2 stones) vs 5 skeletons.
+**Next:**
+- [ ] **Chunk 10 — Juice & tuning.** Health bars / hit flashes, swing + impact effects,
+  and a balance pass (damage, knockback, speeds, cooldowns, formation radius). → Iterate
+  on feel with the user.
 
-### Phase A — Player melee core (M1)
-- [x] **Chunk 1 — Mouse aim + follow camera.** `FollowCamera.cs` on `Camera3D` tracks
-  the player's position at a fixed offset (no rotation inherited). `Player.AimAtMouse()`
-  raycasts camera→player-plane at the cursor and `LookAt`s it; red `FacingMarker` nub
-  shows facing. **DONE & confirmed.**
-- [x] **Chunk 2 — Sword swing.** Sword mesh on the player; left-click swings a ~0.2s arc
-  with a cooldown; an `Area3D` arc hitbox is live during the swing and prints overlaps.
-  Add an `attack` input action. → User confirms the swing feels responsive.
+Then proceed to M5+ (§6), updating checkboxes and §8 as you go.
 
-### Phase B — Skeletons & combat (M2)
-- [x] **Chunk 3 — `Unit`/health foundation + damage dummy.** Built `Unit`
-  (`Team`, `Health`, `TakeDamage`, `Die`, knockback-decay groundwork); refactored
-  `Player` onto it so the sword deals `SwordDamage` to enemy-team `Unit`s. Added
-  `Enemy` (`scenes/Skeleton.tscn`), one instanced in `Main.tscn`, dies in 3 hits.
-  Headless test `scenes/Tests/UnitTest.tscn` confirms the damage/death pipeline.
-  → User confirms the dummy dies after 3 sword hits.
-- [x] **Chunk 4 — Sword knockback.** Sword hits apply a `SwordKnockback` (10 m/s) impulse
-  along the hit direction via `TakeDamage`; `Unit` decays it each frame; `Enemy` already
-  folds it into `MoveAndSlide`. Headless `UnitTest` verifies the impulse (flat, correct
-  speed/direction, dead units ignore it). → User confirms skeletons fly back.
-- [x] **Chunk 5 — Skeleton AI + player can die.** `Enemy` chases the nearest enemy-team
-  unit (scans the shared `units` group), faces it, and melees on contact (`AttackDamage`
-  every `AttackCooldown`, no knockback). `Unit.Die` now calls a virtual `OnDeath` hook —
-  skeletons free themselves; `Player` overrides it to freeze and show a `GAME OVER` label
-  (CanvasLayer in `Main.tscn`, `game_over` group) instead. Headless `UnitTest` adds a
-  frame-stepped chase test + a death-hook test. → User confirms a skeleton chases, hits,
-  and can kill the player.
-
-### Phase C — Allies (M3)
-- [x] **Chunk 6 — Allies + formation (movement only).** `Ally : Unit`; 4 allies steer to
-  formation slots (local offsets rotated by the player's facing via `SlotWorldPosition`)
-  with arrive-slowdown, and face their travel direction. Player joins a `player` group so
-  allies find their anchor. `scenes/Ally.tscn` (blue capsule) ×4 in `Main.tscn`. No combat
-  yet. Headless `UnitTest` adds a follow + slot-rotation check. → User confirms they hold
-  formation while moving and turning.
-- [x] **Chunk 7 — Ally combat (loose leash) + fists.** `Ally` engages the nearest enemy
-  whose distance to its formation *slot* is within `LeashRadius` (6 m), chases to
-  `AttackRange`, and punches (`AttackDamage` 8 every `AttackCooldown`, no knockback);
-  when none are in leash it falls back to the slot. Gating the leash on the slot (not the
-  ally) prevents scattering. Headless `UnitTest` adds a combat test: engages an in-leash
-  enemy, ignores a far one, and re-forms. → User confirms they engage nearby skeletons
-  without scattering.
-- [x] **Chunk 8 — Stone-throwing allies.** `Stone.cs`/`Stone.tscn`: a projectile that flies
-  straight (aimed at the target on launch), proximity-hits enemy-team units for `Damage`
-  (no knockback), and frees on hit or `MaxLifetime`. `Ally.Weapon` (Fists|Stones): stone
-  allies hold near their slot and lob a stone at in-leash targets every `ThrowCooldown`
-  (12 dmg), closing in only if the target is beyond `ThrowRange`. Squad = 2 fists (Ally1/2)
-  + 2 stones (Ally3/4) in `Main.tscn`. Headless `UnitTest` adds a ranged test (pelts an
-  in-leash enemy without charging). → User confirms ranged allies hit.
-
-### Phase D — Vertical slice (M4)
-- [ ] **Chunk 9 — 5v5 encounter + win/lose.** A `GameManager` spawns player + 4 allies vs
-  5 skeletons; win when all skeletons die, lose when the player dies; result label +
-  restart key. → User plays a full 5v5.
-- [ ] **Chunk 10 — Juice & tuning.** Health bars / hit flashes, swing + impact effects, and
-  a balance pass (damage, knockback, speeds, cooldowns, formation radius). → Iterate on
-  feel with the user.
-
-Then proceed to M5+ (§5), updating the checkboxes and §6 as you go.
-
-## 8. Quick Reference (fill in once known)
+## 8. Quick Reference
 
 ```powershell
 # Godot exe (PowerShell variable for convenience):
@@ -220,3 +161,18 @@ $godot = "C:\Godot\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64
 # Build C#:
 dotnet build
 ```
+
+## 9. Environment State (update as we go)
+
+- .NET SDK: **v10.0.203** (≥ 8.0 ✓)
+- Godot .NET: **v4.6.3.stable.mono** ✓ — path in header above.
+- Project: `project.godot`, assembly_name=`Eggs`, builds clean (`Eggs.dll`).
+  Solution `Eggs.sln` / `Eggs.csproj` (Godot.NET.Sdk 4.6.3, net8.0).
+- Renderer: **GL Compatibility (OpenGL3)** in `project.godot [rendering]`.
+  ⚠️ Do NOT switch to Forward+/Vulkan: this machine (NVIDIA 940MX, driver 376.54 →
+  Vulkan 1.0.24) crashes with `vkCreateComputePipelines` errors. Compatibility runs fine.
+- Godot relaunches **detached** on Windows → launching from a tool returns exit 0
+  instantly with empty stdout. Read the real per-run log at:
+  `%APPDATA%\Godot\app_userdata\3D Eggs\logs\godot.log`
+- Layout: scenes in `scenes/`, scripts in `scripts/`. Launch via `play.bat` or editor F5.
+- Git: initialized; commit after each chunk / before risky changes.
