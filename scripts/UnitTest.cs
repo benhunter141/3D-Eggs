@@ -240,8 +240,14 @@ public partial class UnitTest : Node3D
 
 		bool engaged = near.Health < near.MaxHealth;
 		bool stayedClose = ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition()) <= ally.LeashRadius;
+		// Forward is -Z: the ally's front should point AT the enemy it's punching, not away.
+		Vector3 fwd = -ally.GlobalTransform.Basis.Z;
+		Vector3 toEnemy = (near.GlobalPosition - ally.GlobalPosition).Normalized();
+		float facingDot = fwd.Dot(toEnemy);
+		bool facing = facingDot > 0.9f;
 		GD.Print($"near enemy HP={near.Health}/{near.MaxHealth} (engaged={engaged}), " +
-			$"ally {ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition()):0.00} m from slot (stayedClose={stayedClose})");
+			$"ally {ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition()):0.00} m from slot (stayedClose={stayedClose}), " +
+			$"facing dot={facingDot:0.00} (facing={facing})");
 
 		// Now a fresh fight: enemy far outside the leash. The ally must ignore it and
 		// re-form on its slot rather than chasing across the map.
@@ -262,10 +268,10 @@ public partial class UnitTest : Node3D
 		GD.Print($"far enemy HP={far.Health}/{far.MaxHealth} (ignored={ignored}), " +
 			$"ally {ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition()):0.00} m from slot (reformed={reformed})");
 
-		bool pass = engaged && stayedClose && ignored && reformed;
+		bool pass = engaged && stayedClose && facing && ignored && reformed;
 		GD.Print(pass
-			? "PASS: ally engages in-leash enemies, ignores far ones, and re-forms"
-			: $"FAIL: engaged={engaged}, stayedClose={stayedClose}, ignored={ignored}, reformed={reformed}");
+			? "PASS: ally engages in-leash enemies, faces them, ignores far ones, and re-forms"
+			: $"FAIL: engaged={engaged}, stayedClose={stayedClose}, facing={facing}, ignored={ignored}, reformed={reformed}");
 		return pass;
 	}
 }

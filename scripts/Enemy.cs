@@ -91,7 +91,9 @@ public partial class Enemy : Unit
 		if (GlobalPosition.DistanceSquaredTo(flat) < 0.0025f)
 			return;
 
-		float desiredYaw = Mathf.Atan2(flat.X - GlobalPosition.X, flat.Z - GlobalPosition.Z);
+		// Forward is -Z, so negate the delta: atan2(dx,dz) would aim our BACK at the target.
+		Vector3 dir = flat - GlobalPosition;
+		float desiredYaw = Mathf.Atan2(-dir.X, -dir.Z);
 		float t = 1f - Mathf.Exp(-TurnLerp * dt);
 		Vector3 rot = Rotation;
 		rot.Y = Mathf.LerpAngle(rot.Y, desiredYaw, t);
