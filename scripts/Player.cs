@@ -47,6 +47,15 @@ public partial class Player : Unit
 	{
 		float dt = (float)delta;
 
+		if (IsDead)
+		{
+			// Game over: ignore input/aim, just bleed off momentum in place.
+			Vector3 stop = new Vector3(Velocity.X, 0f, Velocity.Z).MoveToward(Vector3.Zero, Friction * dt);
+			Velocity = stop;
+			MoveAndSlide();
+			return;
+		}
+
 		// GetVector auto-normalizes, so diagonals aren't faster.
 		// Screen-up (W) maps to -Z (away from the camera).
 		Vector2 input = Input.GetVector("move_left", "move_right", "move_up", "move_down");
@@ -137,6 +146,18 @@ public partial class Player : Unit
 	{
 		_hitbox.Monitoring = active;
 		_hitboxShape.Disabled = !active;
+	}
+
+	// The player doesn't vanish on death — it freezes and flips on the game-over UI
+	// (any CanvasItem in the "game_over" group). Restart comes later (Chunk 9).
+	protected override void OnDeath()
+	{
+		Velocity = Vector3.Zero;
+		SetHitboxActive(false);
+		foreach (Node n in GetTree().GetNodesInGroup("game_over"))
+			if (n is CanvasItem ci)
+				ci.Visible = true;
+		GD.Print("[Player] GAME OVER");
 	}
 
 	// Rotate the player to face the mouse cursor. We shoot a ray from the camera

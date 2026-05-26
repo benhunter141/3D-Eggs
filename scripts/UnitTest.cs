@@ -1,12 +1,39 @@
 using Godot;
+using System.Threading.Tasks;
 
-// Headless logic check for the Chunk 3 damage/death pipeline. Run with:
+// Headless logic checks for the combat pipeline. Run with:
 //   godot --headless --path . res://scenes/Tests/UnitTest.tscn
-// Spawns a skeleton and hits it with sword-strength damage until it dies, printing
-// each step — confirms the pipeline works without needing mouse input in-game.
+// Covers: damage/death (Chunk 3), sword knockback (Chunk 4), and Chunk 5's
+// skeleton chase/attack AI plus the player-style death hook (death without
+// being freed). Output goes to stdout for Claude to read.
 public partial class UnitTest : Node3D
 {
+	// A stand-in for the Player's death behaviour: stays in the tree and flips a
+	// flag instead of QueueFree-ing, so we can verify the OnDeath hook in isolation.
+	private partial class DeathHookUnit : Unit
+	{
+		public bool OnDeathCalled;
+		protected override void OnDeath() => OnDeathCalled = true; // no QueueFree
+	}
+
 	public override void _Ready()
+	{
+		_ = RunAll();
+	}
+
+	private async Task RunAll()
+	{
+		bool death = TestDamageDeath();
+		bool knock = TestKnockback();
+		bool hook = TestDeathHook();
+		bool chase = await TestChase();
+
+		GD.Print(death && knock && hook && chase ? "=== ALL PASS ===" : "=== FAIL ===");
+		GetTree().Quit();
+	}
+
+	// Chunk 3: a skeleton dies after the expected number of sword hits.
+	private bool TestDamageDeath()
 	{
 		GD.Print("=== UnitTest: damage/death pipeline ===");
 
@@ -25,20 +52,15 @@ public partial class UnitTest : Node3D
 			skel.TakeDamage(swordDamage);
 		}
 
-		bool deathPass = skel.IsDead && hits == expected;
-		GD.Print(deathPass
+		bool pass = skel.IsDead && hits == expected;
+		GD.Print(pass
 			? $"PASS: skeleton died after {hits} hits"
 			: $"FAIL: dead={skel.IsDead}, hits={hits}, expected={expected}");
-
-		bool knockPass = TestKnockback();
-
-		GD.Print(deathPass && knockPass ? "=== ALL PASS ===" : "=== FAIL ===");
-		GetTree().Quit();
+		return pass;
 	}
 
-	// Verify the sword's knockback impulse: a fresh skeleton hit from one side should
-	// gain a horizontal shove of the right speed pointing away from the attacker, and
-	// that shove should bleed off via DecayKnockback. (Dead units take no knockback.)
+	// Chunk 4: a fresh skeleton hit from one side gains a flat shove of the right
+	// speed/direction that bleeds off; dead units ignore further knockback.
 	private bool TestKnockback()
 	{
 		GD.Print("=== UnitTest: knockback impulse ===");
@@ -67,6 +89,63 @@ public partial class UnitTest : Node3D
 
 		bool pass = flat && speedOk && dirOk && deadIgnores;
 		GD.Print(pass ? "PASS: knockback impulse correct" : "FAIL: knockback wrong");
+		return pass;
+	}
+
+	// Chunk 5: the player-style death hook. A lethal hit marks the unit dead and
+	// runs OnDeath, but (unlike a skeleton) it stays in the tree — it isn't freed.
+	private bool TestDeathHook()
+	{
+		GD.Print("=== UnitTest: death hook (player-style, no free) ===");
+
+		var u = new DeathHookUnit { MaxHealth = 30f };
+		AddChild(u);                 // Health = 30
+		u.TakeDamage(40f);           // lethal
+
+		bool pass = u.IsDead && u.OnDeathCalled && IsInstanceValid(u) && u.IsInsideTree();
+		GD.Print($"dead={u.IsDead}, hookRan={u.OnDeathCalled}, stillInTree={u.IsInsideTree()}");
+		GD.Print(pass ? "PASS: died without being freed" : "FAIL: death hook wrong");
+		return pass;
+	}
+
+	// Chunk 5: a skeleton chases the nearest enemy-team unit and melees it on
+	// contact. Frame-stepped: place a stationary player-team target and a skeleton
+	// 6 m away, run physics, then assert it closed in and dealt damage.
+	private async Task<bool> TestChase()
+	{
+		GD.Print("=== UnitTest: skeleton chase + melee ===");
+
+		// Clear the leftover bodies from the earlier sync tests so they don't run
+		// their own AI during the frames we step here.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Stationary player-team target at the origin (plain Unit = no AI, no movement).
+		var target = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(target);
+		target.GlobalPosition = Vector3.Zero;
+
+		var skel = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(skel);
+		skel.GlobalPosition = new Vector3(0f, 0f, 6f);
+
+		float startDist = skel.GlobalPosition.DistanceTo(target.GlobalPosition);
+		GD.Print($"start dist={startDist:0.00}, attackRange={skel.AttackRange}");
+
+		// ~3.3 s of physics at 60 Hz — enough to close 6 m at 4 m/s and land a few hits.
+		for (int i = 0; i < 200; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float endDist = skel.GlobalPosition.DistanceTo(target.GlobalPosition);
+		bool closed = endDist <= skel.AttackRange + 0.3f;
+		bool damaged = target.Health < target.MaxHealth;
+		GD.Print($"end dist={endDist:0.00}, target HP={target.Health}/{target.MaxHealth}");
+
+		bool pass = closed && damaged;
+		GD.Print(pass
+			? "PASS: skeleton chased into range and dealt damage"
+			: $"FAIL: closed={closed}, damaged={damaged}");
 		return pass;
 	}
 }

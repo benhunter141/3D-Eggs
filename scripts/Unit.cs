@@ -23,6 +23,9 @@ public partial class Unit : CharacterBody3D
 	public override void _Ready()
 	{
 		Health = MaxHealth;
+		// Every fighter joins this group so others can find targets cheaply
+		// (skeletons scan it for the nearest enemy-team unit).
+		AddToGroup("units");
 	}
 
 	// Take `amount` damage. `hitDirection` points the way we'd be shoved (attacker→us);
@@ -50,6 +53,13 @@ public partial class Unit : CharacterBody3D
 	{
 		IsDead = true;
 		GD.Print($"[Unit] {Name} died");
+		OnDeath();
+	}
+
+	// What actually happens to the body on death. Default: vanish (skeletons).
+	// The player overrides this to stay in the scene and show a game-over state.
+	protected virtual void OnDeath()
+	{
 		QueueFree();
 	}
 

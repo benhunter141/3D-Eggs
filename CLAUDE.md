@@ -73,12 +73,13 @@ momentum if attempted early.
       swing a sword. Tune until it *feels good*. (§7 Chunks 1–2)
       Progress: WASD + mouse aim + follow camera (Chunk 1 ✓); sword swing built (Chunk 2,
       pending user feel-check).
-- [~] **M2 — Skeletons:** chase the player, take damage, die; sword knockback; player
-      can be hit and die. (§7 Chunks 3–5)
+- [x] **M2 — Skeletons:** chase the player, take damage, die; sword knockback; player
+      can be hit and die. (§7 Chunks 3–5) ✅ DONE
       Progress: `Unit` base (Team/Health/TakeDamage/Die + knockback-decay) built;
       `Player` refactored onto it; sword deals real damage; skeleton dummy dies in 3
       hits (Chunk 3 ✓); sword knockback flings skeletons along the hit direction
-      (Chunk 4 ✓). Both headless-tested. Remaining: skeleton AI + player death (Chunk 5).
+      (Chunk 4 ✓); skeletons chase the nearest enemy-team unit and melee on contact,
+      player has a game-over state on death (Chunk 5 ✓). All headless-tested.
 - [ ] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
       stones) and return to formation. (§7 Chunks 6–8)
 - [ ] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice &
@@ -154,9 +155,13 @@ works the same for everyone.
   along the hit direction via `TakeDamage`; `Unit` decays it each frame; `Enemy` already
   folds it into `MoveAndSlide`. Headless `UnitTest` verifies the impulse (flat, correct
   speed/direction, dead units ignore it). → User confirms skeletons fly back.
-- [ ] **Chunk 5 — Skeleton AI + player can die.** Skeletons chase the nearest enemy-team
-  unit and melee on contact (damage, no knockback). Player has health + a game-over
-  state. → User confirms a skeleton chases, hits, and can kill the player.
+- [x] **Chunk 5 — Skeleton AI + player can die.** `Enemy` chases the nearest enemy-team
+  unit (scans the shared `units` group), faces it, and melees on contact (`AttackDamage`
+  every `AttackCooldown`, no knockback). `Unit.Die` now calls a virtual `OnDeath` hook —
+  skeletons free themselves; `Player` overrides it to freeze and show a `GAME OVER` label
+  (CanvasLayer in `Main.tscn`, `game_over` group) instead. Headless `UnitTest` adds a
+  frame-stepped chase test + a death-hook test. → User confirms a skeleton chases, hits,
+  and can kill the player.
 
 ### Phase C — Allies (M3)
 - [ ] **Chunk 6 — Allies + formation (movement only).** `Ally : Unit`; 4 allies steer to
