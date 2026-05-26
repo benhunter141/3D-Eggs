@@ -71,7 +71,8 @@ momentum if attempted early.
       flat ground + a player capsule visible. ✅ DONE
 - [~] **M1 — Twin-stick melee feel ⭐ (top priority):** WASD move, mouse aim, click to
       swing a sword. Tune until it *feels good*. (§7 Chunks 1–2)
-      Progress: WASD + mouse aim + follow camera confirmed (Chunk 1 ✓). TODO: sword swing.
+      Progress: WASD + mouse aim + follow camera (Chunk 1 ✓); sword swing built (Chunk 2,
+      pending user feel-check).
 - [ ] **M2 — Skeletons:** chase the player, take damage, die; sword knockback; player
       can be hit and die. (§7 Chunks 3–5)
 - [ ] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
@@ -134,7 +135,7 @@ works the same for everyone.
   the player's position at a fixed offset (no rotation inherited). `Player.AimAtMouse()`
   raycasts camera→player-plane at the cursor and `LookAt`s it; red `FacingMarker` nub
   shows facing. **DONE & confirmed.**
-- [ ] **Chunk 2 — Sword swing.** Sword mesh on the player; left-click swings a ~0.2s arc
+- [x] **Chunk 2 — Sword swing.** Sword mesh on the player; left-click swings a ~0.2s arc
   with a cooldown; an `Area3D` arc hitbox is live during the swing and prints overlaps.
   Add an `attack` input action. → User confirms the swing feels responsive.
 

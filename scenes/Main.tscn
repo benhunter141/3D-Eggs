@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://b3degg0main01"]
+[gd_scene load_steps=17 format=3 uid="uid://b3degg0main01"]
 
 [ext_resource type="Script" path="res://scripts/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="2_camera"]
@@ -42,6 +42,17 @@ size = Vector3(0.2, 0.2, 0.7)
 [sub_resource type="StandardMaterial3D" id="Mat_marker"]
 albedo_color = Color(0.9, 0.2, 0.2, 1)
 
+[sub_resource type="BoxMesh" id="BoxMesh_sword"]
+size = Vector3(0.1, 0.1, 1.4)
+
+[sub_resource type="StandardMaterial3D" id="Mat_sword"]
+albedo_color = Color(0.78, 0.81, 0.86, 1)
+metallic = 0.6
+roughness = 0.35
+
+[sub_resource type="BoxShape3D" id="BoxShape_swordhit"]
+size = Vector3(0.6, 0.6, 1.5)
+
 [node name="Main" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
@@ -76,6 +87,21 @@ shape = SubResource("CapsuleShape_player")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -0.75)
 mesh = SubResource("BoxMesh_marker")
 surface_material_override/0 = SubResource("Mat_marker")
+
+[node name="SwordPivot" type="Node3D" parent="Player"]
+
+[node name="Sword" type="MeshInstance3D" parent="Player/SwordPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -0.9)
+mesh = SubResource("BoxMesh_sword")
+surface_material_override/0 = SubResource("Mat_sword")
+
+[node name="Hitbox" type="Area3D" parent="Player/SwordPivot"]
+monitoring = false
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Player/SwordPivot/Hitbox"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -0.9)
+shape = SubResource("BoxShape_swordhit")
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 14, 14)

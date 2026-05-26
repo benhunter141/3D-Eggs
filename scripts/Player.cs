@@ -1,13 +1,41 @@
 using Godot;
+using System.Collections.Generic;
 
 // The player capsule. Twin-stick movement on the flat XZ plane.
-// WASD (or left stick) moves; accel/friction give it a tunable "feel".
+// WASD (or left stick) moves; mouse aims; left-click swings the sword.
 public partial class Player : CharacterBody3D
 {
 	// --- Tunable feel knobs (editable in the Inspector too) ---
 	[Export] public float Speed = 8.0f;         // top movement speed (m/s)
 	[Export] public float Acceleration = 60.0f; // how fast we ramp up to Speed
 	[Export] public float Friction = 50.0f;     // how fast we slow to a stop
+
+	// --- Sword swing ---
+	[Export] public float SwingArcDegrees = 150.0f;  // total left-to-right sweep
+	[Export] public float SwingDuration = 0.2f;      // seconds the blade is sweeping
+	[Export] public float SwingCooldown = 0.35f;     // delay after a swing before the next
+	[Export] public float SwordRestDegrees = -55.0f; // idle angle of the blade (held to the side)
+
+	private Node3D _swordPivot;
+	private Area3D _hitbox;
+	private CollisionShape3D _hitboxShape;
+
+	// Bodies already reported this swing, so each gets one print per swing.
+	private readonly HashSet<Node3D> _hitThisSwing = new();
+
+	private bool _swinging;
+	private float _swingTimer;    // counts up 0..SwingDuration while swinging
+	private float _cooldownTimer; // counts down; > 0 blocks a new swing
+
+	public override void _Ready()
+	{
+		_swordPivot = GetNode<Node3D>("SwordPivot");
+		_hitbox = GetNode<Area3D>("SwordPivot/Hitbox");
+		_hitboxShape = GetNode<CollisionShape3D>("SwordPivot/Hitbox/CollisionShape3D");
+
+		SetSwordAngle(SwordRestDegrees);
+		SetHitboxActive(false);
+	}
 
 	public override void _PhysicsProcess(double delta)
 	{
@@ -30,6 +58,67 @@ public partial class Player : CharacterBody3D
 		MoveAndSlide();
 
 		AimAtMouse();
+		UpdateSwing(dt);
+	}
+
+	// Drive the swing state machine: trigger on attack, sweep the blade across a
+	// timed arc, keep the hitbox live during the sweep, then cool down.
+	private void UpdateSwing(float dt)
+	{
+		if (_cooldownTimer > 0f)
+			_cooldownTimer -= dt;
+
+		if (!_swinging && _cooldownTimer <= 0f && Input.IsActionJustPressed("attack"))
+			StartSwing();
+
+		if (!_swinging)
+			return;
+
+		_swingTimer += dt;
+		float t = Mathf.Clamp(_swingTimer / SwingDuration, 0f, 1f);
+		float half = SwingArcDegrees * 0.5f;
+		SetSwordAngle(Mathf.Lerp(half, -half, t)); // sweep the player's right side to the left
+
+		// Poll overlaps each frame — bodies can enter mid-sweep as the box rotates.
+		foreach (Node3D body in _hitbox.GetOverlappingBodies())
+		{
+			if (body == this)
+				continue;
+			if (_hitThisSwing.Add(body))
+				GD.Print($"[Sword] hit {body.Name}");
+		}
+
+		if (_swingTimer >= SwingDuration)
+			EndSwing();
+	}
+
+	private void StartSwing()
+	{
+		_swinging = true;
+		_swingTimer = 0f;
+		_hitThisSwing.Clear();
+		SetHitboxActive(true);
+	}
+
+	private void EndSwing()
+	{
+		_swinging = false;
+		_cooldownTimer = SwingCooldown;
+		SetHitboxActive(false);
+		SetSwordAngle(SwordRestDegrees);
+	}
+
+	private void SetSwordAngle(float degrees)
+	{
+		Vector3 rot = _swordPivot.RotationDegrees;
+		rot.Y = degrees;
+		_swordPivot.RotationDegrees = rot;
+	}
+
+	private void SetHitboxActive(bool active)
+	{
+		_hitbox.Monitoring = active;
+		_hitboxShape.Disabled = !active;
 	}
 
 	// Rotate the player to face the mouse cursor. We shoot a ray from the camera
