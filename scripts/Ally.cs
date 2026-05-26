@@ -10,7 +10,7 @@ public partial class Ally : Unit
 	[Export] public float Acceleration = 60.0f;  // how fast it ramps toward the target velocity
 	[Export] public float ArriveRadius = 1.5f;   // begin slowing within this distance of the slot
 	[Export] public float StopRadius = 0.12f;    // close enough — hold position
-	[Export] public float TurnLerp = 10.0f;      // how fast it rotates to face its travel direction
+	[Export] public float TurnLerp = 10.0f;      // how fast it rotates to match the player's facing
 
 	// Local-space slot offset relative to the player (forward is -Z, so +Z trails behind).
 	// Set per-ally in the scene; rotated by the player's yaw each frame to get the world slot.
@@ -61,9 +61,10 @@ public partial class Ally : Unit
 		Velocity = horizontal + KnockbackVelocity;
 		MoveAndSlide();
 
-		// Face the way we're actually heading (only while moving enough to matter).
-		if (horizontal.LengthSquared() > 0.04f)
-			FaceTowards(GlobalPosition + horizontal, dt);
+		// Face the same way the player does (the player aims at the mouse), so the whole
+		// squad points where you're aiming rather than where each ally happens to walk.
+		if (_player != null)
+			FacePlayerYaw(dt);
 	}
 
 	// World position of this ally's formation slot: the local offset rotated by the
@@ -75,17 +76,12 @@ public partial class Ally : Unit
 		return _player.GlobalPosition + _player.GlobalTransform.Basis * FormationOffset;
 	}
 
-	// Smoothly rotate to face a world point on the flat plane (forward is -Z).
-	private void FaceTowards(Vector3 worldPos, float dt)
+	// Smoothly match the player's yaw so the ally faces wherever the player is aiming.
+	private void FacePlayerYaw(float dt)
 	{
-		Vector3 flat = new Vector3(worldPos.X, GlobalPosition.Y, worldPos.Z);
-		if (GlobalPosition.DistanceSquaredTo(flat) < 0.0025f)
-			return;
-
-		float desiredYaw = Mathf.Atan2(flat.X - GlobalPosition.X, flat.Z - GlobalPosition.Z);
 		float t = 1f - Mathf.Exp(-TurnLerp * dt);
 		Vector3 rot = Rotation;
-		rot.Y = Mathf.LerpAngle(rot.Y, desiredYaw, t);
+		rot.Y = Mathf.LerpAngle(rot.Y, _player.Rotation.Y, t);
 		Rotation = rot;
 	}
 }
