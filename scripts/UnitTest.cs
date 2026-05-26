@@ -29,8 +29,9 @@ public partial class UnitTest : Node3D
 		bool chase = await TestChase();
 		bool formation = await TestFormation();
 		bool allyCombat = await TestAllyCombat();
+		bool stones = await TestStoneThrow();
 
-		GD.Print(death && knock && hook && chase && formation && allyCombat
+		GD.Print(death && knock && hook && chase && formation && allyCombat && stones
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -272,6 +273,54 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: ally engages in-leash enemies, faces them, ignores far ones, and re-forms"
 			: $"FAIL: engaged={engaged}, stayedClose={stayedClose}, facing={facing}, ignored={ignored}, reformed={reformed}");
+		return pass;
+	}
+
+	// Chunk 8: a stone-throwing ally pelts an enemy in leash range from where it stands.
+	// Park a stone-ally in its slot with a stationary enemy a few metres away (inside both
+	// leash and throw range); after a couple of seconds the enemy should have taken stone
+	// damage WITHOUT the ally charging into melee — ranged allies hold their ground.
+	private async Task<bool> TestStoneThrow()
+	{
+		GD.Print("=== UnitTest: ally stone throwing (ranged) ===");
+
+		// Wipe leftover units (and any in-flight stones) so nothing perturbs the test.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var player = new Node3D();
+		AddChild(player);
+		player.AddToGroup("player");
+		player.GlobalPosition = Vector3.Zero;
+
+		var ally = GD.Load<PackedScene>("res://scenes/Ally.tscn").Instantiate<Ally>();
+		ally.Weapon = Ally.WeaponType.Stones;          // set before _Ready so it loads the stone scene
+		ally.FormationOffset = new Vector3(2f, 0f, 1.5f);
+		AddChild(ally);
+		ally.GlobalPosition = ally.SlotWorldPosition();   // parked in its slot
+
+		// Stationary enemy ~2.5 m from the slot: inside both leash and throw range.
+		var enemy = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		AddChild(enemy);
+		enemy.GlobalPosition = new Vector3(4f, 0f, 3f);
+		float toSlot = ally.SlotWorldPosition().DistanceTo(enemy.GlobalPosition);
+		GD.Print($"enemy {toSlot:0.00} m from slot (leash={ally.LeashRadius}, throwRange={ally.ThrowRange}) -> should be pelted");
+
+		// ~2 s: enough for a throw or two to land at StoneDamage each.
+		for (int i = 0; i < 120; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		bool hit = enemy.Health < enemy.MaxHealth;
+		float allyToSlot = ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition());
+		bool heldGround = allyToSlot < 1.0f;   // didn't rush into melee like a fist-ally would
+		GD.Print($"enemy HP={enemy.Health}/{enemy.MaxHealth} (hit={hit}), " +
+			$"ally {allyToSlot:0.00} m from slot (heldGround={heldGround})");
+
+		bool pass = hit && heldGround;
+		GD.Print(pass
+			? "PASS: stone-ally pelted the enemy from range without charging in"
+			: $"FAIL: hit={hit}, heldGround={heldGround}");
 		return pass;
 	}
 }

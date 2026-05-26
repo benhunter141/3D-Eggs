@@ -80,15 +80,18 @@ momentum if attempted early.
       hits (Chunk 3 ✓); sword knockback flings skeletons along the hit direction
       (Chunk 4 ✓); skeletons chase the nearest enemy-team unit and melee on contact,
       player has a game-over state on death (Chunk 5 ✓). All headless-tested.
-- [~] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
-      stones) and return to formation. (§7 Chunks 6–8)
+- [x] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
+      stones) and return to formation. (§7 Chunks 6–8) ✅ DONE
       Progress: `Ally : Unit` steers to a player-relative formation slot with
       arrive-slowdown; the slot offset rotates with the player's facing, so the squad
-      turns with you. 4 allies wired into `Main.tscn` (Chunk 6 ✓). Allies now brawl on a
+      turns with you. 4 allies wired into `Main.tscn` (Chunk 6 ✓). Allies brawl on a
       loose leash: engage the nearest enemy within `LeashRadius` (6 m) of their slot,
       chase + punch with fists (8 dmg, no knockback), and re-form when none are near —
-      leash gated on the slot so they don't scatter (Chunk 7 ✓). Stones next (Chunk 8).
-      Headless `UnitTest` verifies follow + slot rotation + loose-leash combat.
+      leash gated on the slot so they don't scatter (Chunk 7 ✓). `Ally.Weapon` now picks
+      Fists or Stones: stone-throwers hold their ground and lob a `Stone` projectile
+      (12 dmg, no knockback) at in-leash targets on a cooldown. Squad = 2 fists + 2 stones
+      in `Main.tscn` (Chunk 8 ✓). Headless `UnitTest` verifies follow + slot rotation +
+      loose-leash fists + ranged stone-throwing.
 - [ ] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice &
       tuning. (§7 Chunks 9–10)
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
@@ -184,8 +187,13 @@ works the same for everyone.
   ally) prevents scattering. Headless `UnitTest` adds a combat test: engages an in-leash
   enemy, ignores a far one, and re-forms. → User confirms they engage nearby skeletons
   without scattering.
-- [ ] **Chunk 8 — Stone-throwing allies.** A `Stone` projectile thrown at targets in leash
-  range on a cooldown. Squad = 2 fists + 2 stones. → User confirms ranged allies hit.
+- [x] **Chunk 8 — Stone-throwing allies.** `Stone.cs`/`Stone.tscn`: a projectile that flies
+  straight (aimed at the target on launch), proximity-hits enemy-team units for `Damage`
+  (no knockback), and frees on hit or `MaxLifetime`. `Ally.Weapon` (Fists|Stones): stone
+  allies hold near their slot and lob a stone at in-leash targets every `ThrowCooldown`
+  (12 dmg), closing in only if the target is beyond `ThrowRange`. Squad = 2 fists (Ally1/2)
+  + 2 stones (Ally3/4) in `Main.tscn`. Headless `UnitTest` adds a ranged test (pelts an
+  in-leash enemy without charging). → User confirms ranged allies hit.
 
 ### Phase D — Vertical slice (M4)
 - [ ] **Chunk 9 — 5v5 encounter + win/lose.** A `GameManager` spawns player + 4 allies vs

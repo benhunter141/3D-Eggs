@@ -1,24 +1,35 @@
 using Godot;
 
 // A friendly fighter that follows the player in formation and brawls on a LOOSE LEASH:
-// it engages enemies only while one is within LeashRadius of its formation slot, chasing
-// and punching with fists (damage, no knockback), then falls back to its slot when none
-// are near. Measuring the leash from the SLOT (not the ally) is what stops the squad from
-// scattering — an ally never wanders further than one leash from where it belongs.
-// Movement/formation logic is from Chunk 6; combat is layered on top here (Chunk 7).
+// it engages enemies only while one is within LeashRadius of its formation slot, then
+// falls back to its slot when none are near. Measuring the leash from the SLOT (not the
+// ally) is what stops the squad from scattering — an ally never wanders further than one
+// leash from where it belongs.
+// Two weapon types (Weapon): Fists rush into melee range and punch; Stones hang back and
+// lob a projectile on a cooldown. Both deal damage with NO knockback — only the player's
+// sword shoves. Formation is from Chunk 6; fists from Chunk 7; stones added in Chunk 8.
 public partial class Ally : Unit
 {
+	public enum WeaponType { Fists, Stones }
+
 	[Export] public float MoveSpeed = 10.0f;     // top follow speed (m/s); > player Speed so it can catch up
 	[Export] public float Acceleration = 60.0f;  // how fast it ramps toward the target velocity
 	[Export] public float ArriveRadius = 1.5f;   // begin slowing within this distance of the slot
 	[Export] public float StopRadius = 0.12f;    // close enough — hold position
 	[Export] public float TurnLerp = 10.0f;      // how fast it rotates to match the player's facing
 
-	// --- Combat (fists, loose leash) ---
+	// --- Combat (loose leash) ---
+	[Export] public WeaponType Weapon = WeaponType.Fists; // fist-fighter or stone-thrower
 	[Export] public float LeashRadius = 6.0f;    // engage enemies within this distance of the slot
-	[Export] public float AttackRange = 1.6f;    // stop & swing once this close to the target
-	[Export] public float AttackDamage = 8.0f;   // fist damage per hit (no knockback)
-	[Export] public float AttackCooldown = 0.8f; // seconds between fist hits
+	[Export] public float AttackRange = 1.6f;    // (fists) stop & swing once this close to the target
+	[Export] public float AttackDamage = 8.0f;   // (fists) damage per punch (no knockback)
+	[Export] public float AttackCooldown = 0.8f; // (fists) seconds between punches
+
+	// --- Ranged (stones) ---
+	[Export] public float ThrowRange = 7.0f;     // (stones) throw at targets within this distance, else close in
+	[Export] public float StoneDamage = 12.0f;   // (stones) damage carried by each thrown stone (no knockback)
+	[Export] public float ThrowCooldown = 1.2f;  // (stones) seconds between throws
+	[Export] public PackedScene StoneScene;      // (stones) projectile to spawn; falls back to res://scenes/Stone.tscn
 
 	// Local-space slot offset relative to the player (forward is -Z, so +Z trails behind).
 	// Set per-ally in the scene; rotated by the player's yaw each frame to get the world slot.
@@ -33,6 +44,10 @@ public partial class Ally : Unit
 		base._Ready();
 		// The player tags itself into the "player" group on ready; grab it once.
 		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
+
+		// Stone-throwers need a projectile scene; auto-load one if none was wired in.
+		if (Weapon == WeaponType.Stones && StoneScene == null)
+			StoneScene = GD.Load<PackedScene>("res://scenes/Stone.tscn");
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -65,15 +80,28 @@ public partial class Ally : Unit
 			FaceTowards(target.GlobalPosition, dt);
 			facingHandled = true;
 
-			if (dist > AttackRange)
+			if (Weapon == WeaponType.Fists)
 			{
-				desiredVel = toTarget.Normalized() * MoveSpeed;
+				// Fists: rush into melee range, then punch on cooldown.
+				if (dist > AttackRange)
+					desiredVel = toTarget.Normalized() * MoveSpeed;
+				else if (_attackTimer <= 0f)
+				{
+					target.TakeDamage(AttackDamage);   // fists: damage only, no shove
+					_attackTimer = AttackCooldown;
+					GD.Print($"[Ally] {Name} punched {target.Name} for {AttackDamage}");
+				}
 			}
-			else if (_attackTimer <= 0f)
+			else
 			{
-				target.TakeDamage(AttackDamage);   // fists: damage only, no shove
-				_attackTimer = AttackCooldown;
-				GD.Print($"[Ally] {Name} punched {target.Name} for {AttackDamage}");
+				// Stones: hang back and pelt; only close in when the target is out of throw range.
+				if (dist > ThrowRange)
+					desiredVel = toTarget.Normalized() * MoveSpeed;
+				else if (_attackTimer <= 0f)
+				{
+					ThrowStoneAt(target);
+					_attackTimer = ThrowCooldown;
+				}
 			}
 		}
 		else if (_player != null)
@@ -102,6 +130,24 @@ public partial class Ally : Unit
 		// in combat, FaceTowards already aimed us at the target.
 		if (!facingHandled && _player != null)
 			FacePlayerYaw(dt);
+	}
+
+	// Spawn a Stone at our feet aimed at the target and let it fly (Chunk 8). Added to our
+	// parent so it lives independently of us, and tagged with our team so it never hits
+	// friendlies. Stones deal damage with no knockback.
+	private void ThrowStoneAt(Unit target)
+	{
+		if (StoneScene == null)
+		{
+			GD.PrintErr($"[Ally] {Name} is a stone-thrower but has no StoneScene");
+			return;
+		}
+		var stone = StoneScene.Instantiate<Stone>();
+		stone.Damage = StoneDamage;
+		GetParent().AddChild(stone);
+		stone.GlobalPosition = GlobalPosition;
+		stone.Launch(target.GlobalPosition - GlobalPosition, Team);
+		GD.Print($"[Ally] {Name} threw a stone at {target.Name}");
 	}
 
 	// Nearest living enemy-team unit whose distance to OUR SLOT is within LeashRadius.
