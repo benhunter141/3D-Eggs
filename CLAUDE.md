@@ -73,8 +73,11 @@ momentum if attempted early.
       swing a sword. Tune until it *feels good*. (§7 Chunks 1–2)
       Progress: WASD + mouse aim + follow camera (Chunk 1 ✓); sword swing built (Chunk 2,
       pending user feel-check).
-- [ ] **M2 — Skeletons:** chase the player, take damage, die; sword knockback; player
+- [~] **M2 — Skeletons:** chase the player, take damage, die; sword knockback; player
       can be hit and die. (§7 Chunks 3–5)
+      Progress: `Unit` base (Team/Health/TakeDamage/Die + knockback-decay) built;
+      `Player` refactored onto it; sword deals real damage; skeleton dummy dies in 3
+      hits (Chunk 3 ✓, headless-tested).
 - [ ] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
       stones) and return to formation. (§7 Chunks 6–8)
 - [ ] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice &
@@ -140,10 +143,12 @@ works the same for everyone.
   Add an `attack` input action. → User confirms the swing feels responsive.
 
 ### Phase B — Skeletons & combat (M2)
-- [ ] **Chunk 3 — `Unit`/health foundation + damage dummy.** Build `Unit` (`Health`,
-  `Team`, `TakeDamage`, `Die`); refactor `Player` onto it. Drop in one stationary
-  skeleton the sword kills. → Headless test prints damage/death; user confirms the
-  dummy dies after N hits.
+- [x] **Chunk 3 — `Unit`/health foundation + damage dummy.** Built `Unit`
+  (`Team`, `Health`, `TakeDamage`, `Die`, knockback-decay groundwork); refactored
+  `Player` onto it so the sword deals `SwordDamage` to enemy-team `Unit`s. Added
+  `Enemy` (`scenes/Skeleton.tscn`), one instanced in `Main.tscn`, dies in 3 hits.
+  Headless test `scenes/Tests/UnitTest.tscn` confirms the damage/death pipeline.
+  → User confirms the dummy dies after 3 sword hits.
 - [ ] **Chunk 4 — Sword knockback.** Sword hits apply a knockback impulse along the hit
   direction; `Unit` decays it each frame. → User confirms skeletons fly back.
 - [ ] **Chunk 5 — Skeleton AI + player can die.** Skeletons chase the nearest enemy-team

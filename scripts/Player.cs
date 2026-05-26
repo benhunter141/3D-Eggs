@@ -3,7 +3,8 @@ using System.Collections.Generic;
 
 // The player capsule. Twin-stick movement on the flat XZ plane.
 // WASD (or left stick) moves; mouse aims; left-click swings the sword.
-public partial class Player : CharacterBody3D
+// Extends Unit so it shares the team/health/damage pipeline with allies and enemies.
+public partial class Player : Unit
 {
 	// --- Tunable feel knobs (editable in the Inspector too) ---
 	[Export] public float Speed = 8.0f;         // top movement speed (m/s)
@@ -11,6 +12,7 @@ public partial class Player : CharacterBody3D
 	[Export] public float Friction = 50.0f;     // how fast we slow to a stop
 
 	// --- Sword swing ---
+	[Export] public float SwordDamage = 40.0f;       // damage per enemy hit per swing
 	[Export] public float SwingArcDegrees = 150.0f;  // total right-to-left sweep
 	[Export] public float SwingDuration = 0.2f;      // seconds the blade is sweeping
 	[Export] public float SwingCooldown = 0.35f;     // delay after a swing before the next
@@ -30,6 +32,8 @@ public partial class Player : CharacterBody3D
 
 	public override void _Ready()
 	{
+		base._Ready();   // init Health from MaxHealth
+
 		_swordPivot = GetNode<Node3D>("SwordPivot");
 		_hitbox = GetNode<Area3D>("SwordPivot/Hitbox");
 		_hitboxShape = GetNode<CollisionShape3D>("SwordPivot/Hitbox/CollisionShape3D");
@@ -87,12 +91,18 @@ public partial class Player : CharacterBody3D
 		SetSwordAngle(Mathf.Lerp(-half, half, t)); // sweep from the right (-) to the left (+)
 
 		// Poll overlaps each frame — bodies can enter mid-sweep as the box rotates.
+		// Each body is struck at most once per swing; only damage enemy-team Units.
 		foreach (Node3D body in _hitbox.GetOverlappingBodies())
 		{
-			if (body == this)
+			if (body == this || !_hitThisSwing.Add(body))
 				continue;
-			if (_hitThisSwing.Add(body))
-				GD.Print($"[Sword] hit {body.Name}");
+
+			if (body is Unit unit && unit.Team != Team)
+			{
+				Vector3 hitDir = unit.GlobalPosition - GlobalPosition;
+				unit.TakeDamage(SwordDamage, hitDir);  // knockback strength added in Chunk 4
+				GD.Print($"[Sword] {Name} hit {unit.Name} for {SwordDamage}");
+			}
 		}
 
 		if (_swingTimer >= SwingDuration)

@@ -1,7 +1,8 @@
-[gd_scene load_steps=17 format=3 uid="uid://b3degg0main01"]
+[gd_scene load_steps=18 format=3 uid="uid://b3degg0main01"]
 
 [ext_resource type="Script" path="res://scripts/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="2_camera"]
+[ext_resource type="PackedScene" path="res://scenes/Skeleton.tscn" id="3_skeleton"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat_1"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -108,3 +109,6 @@ transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 
 script = ExtResource("2_camera")
 Target = NodePath("../Player")
 Offset = Vector3(0, 13, 14)
+
+[node name="Skeleton" parent="." instance=ExtResource("3_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -6)
