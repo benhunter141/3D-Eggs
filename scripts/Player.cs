@@ -13,6 +13,7 @@ public partial class Player : Unit
 
 	// --- Sword swing ---
 	[Export] public float SwordDamage = 40.0f;       // damage per enemy hit per swing
+	[Export] public float SwordKnockback = 10.0f;    // shove speed (m/s) flung along the hit direction
 	[Export] public float SwingArcDegrees = 150.0f;  // total right-to-left sweep
 	[Export] public float SwingDuration = 0.2f;      // seconds the blade is sweeping
 	[Export] public float SwingCooldown = 0.35f;     // delay after a swing before the next
@@ -100,8 +101,8 @@ public partial class Player : Unit
 			if (body is Unit unit && unit.Team != Team)
 			{
 				Vector3 hitDir = unit.GlobalPosition - GlobalPosition;
-				unit.TakeDamage(SwordDamage, hitDir);  // knockback strength added in Chunk 4
-				GD.Print($"[Sword] {Name} hit {unit.Name} for {SwordDamage}");
+				unit.TakeDamage(SwordDamage, hitDir, SwordKnockback);  // shove flings them away
+				GD.Print($"[Sword] {Name} hit {unit.Name} for {SwordDamage} (knockback {SwordKnockback})");
 			}
 		}
 

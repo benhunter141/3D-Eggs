@@ -2,7 +2,7 @@ using Godot;
 
 // Shared base for every fighter — Player, Ally, Enemy all extend this so combat
 // (team, health, damage, death, knockback) works identically for everyone.
-// Knockback lives here and decays each frame; the sword starts feeding it in Chunk 4.
+// Knockback lives here and decays each frame; the player's sword feeds it on hit.
 public partial class Unit : CharacterBody3D
 {
 	public enum TeamId { Player, Enemy }
@@ -17,13 +17,16 @@ public partial class Unit : CharacterBody3D
 	// Lingering shove velocity; subclasses fold this into their MoveAndSlide.
 	protected Vector3 KnockbackVelocity = Vector3.Zero;
 
+	// Read-only view for debugging / headless tests.
+	public Vector3 CurrentKnockback => KnockbackVelocity;
+
 	public override void _Ready()
 	{
 		Health = MaxHealth;
 	}
 
 	// Take `amount` damage. `hitDirection` points the way we'd be shoved (attacker→us);
-	// knockbackStrength 0 means no shove — only the player's sword passes >0 (Chunk 4).
+	// knockbackStrength 0 means no shove — only the player's sword passes >0.
 	public virtual void TakeDamage(float amount, Vector3 hitDirection = default, float knockbackStrength = 0.0f)
 	{
 		if (IsDead)

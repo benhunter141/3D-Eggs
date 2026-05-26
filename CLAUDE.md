@@ -77,7 +77,8 @@ momentum if attempted early.
       can be hit and die. (§7 Chunks 3–5)
       Progress: `Unit` base (Team/Health/TakeDamage/Die + knockback-decay) built;
       `Player` refactored onto it; sword deals real damage; skeleton dummy dies in 3
-      hits (Chunk 3 ✓, headless-tested).
+      hits (Chunk 3 ✓); sword knockback flings skeletons along the hit direction
+      (Chunk 4 ✓). Both headless-tested. Remaining: skeleton AI + player death (Chunk 5).
 - [ ] **M3 — Allies in formation:** loose-leash followers that fight (fists + thrown
       stones) and return to formation. (§7 Chunks 6–8)
 - [ ] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice &
@@ -149,8 +150,10 @@ works the same for everyone.
   `Enemy` (`scenes/Skeleton.tscn`), one instanced in `Main.tscn`, dies in 3 hits.
   Headless test `scenes/Tests/UnitTest.tscn` confirms the damage/death pipeline.
   → User confirms the dummy dies after 3 sword hits.
-- [ ] **Chunk 4 — Sword knockback.** Sword hits apply a knockback impulse along the hit
-  direction; `Unit` decays it each frame. → User confirms skeletons fly back.
+- [x] **Chunk 4 — Sword knockback.** Sword hits apply a `SwordKnockback` (10 m/s) impulse
+  along the hit direction via `TakeDamage`; `Unit` decays it each frame; `Enemy` already
+  folds it into `MoveAndSlide`. Headless `UnitTest` verifies the impulse (flat, correct
+  speed/direction, dead units ignore it). → User confirms skeletons fly back.
 - [ ] **Chunk 5 — Skeleton AI + player can die.** Skeletons chase the nearest enemy-team
   unit and melee on contact (damage, no knockback). Player has health + a game-over
   state. → User confirms a skeleton chases, hits, and can kill the player.
