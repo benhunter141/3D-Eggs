@@ -28,8 +28,10 @@ public partial class UnitTest : Node3D
 		bool hook = TestDeathHook();
 		bool chase = await TestChase();
 		bool formation = await TestFormation();
+		bool allyCombat = await TestAllyCombat();
 
-		GD.Print(death && knock && hook && chase && formation ? "=== ALL PASS ===" : "=== FAIL ===");
+		GD.Print(death && knock && hook && chase && formation && allyCombat
+			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
 
@@ -200,6 +202,70 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: ally holds its slot and the formation rotates with the player"
 			: $"FAIL: arrived={arrived}, slotMoved={slotMoved}, reformed={reformed}");
+		return pass;
+	}
+
+	// Chunk 7: loose-leash combat. An ally engages and punches an enemy parked near its
+	// slot, but ignores one far outside the leash — it holds formation instead of running
+	// off (no scatter). Stationary plain Units stand in for enemies so only the ally moves.
+	private async Task<bool> TestAllyCombat()
+	{
+		GD.Print("=== UnitTest: ally combat (loose leash + fists) ===");
+
+		// Wipe leftover units so stray AI/knockback doesn't perturb the ally.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var player = new Node3D();
+		AddChild(player);
+		player.AddToGroup("player");
+		player.GlobalPosition = Vector3.Zero;
+
+		var ally = GD.Load<PackedScene>("res://scenes/Ally.tscn").Instantiate<Ally>();
+		ally.FormationOffset = new Vector3(2f, 0f, 1.5f);
+		AddChild(ally);                                   // _Ready grabs the player anchor
+		ally.GlobalPosition = ally.SlotWorldPosition();   // start parked in its slot
+
+		// A stationary enemy a couple of metres from the slot — inside the leash.
+		var near = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		AddChild(near);
+		near.GlobalPosition = new Vector3(4f, 0f, 3f);
+		float nearToSlot = ally.SlotWorldPosition().DistanceTo(near.GlobalPosition);
+		GD.Print($"near enemy {nearToSlot:0.00} m from slot (leash={ally.LeashRadius}) -> should engage");
+
+		// ~2 s: long enough to close the gap and land a few punches.
+		for (int i = 0; i < 120; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		bool engaged = near.Health < near.MaxHealth;
+		bool stayedClose = ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition()) <= ally.LeashRadius;
+		GD.Print($"near enemy HP={near.Health}/{near.MaxHealth} (engaged={engaged}), " +
+			$"ally {ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition()):0.00} m from slot (stayedClose={stayedClose})");
+
+		// Now a fresh fight: enemy far outside the leash. The ally must ignore it and
+		// re-form on its slot rather than chasing across the map.
+		near.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var far = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		AddChild(far);
+		far.GlobalPosition = new Vector3(15f, 0f, 15f);
+		float farToSlot = ally.SlotWorldPosition().DistanceTo(far.GlobalPosition);
+		GD.Print($"far enemy {farToSlot:0.00} m from slot (leash={ally.LeashRadius}) -> should ignore");
+
+		for (int i = 0; i < 120; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		bool ignored = far.Health == far.MaxHealth;
+		bool reformed = ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition()) < 0.3f;
+		GD.Print($"far enemy HP={far.Health}/{far.MaxHealth} (ignored={ignored}), " +
+			$"ally {ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition()):0.00} m from slot (reformed={reformed})");
+
+		bool pass = engaged && stayedClose && ignored && reformed;
+		GD.Print(pass
+			? "PASS: ally engages in-leash enemies, ignores far ones, and re-forms"
+			: $"FAIL: engaged={engaged}, stayedClose={stayedClose}, ignored={ignored}, reformed={reformed}");
 		return pass;
 	}
 }

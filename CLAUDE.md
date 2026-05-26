@@ -84,8 +84,11 @@ momentum if attempted early.
       stones) and return to formation. (§7 Chunks 6–8)
       Progress: `Ally : Unit` steers to a player-relative formation slot with
       arrive-slowdown; the slot offset rotates with the player's facing, so the squad
-      turns with you. 4 allies wired into `Main.tscn`, movement only — combat next
-      (Chunk 6 ✓). Headless `UnitTest` verifies follow + slot rotation.
+      turns with you. 4 allies wired into `Main.tscn` (Chunk 6 ✓). Allies now brawl on a
+      loose leash: engage the nearest enemy within `LeashRadius` (6 m) of their slot,
+      chase + punch with fists (8 dmg, no knockback), and re-form when none are near —
+      leash gated on the slot so they don't scatter (Chunk 7 ✓). Stones next (Chunk 8).
+      Headless `UnitTest` verifies follow + slot rotation + loose-leash combat.
 - [ ] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice &
       tuning. (§7 Chunks 9–10)
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
@@ -174,9 +177,13 @@ works the same for everyone.
   allies find their anchor. `scenes/Ally.tscn` (blue capsule) ×4 in `Main.tscn`. No combat
   yet. Headless `UnitTest` adds a follow + slot-rotation check. → User confirms they hold
   formation while moving and turning.
-- [ ] **Chunk 7 — Ally combat (loose leash) + fists.** Allies attack skeletons within a
-  leash radius of their slot, then return when none are near. Fists = damage, no
-  knockback. → User confirms they engage nearby skeletons without scattering.
+- [x] **Chunk 7 — Ally combat (loose leash) + fists.** `Ally` engages the nearest enemy
+  whose distance to its formation *slot* is within `LeashRadius` (6 m), chases to
+  `AttackRange`, and punches (`AttackDamage` 8 every `AttackCooldown`, no knockback);
+  when none are in leash it falls back to the slot. Gating the leash on the slot (not the
+  ally) prevents scattering. Headless `UnitTest` adds a combat test: engages an in-leash
+  enemy, ignores a far one, and re-forms. → User confirms they engage nearby skeletons
+  without scattering.
 - [ ] **Chunk 8 — Stone-throwing allies.** A `Stone` projectile thrown at targets in leash
   range on a cooldown. Squad = 2 fists + 2 stones. → User confirms ranged allies hit.
 
