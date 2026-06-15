@@ -16,6 +16,18 @@ public partial class Unit : CharacterBody3D
 	[Export] public float MaxHealth = 100.0f;
 	[Export] public float KnockbackDecay = 14.0f;   // how fast a shove bleeds off (m/s per s)
 
+	// --- Staggered target re-acquisition (M5 crowds) ---
+	// Re-scanning UnitRegistry for the nearest foe EVERY physics frame is the crowd hotspot:
+	// it is O(opponents) per unit, so a 100-unit battle is ~O(n^2) of distance checks per
+	// frame. Instead each AI unit refreshes its pick only every TargetRescanInterval frames,
+	// spread across frames by a per-unit phase so the cost never spikes on one frame, and
+	// keeps tracking the cached target's LIVE position in between (only the "who is nearest"
+	// decision is throttled, not the chase). A dead/freed target forces an immediate re-scan.
+	[Export] public int TargetRescanInterval = 6;   // physics frames between nearest-foe re-scans
+
+	protected Unit CachedTarget;     // last picked target; reused between re-scans
+	private int _rescanCounter = -1; // counts down to the next re-scan; <0 until phase is seeded
+
 	// --- Hit feedback (juice) ---
 	[Export] public Color FlashColor = new Color(1f, 1f, 1f); // colour the body pops toward on a hit
 	[Export] public float FlashDuration = 0.12f;              // seconds for one flash to fade out
@@ -151,6 +163,31 @@ public partial class Unit : CharacterBody3D
 	{
 		KnockbackVelocity = KnockbackVelocity.MoveToward(Vector3.Zero, KnockbackDecay * dt);
 	}
+
+	// True on the frames this unit should re-scan UnitRegistry for its nearest target. Call
+	// once per physics frame; scan and store into CachedTarget only when it returns true.
+	// Seeds a random phase on first use so a crowd's scans fan out across frames rather than
+	// all landing together, and forces an immediate re-scan when the cached target just died
+	// or left the tree so a chaser never lingers on a corpse. Allocation-free (no closures).
+	protected bool ShouldRescanTarget()
+	{
+		int interval = Mathf.Max(1, TargetRescanInterval);
+		if (_rescanCounter < 0)
+			_rescanCounter = (int)(GD.Randi() % (uint)interval);   // per-unit phase offset
+
+		bool invalid = CachedTarget != null && (!IsInstanceValid(CachedTarget) || CachedTarget.IsDead);
+		if (invalid || --_rescanCounter <= 0)
+		{
+			_rescanCounter = interval;
+			return true;
+		}
+		return false;
+	}
+
+	// CachedTarget filtered to a still-living, valid unit — or null if it's gone. Use this
+	// (not CachedTarget directly) so a target that died between re-scans reads as no target.
+	protected Unit LiveTarget =>
+		CachedTarget != null && IsInstanceValid(CachedTarget) && !CachedTarget.IsDead ? CachedTarget : null;
 
 	// Kick the flash up to `amount` (keep the brighter value if already flashing).
 	private void Flash(float amount)

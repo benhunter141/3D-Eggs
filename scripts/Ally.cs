@@ -91,7 +91,11 @@ public partial class Ally : Unit
 		}
 		else
 		{
-			Unit target = FindTargetInLeash();
+			// Throttled leash scan (M5): re-pick our in-leash target only every few frames,
+			// but keep engaging the cached target's live position every frame.
+			if (ShouldRescanTarget())
+				CachedTarget = FindTargetInLeash();
+			Unit target = LiveTarget;
 			if (target != null)
 			{
 				// Combat: chase the in-leash enemy and strike on contact (no knockback).

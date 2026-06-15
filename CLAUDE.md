@@ -75,7 +75,13 @@ projectiles call `UnitRegistry.FindNearestOpponent(team, pos[, maxRange])` /
 marshalled a fresh Godot array across the C++↔C# boundary every frame (O(n) alloc × n
 scanners), the first wall for 50–100-unit crowds. Queries defensively skip dead/invalid
 entries. **When adding any unit/projectile that needs targets, use the registry, never a
-per-frame group scan.**
+per-frame group scan.** AI units further **throttle** the pick (M5, Chunk 18): instead of
+re-scanning every frame they call `Unit.ShouldRescanTarget()` → store into `CachedTarget`,
+which re-scans only every `TargetRescanInterval` frames (default 6, phase-staggered per
+unit so the cost spreads across frames) and reuses the cache in between while still chasing
+its LIVE position. A dead/freed cached target forces an immediate re-scan. Allocation-free
+(no per-frame closures). Cold-process A/B: ~halves the median physics step (100 units
+9.4→4.4 ms). Projectiles (Stone/Arrow) still scan every frame — they need exact proximity.
 
 **Match state:** `GameManager` (node in `Main.tscn`) is the single authority — each
 frame it declares LOSE if the player is dead, else WIN once all enemy units are cleared.
@@ -103,13 +109,14 @@ ended it only listens for the `restart` action (R / gamepad) → `ReloadCurrentS
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `FollowCamera.cs`,
-`GameManager.cs`, `SceneButton.cs`.
+`GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs` (M5 stress harness).
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable
 win/lose UI), `Levels/Level1_HoldTheLine.tscn` (captain + pike wall vs swordmen/bowmen),
 `Levels/Level2_Pincer.tscn` (two-flank swordman charge), `Levels/Level3_ArrowStorm.tscn`
 (advance under massed bowman fire), `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`,
-`Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Tests/UnitTest.tscn`. (Legacy `Main.tscn`
+`Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Tests/UnitTest.tscn`,
+`Tests/Crowd.tscn` (M5 stress sweep). (Legacy `Main.tscn`
 retired in Chunk 15 — git history keeps it.)
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
@@ -131,8 +138,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
       Chunks 11–16 done (Level Select shell; Pike + Pikeman + Brace; Swordman; Bowman + Arrow;
       Level 1 "Hold the Line"; Levels 2 "Pincer" & 3 "Arrow Storm" + objective labels).
-- [~] **M5 — Crowds:** scale to 50–100 units smoothly. Chunk 17 done (`UnitRegistry`
-      replaces the per-frame O(n²) group scans). Stress scene + LOD/throttle next.
+- [~] **M5 — Crowds:** scale to 50–100 units smoothly. Chunks 17–18 done (`UnitRegistry`
+      killed the per-frame O(n²) group scans; `Crowd.tscn` stress harness + staggered target
+      re-scan). 50 AND 100 units sit within the 60 FPS budget (median physics ~2.9 / ~4.4 ms
+      throttled). Crowd battle level (Chunk 19) next.
 - [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
 - [ ] **M8 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
@@ -257,11 +266,18 @@ cost first, then add a stress scene to measure, then ship a big battle.
   `UnitRegistry.FindNearestOpponent` / `Opponents`. Pure perf refactor — all 11 headless
   tests still pass, incl. a new registry test (buckets, nearest, max-range, skip-dead,
   unregister-on-free). See §5 "Target scanning".
-- [ ] **Chunk 18 — Stress scene + frame budget.** A `scenes/Tests/Crowd.tscn` (or headless
-  spawner) that drops N×N units (param up to ~100), prints physics-frame time / FPS, so we
-  can measure before/after. Add cheap throttling if needed: stagger target re-acquisition
-  (re-scan every few frames per unit, not every frame) and/or skip `FaceTowards` jitter at
-  rest. Measure 50 then 100 units; record numbers here.
+- [x] **Chunk 18 — Stress scene + frame budget.** `scenes/Tests/Crowd.tscn` + `CrowdTest.cs`
+  spawn two armies (Swordman/Bowman vs Pikemen) at a parametric crowd size and report the
+  MEDIAN physics-step ms over a sample window (median, not mean — C# GC pauses inflate the
+  mean at this scale; the min/p90 frame the GC tail). Cold-process A/B (`++ --count=N
+  --rescan=K`) is the trustworthy comparison — within one process the medians drift with run
+  order. Added the staggered target re-scan (`Unit.ShouldRescanTarget()`/`CachedTarget`,
+  `TargetRescanInterval`=6) across Enemy/Swordman/Bowman/Ally. **Numbers (cold-process
+  median physics step, 60 FPS budget = 16.67 ms):** N=50 scan-every-frame 5.7 ms → throttled
+  2.9 ms; N=100 9.4 → 4.4 ms — the throttle ~halves it and both sizes are well within budget
+  (even unthrottled 100 floors ~6 ms; `MoveAndSlide` physics, not the registry scan, is now
+  the dominant term). All 11 headless `UnitTest` checks still pass. `FaceTowards`-at-rest
+  skip wasn't needed — budget already met.
 - [ ] **Chunk 19 — A crowd battle level.** Once 100 units hold framerate, build one large
   hand-designed level (big phalanx vs a small army) + LevelSelect button. Tune for fun, not
   just for the counter.

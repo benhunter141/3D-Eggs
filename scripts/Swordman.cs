@@ -56,7 +56,11 @@ public partial class Swordman : Unit
 			_chargeTimer -= dt;
 
 		Vector3 chase = Vector3.Zero;
-		Unit target = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+		// Throttled nearest-foe pick (M5): re-scan only every few frames, but keep chasing the
+		// cached target's live position every frame.
+		if (ShouldRescanTarget())
+			CachedTarget = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+		Unit target = LiveTarget;
 
 		// Fresh acquire (had nobody last frame, have someone now) -> kick off a charge burst.
 		if (target != null && !_hadTarget)

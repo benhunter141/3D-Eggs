@@ -49,7 +49,11 @@ public partial class Bowman : Unit
 			_fireTimer -= dt;
 
 		Vector3 move = Vector3.Zero;
-		Unit target = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+		// Throttled nearest-foe pick (M5): re-scan only every few frames, but keep kiting the
+		// cached target's live position every frame.
+		if (ShouldRescanTarget())
+			CachedTarget = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+		Unit target = LiveTarget;
 		if (target != null)
 		{
 			Vector3 toTarget = target.GlobalPosition - GlobalPosition;
