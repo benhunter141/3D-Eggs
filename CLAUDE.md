@@ -111,7 +111,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice.
       Chunk 9 done (5v5 encounter + win/lose/restart). Standalone juice (Chunk 10) is
       **deferred** — it now folds into the per-level tuning passes under M4.5.
-- [ ] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
+- [~] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
       a **pikeman captain** leading a **braceable pike wall** across hand-designed
       medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
       (Chunks 11–16 in §7.)
@@ -194,7 +194,7 @@ favour of a **level-select front-end + hand-designed phalanx battles**.
    the braced phalanx across open ground **under fire** to close. Endurance.
 
 **Chunks (the WORKFLOW box above still applies — build the first `[ ]`):**
-- [ ] **Chunk 11 — Level Select shell + scene routing.** `scenes/Menu/LevelSelect.tscn`
+- [x] **Chunk 11 — Level Select shell + scene routing.** `scenes/Menu/LevelSelect.tscn`
   (title + one button per level; unbuilt ones disabled) becomes the new `run/main_scene`.
   `scripts/SceneButton.cs` (exported `ScenePath` → `GetTree().ChangeSceneToFile`). Replace
   the single Restart button with a reusable **Result menu** (Retry = reload scene, Level
