@@ -92,8 +92,10 @@ ended it only listens for the `restart` action (R / gamepad) → `ReloadCurrentS
 - Direct player-issued ally commands come later (M7).
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `Ally.cs`, `Enemy.cs`, `Stone.cs`,
-`FollowCamera.cs`, `GameManager.cs`, `RestartButton.cs`. `scenes/` — `Main.tscn` (main),
-`Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Tests/UnitTest.tscn`.
+`FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`. `scenes/` — `Menu/LevelSelect.tscn`
+(entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable win/lose UI), `Main.tscn` (legacy
+5v5, routed from Level 1 until Chunk 15), `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`,
+`Tests/UnitTest.tscn`.
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
 
@@ -107,7 +109,12 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **M3 — Allies in formation:** loose-leash followers that fight (fists + stones)
       and re-form.
 - [~] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice.
-      Chunk 9 done (5v5 encounter + win/lose/restart); juice & tuning is Chunk 10.
+      Chunk 9 done (5v5 encounter + win/lose/restart). Standalone juice (Chunk 10) is
+      **deferred** — it now folds into the per-level tuning passes under M4.5.
+- [ ] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
+      a **pikeman captain** leading a **braceable pike wall** across hand-designed
+      medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
+      (Chunks 11–16 in §7.)
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
 - [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
@@ -139,10 +146,81 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
   VICTORY over GAME OVER). 5 skeletons in `Main.tscn`; VICTORY/GAME OVER labels; Restart
   button + `restart` key (R / gamepad).
 
-**Next:**
-- [ ] **Chunk 10 — Juice & tuning.** Health bars / hit flashes, swing + impact effects,
-  and a balance pass (damage, knockback, speeds, cooldowns, formation radius). → Iterate
-  on feel with the user.
+**Deferred (do NOT build next — superseded by the pivot below):**
+- [~] **Chunk 10 — Juice & tuning.** Health bars / hit flashes, swing + impact effects,
+  balance pass. Rolled into the per-level tuning of Chunks 15–16; revisit only if asked.
+
+---
+
+### ▶ ACTIVE PLAN — Level Select + Phalanx Battles (Chunks 11–16)
+
+**Direction change (locked with the user 2026-06-14):** retire the single 5v5 sandbox in
+favour of a **level-select front-end + hand-designed phalanx battles**.
+- **Control = Captain + phalanx.** You twin-stick **one pikeman captain** (WASD + mouse,
+  click = pike thrust — the existing `Player`). Your pikemen hold a **tight wall** in
+  player-relative slots that rotate with your facing (existing `Ally` formation).
+  **Right-click / Space = BRACE:** the whole line plants, faces your yaw, presents pikes.
+  **Lose = captain dies; Win = all enemies cleared** — `GameManager` logic is unchanged.
+- **Levels replace the 5v5.** Level Select is the new entry scene; old `Main.tscn` is
+  retired (git history keeps it). All levels are fresh medieval scenarios.
+
+**New durable rules (design law — promote into §5 as the chunks land):**
+- **Pike reach + brace-repel.** Pikemen attack at long range (~3 m). The rule "only the
+  captain's weapon knocks back" still holds, with **one exception:** a **braced** pike
+  *repels* (small shove) whatever charges its front — the phalanx's whole point, and it
+  feeds the pinball feel.
+- **Brace is polled, not plumbed.** Every Pikeman reads the `brace` input itself each
+  frame (no captain→squad messaging), keeping the stance decoupled.
+- **Enemy archetypes never knock back.** **Swordman** = charging/flanking melee (curls
+  around the wall to dodge braced pikes); **Bowman** = kiting ranged (holds a range band,
+  flees melee, lobs arrows).
+
+**Unit reference (build each as a reusable sub-scene):**
+- `Captain` (= `Player`, pike skin, longer thrust hitbox; the `FollowCamera` target).
+- `Pikeman` (= `Ally` + `WeaponType.Pike`): reach ~3 m, moderate dmg; **brace** = hold
+  slot, face captain yaw, damage + small repel of enemies in the pike-front.
+- `Swordman` (enemy): chase nearest player-team unit, **charge burst** on acquire,
+  flank-offset approach, melee on contact.
+- `Bowman` (enemy): keep ~10–14 m, flee if a melee unit < ~5 m, fire an `Arrow` on cooldown.
+- `Arrow` (projectile): mirrors `Stone` (straight flight, proximity hit on the *opposite*
+  team, damage no knockback, lifetime). *A later cleanup may unify Stone + Arrow.*
+
+**Level designs (the "few levels"):**
+1. **Hold the Line** — phalanx vs a screen of **swordmen** backed by **bowmen**. Brace to
+   impale charges; push forward between volleys to reach and rout the archers.
+2. **Pincer** — swordmen charge from **two flanks** (few bowmen); pivot the wall (slot
+   rotation) to face each push. Teaches facing.
+3. **Arrow Storm** — many **bowmen** on the far side behind a thin swordman screen; advance
+   the braced phalanx across open ground **under fire** to close. Endurance.
+
+**Chunks (the WORKFLOW box above still applies — build the first `[ ]`):**
+- [ ] **Chunk 11 — Level Select shell + scene routing.** `scenes/Menu/LevelSelect.tscn`
+  (title + one button per level; unbuilt ones disabled) becomes the new `run/main_scene`.
+  `scripts/SceneButton.cs` (exported `ScenePath` → `GetTree().ChangeSceneToFile`). Replace
+  the single Restart button with a reusable **Result menu** (Retry = reload scene, Level
+  Select = back to menu) usable by every level. Temporarily route button 1 → old
+  `Main.tscn` so routing is testable end-to-end (repointed in Chunk 15).
+- [ ] **Chunk 12 — Pike + Pikeman + Brace.** Add `WeaponType.Pike` to `Ally` (long reach;
+  brace stance = hold slot, face captain yaw, damage + small repel of enemies in the
+  pike-front). `scenes/Pikeman.tscn`, `scenes/Captain.tscn` (pike-skinned `Player`, longer
+  hitbox). Add the `brace` input action (RMB + Space + gamepad) to `project.godot`.
+  Headless-test in `UnitTest.tscn`: reach gate (hits at ~2.8 m, misses at ~3.5 m) +
+  braced pikeman holds slot and damages/repels a unit placed in front.
+- [ ] **Chunk 13 — Swordman.** `scripts/Swordman.cs` (charge burst on acquire +
+  flank-offset approach + melee, no knockback) + `scenes/Swordman.tscn` (reskin Skeleton).
+  Headless-test: charge closes a set distance in T s and lands a hit.
+- [ ] **Chunk 14 — Bowman + Arrow.** `scripts/Arrow.cs` + `scenes/Arrow.tscn` (Stone-like,
+  hits the opposite team). `scripts/Bowman.cs` (range-band kite, flee melee, fire on
+  cooldown) + `scenes/Bowman.tscn`. Headless-test: arrow damages a player-team unit;
+  bowman retreats when a unit closes and holds range otherwise.
+- [ ] **Chunk 15 — Level 1 "Hold the Line" (assemble + tune).** `scenes/Levels/
+  Level1_HoldTheLine.tscn` (ground/light/`FollowCamera`/`GameManager`/Result UI + captain
+  + pikeman wall vs swordmen + bowmen). Tune counts/ranges/charge/brace-repel until it's
+  winnable AND brace clearly matters. Repoint LevelSelect button 1 → Level 1; delete the
+  retired `Main.tscn`. Headless smoke (scene loads; counts correct).
+- [ ] **Chunk 16 — Levels 2 & 3 + finalize menu.** Build **Pincer** and **Arrow Storm**
+  (reuse the unit sub-scenes, new layouts/counts), enable their LevelSelect buttons, add a
+  one-line objective label per level. Headless smoke each.
 
 Then proceed to M5+ (§6), updating checkboxes and §8 as you go.
 

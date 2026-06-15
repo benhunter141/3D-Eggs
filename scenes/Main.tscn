@@ -5,7 +5,7 @@
 [ext_resource type="PackedScene" path="res://scenes/Skeleton.tscn" id="3_skeleton"]
 [ext_resource type="PackedScene" path="res://scenes/Ally.tscn" id="4_ally"]
 [ext_resource type="PackedScene" path="res://scenes/Stone.tscn" id="5_stone"]
-[ext_resource type="Script" path="res://scripts/RestartButton.cs" id="6_restart"]
+[ext_resource type="PackedScene" path="res://scenes/Menu/ResultMenu.tscn" id="6_result"]
 [ext_resource type="Script" path="res://scripts/GameManager.cs" id="7_gm"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat_1"]
@@ -152,47 +152,4 @@ StoneScene = ExtResource("5_stone")
 [node name="GameManager" type="Node" parent="."]
 script = ExtResource("7_gm")
 
-[node name="UI" type="CanvasLayer" parent="."]
-
-[node name="GameOverLabel" type="Label" parent="UI" groups=["game_over"]]
-visible = false
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "GAME OVER"
-horizontal_alignment = 1
-vertical_alignment = 1
-theme_override_colors/font_color = Color(0.9, 0.12, 0.12, 1)
-theme_override_font_sizes/font_size = 80
-
-[node name="VictoryLabel" type="Label" parent="UI" groups=["victory"]]
-visible = false
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "VICTORY"
-horizontal_alignment = 1
-vertical_alignment = 1
-theme_override_colors/font_color = Color(0.2, 0.85, 0.3, 1)
-theme_override_font_sizes/font_size = 80
-
-[node name="RestartButton" type="Button" parent="UI" groups=["game_over", "victory"]]
-visible = false
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -110.0
-offset_top = 70.0
-offset_right = 110.0
-offset_bottom = 134.0
-grow_horizontal = 2
-grow_vertical = 2
-text = "Restart"
-theme_override_font_sizes/font_size = 32
-script = ExtResource("6_restart")
+[node name="ResultMenu" parent="." instance=ExtResource("6_result")]

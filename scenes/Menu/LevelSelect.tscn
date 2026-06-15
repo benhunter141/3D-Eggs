@@ -1,0 +1,77 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3degg0levelsel"]
+
+[ext_resource type="Script" path="res://scripts/SceneButton.cs" id="1_btn"]
+
+[node name="LevelSelect" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.11, 0.12, 0.15, 1)
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -180.0
+offset_right = 200.0
+offset_bottom = 180.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 18
+
+[node name="Title" type="Label" parent="VBox"]
+layout_mode = 2
+text = "PHALANX"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
+theme_override_font_sizes/font_size = 72
+
+[node name="Subtitle" type="Label" parent="VBox"]
+layout_mode = 2
+text = "Select a Battle"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)
+theme_override_font_sizes/font_size = 24
+
+[node name="Spacer" type="Control" parent="VBox"]
+custom_minimum_size = Vector2(0, 20)
+layout_mode = 2
+
+[node name="Level1Button" type="Button" parent="VBox"]
+custom_minimum_size = Vector2(400, 60)
+layout_mode = 2
+text = "1.  Hold the Line"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")
+ScenePath = "res://scenes/Main.tscn"
+
+[node name="Level2Button" type="Button" parent="VBox"]
+custom_minimum_size = Vector2(400, 60)
+layout_mode = 2
+disabled = true
+text = "2.  Pincer  (locked)"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")
+
+[node name="Level3Button" type="Button" parent="VBox"]
+custom_minimum_size = Vector2(400, 60)
+layout_mode = 2
+disabled = true
+text = "3.  Arrow Storm  (locked)"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")

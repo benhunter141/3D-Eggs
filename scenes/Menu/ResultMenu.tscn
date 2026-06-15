@@ -1,0 +1,61 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3degg0result1"]
+
+[ext_resource type="Script" path="res://scripts/SceneButton.cs" id="1_btn"]
+
+[node name="ResultMenu" type="CanvasLayer"]
+
+[node name="GameOverLabel" type="Label" parent="." groups=["game_over"]]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "GAME OVER"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.9, 0.12, 0.12, 1)
+theme_override_font_sizes/font_size = 80
+
+[node name="VictoryLabel" type="Label" parent="." groups=["victory"]]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "VICTORY"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.2, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 80
+
+[node name="Buttons" type="HBoxContainer" parent="." groups=["game_over", "victory"]]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = 70.0
+offset_right = 230.0
+offset_bottom = 134.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+
+[node name="RetryButton" type="Button" parent="Buttons"]
+custom_minimum_size = Vector2(220, 64)
+layout_mode = 2
+text = "Retry"
+theme_override_font_sizes/font_size = 32
+script = ExtResource("1_btn")
+
+[node name="MenuButton" type="Button" parent="Buttons"]
+custom_minimum_size = Vector2(220, 64)
+layout_mode = 2
+text = "Level Select"
+theme_override_font_sizes/font_size = 32
+script = ExtResource("1_btn")
+ScenePath = "res://scenes/Menu/LevelSelect.tscn"
