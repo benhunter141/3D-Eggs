@@ -91,11 +91,13 @@ ended it only listens for the `restart` action (R / gamepad) → `ReloadCurrentS
 - **Squad:** 2 fists (Ally1/2) + 2 stones (Ally3/4) in `Main.tscn`.
 - Direct player-issued ally commands come later (M7).
 
-**Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `Ally.cs`, `Enemy.cs`, `Stone.cs`,
-`FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`. `scenes/` — `Menu/LevelSelect.tscn`
-(entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable win/lose UI), `Main.tscn` (legacy
-5v5, routed from Level 1 until Chunk 15), `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`,
-`Tests/UnitTest.tscn`.
+**Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `Ally.cs`, `Enemy.cs`, `Swordman.cs`,
+`Bowman.cs`, `Stone.cs`, `Arrow.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`.
+`scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable
+win/lose UI), `Levels/Level1_HoldTheLine.tscn` (captain + pike wall vs swordmen/bowmen),
+`Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`, `Bowman.tscn`, `Arrow.tscn`,
+`Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Tests/UnitTest.tscn`. (Legacy `Main.tscn`
+retired in Chunk 15 — git history keeps it.)
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
 
@@ -114,7 +116,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
       a **pikeman captain** leading a **braceable pike wall** across hand-designed
       medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
-      Chunks 11–14 done (Level Select shell; Pike + Pikeman + Brace; Swordman; Bowman + Arrow). (Chunks 11–16 in §7.)
+      Chunks 11–15 done (Level Select shell; Pike + Pikeman + Brace; Swordman; Bowman + Arrow; Level 1 "Hold the Line"). (Chunks 11–16 in §7.)
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
 - [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
@@ -213,7 +215,7 @@ favour of a **level-select front-end + hand-designed phalanx battles**.
   hits the opposite team). `scripts/Bowman.cs` (range-band kite, flee melee, fire on
   cooldown) + `scenes/Bowman.tscn`. Headless-test: arrow damages a player-team unit;
   bowman retreats when a unit closes and holds range otherwise.
-- [ ] **Chunk 15 — Level 1 "Hold the Line" (assemble + tune).** `scenes/Levels/
+- [x] **Chunk 15 — Level 1 "Hold the Line" (assemble + tune).** `scenes/Levels/
   Level1_HoldTheLine.tscn` (ground/light/`FollowCamera`/`GameManager`/Result UI + captain
   + pikeman wall vs swordmen + bowmen). Tune counts/ranges/charge/brace-repel until it's
   winnable AND brace clearly matters. Repoint LevelSelect button 1 → Level 1; delete the
