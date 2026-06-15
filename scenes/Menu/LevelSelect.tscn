@@ -58,7 +58,7 @@ layout_mode = 2
 text = "1.  Hold the Line"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
-ScenePath = "res://scenes/Main.tscn"
+ScenePath = "res://scenes/Levels/Level1_HoldTheLine.tscn"
 
 [node name="Level2Button" type="Button" parent="VBox"]
 custom_minimum_size = Vector2(400, 60)
