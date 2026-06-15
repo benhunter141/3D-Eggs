@@ -159,11 +159,12 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       the 60 FPS budget (median physics ~2.9 / ~4.4 ms throttled). Onslaught balance still
       needs a user feel-check.
 - [~] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
-      Chunks 20–21 done (knockback now BOUNCES + transfers on impact — a shoved unit hands part
+      Chunks 20–22 done (knockback now BOUNCES + transfers on impact — a shoved unit hands part
       of its momentum to whatever it rams and rebounds, so one sword-fling chains through a
-      crowd; `Bumper.tscn` static posts KICK touching units back out faster than they came in).
-      A pinball arena level (Chunk 22) still to come; balance (restitution / transfer /
-      min-bounce / bumper strength) needs a user feel-check.
+      crowd; `Bumper.tscn` static posts KICK touching units back out faster than they came in;
+      `Level5_PinballArena.tscn` is a walled bumper arena that revels in it). All three chunks
+      built; balance (restitution / transfer / min-bounce / bumper strength / arena counts)
+      needs a user feel-check before M6 closes.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
 - [ ] **M8 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
@@ -333,9 +334,13 @@ first (bounce + momentum transfer), then place bouncy obstacles, then a level th
   unit already carrying a shove (> `MinBounceSpeed`); the area kicks anyone who wanders in.
   Headless `UnitTest`: a skeleton shoved at 6 m/s into a bumper leaves at 12 m/s pointing away
   (13/13 checks pass). **Balance/feel unplayed — folds into Chunk 22's arena tuning.**
-- [ ] **Chunk 22 — A pinball arena level.** A new `scenes/Levels/` battle built around bumpers
-  + tight walls so sword-knockback and chain-bounces ricochet units around the field. Add the
-  LevelSelect button + objective label. Headless smoke (loads clean, counts correct).
+- [x] **Chunk 22 — A pinball arena level.** `scenes/Levels/Level5_PinballArena.tscn` — a
+  walled 44×44 arena (four solid perimeter `StaticBody3D` walls) with a cluster of 8 `Bumper`
+  posts in the midfield. Captain + 4-pikeman squad vs a 10-swordman charge (+2 corner bowmen),
+  so sword-knockback flings chargers into bumpers/walls and chain-bounces them around. Added
+  the "5. Pinball Arena" LevelSelect button + objective label. Headless smoke: loads clean, no
+  errors, bumpers fling charging swordmen, no premature win/lose. **Counts/balance unplayed —
+  user feel-check pending.**
 
 Then proceed to M7 (§6), updating checkboxes and §8 as you go.
 
