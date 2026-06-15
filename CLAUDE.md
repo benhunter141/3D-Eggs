@@ -114,7 +114,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
       a **pikeman captain** leading a **braceable pike wall** across hand-designed
       medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
-      Chunks 11–13 done (Level Select shell; Pike + Pikeman + Brace; Swordman). (Chunks 11–16 in §7.)
+      Chunks 11–14 done (Level Select shell; Pike + Pikeman + Brace; Swordman; Bowman + Arrow). (Chunks 11–16 in §7.)
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
 - [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
@@ -209,7 +209,7 @@ favour of a **level-select front-end + hand-designed phalanx battles**.
 - [x] **Chunk 13 — Swordman.** `scripts/Swordman.cs` (charge burst on acquire +
   flank-offset approach + melee, no knockback) + `scenes/Swordman.tscn` (reskin Skeleton).
   Headless-test: charge closes a set distance in T s and lands a hit.
-- [ ] **Chunk 14 — Bowman + Arrow.** `scripts/Arrow.cs` + `scenes/Arrow.tscn` (Stone-like,
+- [x] **Chunk 14 — Bowman + Arrow.** `scripts/Arrow.cs` + `scenes/Arrow.tscn` (Stone-like,
   hits the opposite team). `scripts/Bowman.cs` (range-band kite, flee melee, fire on
   cooldown) + `scenes/Bowman.tscn`. Headless-test: arrow damages a player-team unit;
   bowman retreats when a unit closes and holds range otherwise.
