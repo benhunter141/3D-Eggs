@@ -66,6 +66,7 @@ public partial class Enemy : Unit
 		// Chase plus any lingering sword knockback.
 		Velocity = chase + KnockbackVelocity;
 		MoveAndSlide();
+		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 	}
 
 	// Smoothly rotate to face a world point on the flat plane (forward is -Z).

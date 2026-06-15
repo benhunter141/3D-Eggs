@@ -95,6 +95,20 @@ ended it only listens for the `restart` action (R / gamepad) → `ReloadCurrentS
   `AttackDamage` on `AttackCooldown` (melee on contact).
 - `Player.OnDeath` → freeze + show `GAME OVER`; `Enemy.OnDeath` → free itself.
 
+**Pinball collision response (M6, Chunk 20).** Knockback no longer just decays — when a unit
+carrying a real shove (> `MinBounceSpeed`, default 2.5 m/s) rams something during its
+`MoveAndSlide`, it **hands part of its momentum on** (`KnockbackTransfer`, no damage) and
+**bounces the rest back** (`KnockbackBounce` restitution). So one sword-fling chains through a
+packed line — the chaotic soul. All injection routes through `Unit.AddKnockback` (clamped to
+`MaxKnockback`); the sword's `TakeDamage` shove now goes through it too. Each AI unit calls
+`ResolveKnockbackBounce()` right after its `MoveAndSlide`. **Gotcha:** two equal capsules
+meeting head-on on the flat plane resolve to a near-vertical contact normal and Godot slides
+them *through* each other for a frame, so `GetNormal()`/post-move positions are unreliable for
+body-vs-body. The resolver therefore uses the **knockback travel direction** as the impact axis
+for unit hits (shove the foe that way, reverse our own shove) and only trusts the surface
+normal for **static walls**. The player is currently knockback-immune (its movement code never
+folds in `KnockbackVelocity`) — revisit if pinball should toss the captain too.
+
 **Allies = loose leash (user-locked):**
 - Steer to a player-relative formation **slot**; offset rotates with player facing
   (`SlotWorldPosition`), so the squad turns with you. Arrive-slowdown on approach.
@@ -144,7 +158,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       re-scan; `Level4_Onslaught.tscn` crowd battle, ~49 units). 50 AND 100 units sit within
       the 60 FPS budget (median physics ~2.9 / ~4.4 ms throttled). Onslaught balance still
       needs a user feel-check.
-- [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
+- [~] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
+      Chunk 20 done (knockback now BOUNCES + transfers on impact — a shoved unit hands part
+      of its momentum to whatever it rams and rebounds, so one sword-fling chains through a
+      crowd). Bumpers (Chunk 21) + a pinball arena level (Chunk 22) still to come; balance
+      (restitution / transfer / min-bounce) needs a user feel-check.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
 - [ ] **M8 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
@@ -287,7 +305,34 @@ cost first, then add a stress scene to measure, then ship a big battle.
   loads clean, no premature win/lose. **Counts/balance unplayed — user feel-check pending;
   tune enemy counts / charge / brace-repel if it's un-winnable or trivial.**
 
-Then proceed to M6+ (§6), updating checkboxes and §8 as you go.
+---
+
+### ▶ ACTIVE PLAN — M6 Pinball Physics (Chunks 20–22)
+
+**Goal:** make collisions *chaotic and bouncy* — the game's stated soul. Build the response
+first (bounce + momentum transfer), then place bouncy obstacles, then a level that revels in it.
+
+- [x] **Chunk 20 — Bouncy knockback + impact transfer (chain reactions).** Pure script in
+  `Unit.cs`: a shoved unit (> `MinBounceSpeed`) hands part of its momentum to whatever it rams
+  (`KnockbackTransfer`, no damage) and bounces the rest back (`KnockbackBounce`); all shove
+  injection routes through a new public `Unit.AddKnockback` (clamped to `MaxKnockback`), and
+  each AI subclass calls `ResolveKnockbackBounce()` after its `MoveAndSlide`. So one sword-fling
+  chains through a crowd. Uses the knockback travel direction (not the unreliable capsule
+  contact normal/positions) as the impact axis for body-vs-body; surface normal only for walls.
+  See §5 "Pinball collision response". Headless `UnitTest`: a cue unit flung into a stationary
+  pin hands it a forward shove and rebounds (12/12 checks pass). **Balance + feel unplayed —
+  user feel-check pending (tune `KnockbackBounce`/`Transfer`/`MinBounceSpeed`).**
+- [ ] **Chunk 21 — Bumpers (static bouncy obstacles).** A reusable `scenes/Bumper.tscn`
+  (`StaticBody3D` + `scripts/Bumper.cs`): when a moving unit touches it, fling the unit away
+  from the bumper with an amplified shove (uses `Unit.AddKnockback`), so the arena itself
+  becomes a pinball table. Detect via the unit's `ResolveKnockbackBounce` wall path OR an
+  `Area3D` on the bumper — pick whichever reads cleaner. Headless-test: a unit pushed into a
+  bumper leaves with MORE speed, pointing away.
+- [ ] **Chunk 22 — A pinball arena level.** A new `scenes/Levels/` battle built around bumpers
+  + tight walls so sword-knockback and chain-bounces ricochet units around the field. Add the
+  LevelSelect button + objective label. Headless smoke (loads clean, counts correct).
+
+Then proceed to M7 (§6), updating checkboxes and §8 as you go.
 
 ## 8. Quick Reference
 

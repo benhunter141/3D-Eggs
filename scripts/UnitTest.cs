@@ -35,8 +35,9 @@ public partial class UnitTest : Node3D
 		bool swordman = await TestSwordmanCharge();
 		bool bowman = await TestBowmanKite();
 		bool registry = await TestRegistry();
+		bool bounce = await TestKnockbackBounce();
 
-		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman && bowman && registry
+		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -584,6 +585,61 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: registry buckets by team, finds nearest, honours range, skips dead, unregisters on free"
 			: "FAIL: registry behaviour wrong");
+		return pass;
+	}
+
+	// Chunk 20 (M6): pinball collision response. A "cue" skeleton flung straight at a stationary
+	// "pin" skeleton should (a) hand the pin part of its momentum along the impact line, shoving
+	// the pin onward, and (b) BOUNCE back off it. Both are on the Enemy team so neither has an
+	// opponent to chase — only the cue's knockback moves it, isolating the collision response.
+	// (Real scene instances, not plain Units, so they carry the collision shapes the bodies need
+	// to actually ram each other.) Knockback on both decays each frame, so we sample per frame.
+	private async Task<bool> TestKnockbackBounce()
+	{
+		GD.Print("=== UnitTest: knockback bounce + transfer (pinball) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Pin at the origin; cue 3 m away on +Z, about to be flung toward it (-Z).
+		var pin = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(pin);
+		pin.GlobalPosition = Vector3.Zero;
+
+		var cue = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(cue);
+		cue.GlobalPosition = new Vector3(0f, 0f, 3f);
+
+		// Fling the cue straight at the pin, fast enough to clear MinBounceSpeed on contact.
+		const float strength = 12f;
+		cue.AddKnockback(new Vector3(0f, 0f, -strength));
+		GD.Print($"cue flung at {strength} m/s toward the pin (minBounce={cue.MinBounceSpeed}, transfer={cue.KnockbackTransfer}, restitution={cue.KnockbackBounce})");
+
+		// Step ~1.3 s, watching for the impact. The mechanic is in the velocities: the pin should
+		// pick up a -Z shove (momentum handed ON, along the cue's travel) and the cue should
+		// reverse to +Z (rebound). We assert on those, not final positions — two equal capsules
+		// meeting head-on at speed overlap for a frame and Godot slides them through each other,
+		// so post-impact positions are noisy even though the knockback impulses are exact.
+		float pinShoveZ = 0f;    // most-negative Z knockback seen on the pin
+		float cueReflectZ = 0f;  // most-positive Z knockback seen on the cue
+		for (int i = 0; i < 80; i++)
+		{
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			pinShoveZ = Mathf.Min(pinShoveZ, pin.CurrentKnockback.Z);
+			cueReflectZ = Mathf.Max(cueReflectZ, cue.CurrentKnockback.Z);
+		}
+
+		// Expected magnitude: contact speed (~11 m/s) scaled by the transfer / restitution fracs.
+		bool transferred = pinShoveZ < -1f;              // pin got shoved along the cue's travel
+		bool bounced = cueReflectZ > 1f;                 // cue rebounded back off the pin
+		GD.Print($"pin peak shove Z={pinShoveZ:0.00} (transferred={transferred}), " +
+			$"cue peak reflect Z={cueReflectZ:0.00} (bounced={bounced})");
+
+		bool pass = transferred && bounced;
+		GD.Print(pass
+			? "PASS: a flung unit hands its momentum to what it rams and bounces back off it"
+			: $"FAIL: transferred={transferred}, bounced={bounced}");
 		return pass;
 	}
 }

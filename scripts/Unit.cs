@@ -16,6 +16,18 @@ public partial class Unit : CharacterBody3D
 	[Export] public float MaxHealth = 100.0f;
 	[Export] public float KnockbackDecay = 14.0f;   // how fast a shove bleeds off (m/s per s)
 
+	// --- Pinball collision response (M6, Chunk 20) ---
+	// A unit carrying a real shove (> MinBounceSpeed) turns its MoveAndSlide collisions into
+	// billiard chaos: it hands part of its momentum to any unit it rams (KnockbackTransfer)
+	// and BOUNCES the rest off whatever it hit — wall or body (KnockbackBounce restitution).
+	// One sword-fling thus scatters a packed line in a chain. Below MinBounceSpeed nothing
+	// fires, so idle units packed in formation just jostle quietly. MaxKnockback caps the
+	// accumulated shove so chains can't blow up to silly speeds.
+	[Export] public float KnockbackBounce = 0.5f;    // restitution: fraction of speed kept after a bounce
+	[Export] public float KnockbackTransfer = 0.5f;  // fraction of speed handed to a unit we ram
+	[Export] public float MinBounceSpeed = 2.5f;     // shoves slower than this don't bounce/transfer
+	[Export] public float MaxKnockback = 18.0f;      // cap on accumulated shove speed (0 = uncapped)
+
 	// --- Staggered target re-acquisition (M5 crowds) ---
 	// Re-scanning UnitRegistry for the nearest foe EVERY physics frame is the crowd hotspot:
 	// it is O(opponents) per unit, so a 100-unit battle is ~O(n^2) of distance checks per
@@ -123,7 +135,7 @@ public partial class Unit : CharacterBody3D
 		{
 			hitDirection.Y = 0f;
 			if (hitDirection.LengthSquared() > 0.0001f)
-				KnockbackVelocity += hitDirection.Normalized() * knockbackStrength;
+				AddKnockback(hitDirection.Normalized() * knockbackStrength);
 		}
 
 		if (Health <= 0f)
@@ -162,6 +174,73 @@ public partial class Unit : CharacterBody3D
 	protected void DecayKnockback(float dt)
 	{
 		KnockbackVelocity = KnockbackVelocity.MoveToward(Vector3.Zero, KnockbackDecay * dt);
+	}
+
+	// Inject a shove with NO damage — the canonical way to add knockback (the sword routes
+	// here too). Flattened onto the ground plane and clamped to MaxKnockback so chained
+	// pinball impacts can't accumulate into runaway speeds. The dead take no shove.
+	public void AddKnockback(Vector3 impulse)
+	{
+		if (IsDead)
+			return;
+		impulse.Y = 0f;
+		KnockbackVelocity += impulse;
+		if (MaxKnockback > 0f && KnockbackVelocity.Length() > MaxKnockback)
+			KnockbackVelocity = KnockbackVelocity.Normalized() * MaxKnockback;
+	}
+
+	// Pinball collision response (M6, Chunk 20). Call once right AFTER MoveAndSlide: if we're
+	// carrying a real shove, every body we drove into this frame gets part of our momentum
+	// along the impact line (a billiard break), and the shove that remains BOUNCES off the
+	// first surface we hit. One reflection per frame is enough — chains build over successive
+	// frames on their own.
+	//
+	// We can't trust KinematicCollision3D.GetNormal()/positions for body-vs-body: two equal
+	// capsules standing on the same plane resolve to a near-VERTICAL contact normal and Godot
+	// slides the mover "over" the obstacle, so the post-move positions read with the bodies in
+	// the wrong order (a capsule artifact). What IS reliable is our own travel direction — we
+	// only get here because we drove into something this frame, and it sits along the way we
+	// were heading. So for a unit we hit, the impact axis is our knockback DIRECTION: shove it
+	// that way and reverse our own shove. Static walls keep their clean surface normal. The
+	// response is kept on the ground plane (Y zeroed) so nothing gets launched into the air.
+	protected void ResolveKnockbackBounce()
+	{
+		float speed = KnockbackVelocity.Length();
+		if (speed < MinBounceSpeed)
+			return;
+		Vector3 travelDir = KnockbackVelocity / speed;   // unit vector along our shove
+
+		bool bounced = false;
+		int count = GetSlideCollisionCount();
+		for (int i = 0; i < count; i++)
+		{
+			KinematicCollision3D col = GetSlideCollision(i);
+
+			// Contact axis pointing from the obstacle back toward us (opposes our motion), so
+			// Bounce() reflects the shove outward.
+			Vector3 contactNormal;
+			if (col.GetCollider() is Unit other && !other.IsDead)
+			{
+				other.AddKnockback(travelDir * speed * KnockbackTransfer);   // pass momentum on (no damage)
+				contactNormal = -travelDir;
+			}
+			else
+			{
+				contactNormal = col.GetNormal();
+				contactNormal.Y = 0f;
+				if (contactNormal.LengthSquared() < 0.0001f)
+					continue;                              // floor/ceiling contact — ignore
+				contactNormal = contactNormal.Normalized();
+				if (KnockbackVelocity.Dot(contactNormal) > 0f)
+					contactNormal = -contactNormal;        // make it oppose our motion
+			}
+
+			if (!bounced)
+			{
+				KnockbackVelocity = KnockbackVelocity.Bounce(contactNormal) * KnockbackBounce;
+				bounced = true;
+			}
+		}
 	}
 
 	// True on the frames this unit should re-scan UnitRegistry for its nearest target. Call

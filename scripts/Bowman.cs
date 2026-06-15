@@ -82,6 +82,7 @@ public partial class Bowman : Unit
 
 		Velocity = move + KnockbackVelocity;
 		MoveAndSlide();
+		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 	}
 
 	// Spawn an Arrow at our position aimed at the target and let it fly. Added to our parent so

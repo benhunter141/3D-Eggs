@@ -147,6 +147,7 @@ public partial class Ally : Unit
 
 		Velocity = horizontal + KnockbackVelocity;
 		MoveAndSlide();
+		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 
 		// Out of combat, face wherever the player is aiming so the squad points together;
 		// in combat, FaceTowards already aimed us at the target.

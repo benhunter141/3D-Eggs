@@ -93,6 +93,7 @@ public partial class Swordman : Unit
 		// Chase plus any lingering pike/sword knockback.
 		Velocity = chase + KnockbackVelocity;
 		MoveAndSlide();
+		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 	}
 
 	// Direction to move: the target's direction nudged sideways by a flank offset that's
