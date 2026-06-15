@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 
 // An arrow fired by a bowman. Mirrors Stone (Chunk 8): flies in a straight line from where
 // it was loosed (aimed at the target's position at fire time) and, on coming within HitRadius
@@ -46,10 +47,13 @@ public partial class Arrow : Node3D
 		GlobalPosition += _direction * Speed * dt;
 
 		// Proximity hit test against living opposite-team units (cheap, no physics layers).
+		// Scans only the opposing team's registry bucket — no per-frame group marshal.
 		float hitSq = HitRadius * HitRadius;
-		foreach (Node n in GetTree().GetNodesInGroup("units"))
+		IReadOnlyList<Unit> foes = UnitRegistry.Opponents(_ownerTeam);
+		for (int i = 0; i < foes.Count; i++)
 		{
-			if (n is Unit u && !u.IsDead && u.Team != _ownerTeam
+			Unit u = foes[i];
+			if (u != null && IsInstanceValid(u) && !u.IsDead
 				&& GlobalPosition.DistanceSquaredTo(u.GlobalPosition) <= hitSq)
 			{
 				u.TakeDamage(Damage);   // arrows: damage only, no shove

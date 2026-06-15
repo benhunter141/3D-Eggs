@@ -43,10 +43,20 @@ public partial class Unit : CharacterBody3D
 	public override void _Ready()
 	{
 		Health = MaxHealth;
-		// Every fighter joins this group so others can find targets cheaply
-		// (skeletons scan it for the nearest enemy-team unit).
+		// Every fighter joins this group (GameManager counts it for win/lose) AND registers
+		// with UnitRegistry, which is what AI/projectiles scan for the nearest foe — the
+		// registry avoids a per-frame GetNodesInGroup marshal. Team is set by subclasses
+		// before this base call, so we bucket into the right side here.
 		AddToGroup("units");
+		UnitRegistry.Register(this);
 		SetupHitFeedback();
+	}
+
+	// Leave the registry the moment we leave the tree (death-free, scene reload, etc.) so
+	// the team buckets always reflect exactly the units currently in play.
+	public override void _ExitTree()
+	{
+		UnitRegistry.Unregister(this);
 	}
 
 	// Build the per-instance flash material (so one unit can flash without lighting up

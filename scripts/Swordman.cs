@@ -56,7 +56,7 @@ public partial class Swordman : Unit
 			_chargeTimer -= dt;
 
 		Vector3 chase = Vector3.Zero;
-		Unit target = FindNearestTarget();
+		Unit target = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
 
 		// Fresh acquire (had nobody last frame, have someone now) -> kick off a charge burst.
 		if (target != null && !_hadTarget)
@@ -103,26 +103,6 @@ public partial class Swordman : Unit
 		Vector3 aim = toTarget + right * (_flankSide * FlankOffset * flankWeight);
 		aim.Y = 0f;
 		return aim.LengthSquared() > 0.0001f ? aim.Normalized() : dir;
-	}
-
-	// Nearest living unit not on our team (scans the shared "units" group).
-	private Unit FindNearestTarget()
-	{
-		Unit best = null;
-		float bestSq = float.MaxValue;
-		foreach (Node n in GetTree().GetNodesInGroup("units"))
-		{
-			if (n is Unit u && !u.IsDead && u.Team != Team)
-			{
-				float d = GlobalPosition.DistanceSquaredTo(u.GlobalPosition);
-				if (d < bestSq)
-				{
-					bestSq = d;
-					best = u;
-				}
-			}
-		}
-		return best;
 	}
 
 	// Smoothly rotate to face a world point on the flat plane (forward is -Z).

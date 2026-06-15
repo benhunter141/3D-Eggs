@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 
 // A thrown stone. Flies in a straight line from where it was launched (aimed at the
 // target's position at throw time) and, on coming within HitRadius of any enemy-team
@@ -41,10 +42,13 @@ public partial class Stone : Node3D
 		GlobalPosition += _direction * Speed * dt;
 
 		// Proximity hit test against living enemy-team units (cheap, no physics layers).
+		// Scans only the opposing team's registry bucket — no per-frame group marshal.
 		float hitSq = HitRadius * HitRadius;
-		foreach (Node n in GetTree().GetNodesInGroup("units"))
+		IReadOnlyList<Unit> foes = UnitRegistry.Opponents(_ownerTeam);
+		for (int i = 0; i < foes.Count; i++)
 		{
-			if (n is Unit u && !u.IsDead && u.Team != _ownerTeam
+			Unit u = foes[i];
+			if (u != null && IsInstanceValid(u) && !u.IsDead
 				&& GlobalPosition.DistanceSquaredTo(u.GlobalPosition) <= hitSq)
 			{
 				u.TakeDamage(Damage);   // stones: damage only, no shove

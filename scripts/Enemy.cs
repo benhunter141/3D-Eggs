@@ -37,7 +37,7 @@ public partial class Enemy : Unit
 			_attackTimer -= dt;
 
 		Vector3 chase = Vector3.Zero;
-		Unit target = FindNearestTarget();
+		Unit target = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
 		if (target != null)
 		{
 			Vector3 toTarget = target.GlobalPosition - GlobalPosition;
@@ -62,26 +62,6 @@ public partial class Enemy : Unit
 		// Chase plus any lingering sword knockback.
 		Velocity = chase + KnockbackVelocity;
 		MoveAndSlide();
-	}
-
-	// Nearest living unit not on our team (scans the shared "units" group).
-	private Unit FindNearestTarget()
-	{
-		Unit best = null;
-		float bestSq = float.MaxValue;
-		foreach (Node n in GetTree().GetNodesInGroup("units"))
-		{
-			if (n is Unit u && !u.IsDead && u.Team != Team)
-			{
-				float d = GlobalPosition.DistanceSquaredTo(u.GlobalPosition);
-				if (d < bestSq)
-				{
-					bestSq = d;
-					best = u;
-				}
-			}
-		}
-		return best;
 	}
 
 	// Smoothly rotate to face a world point on the flat plane (forward is -Z).

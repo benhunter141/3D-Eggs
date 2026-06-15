@@ -1,4 +1,5 @@
 using Godot;
+using System.Linq;
 using System.Threading.Tasks;
 
 // Headless logic checks for the combat pipeline. Run with:
@@ -33,8 +34,9 @@ public partial class UnitTest : Node3D
 		bool pike = await TestPikeBrace();
 		bool swordman = await TestSwordmanCharge();
 		bool bowman = await TestBowmanKite();
+		bool registry = await TestRegistry();
 
-		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman && bowman
+		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman && bowman && registry
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -524,6 +526,64 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: braced pike impales + repels its front within reach, ignores beyond reach, holds the line"
 			: $"FAIL: damaged={damagedInReach}, repelled={repelled}, untouched={untouchedOut}, heldSlot={heldSlot}");
+		return pass;
+	}
+
+	// Chunk 17 (M5): the UnitRegistry that replaced the per-frame group scans tracks units
+	// by team, returns the nearest living opponent, honours a max range, skips dead bodies
+	// that haven't been freed yet, and drops units once they leave the tree.
+	private async Task<bool> TestRegistry()
+	{
+		GD.Print("=== UnitTest: unit registry (nearest-opponent service) ===");
+
+		// Clear leftovers so only this test's units populate the registry.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var hero = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(hero);
+		hero.GlobalPosition = Vector3.Zero;
+
+		// Three enemies at increasing distance along +X.
+		var near = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 30f };
+		var mid = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		var far = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		AddChild(near); AddChild(mid); AddChild(far);
+		near.GlobalPosition = new Vector3(3f, 0f, 0f);
+		mid.GlobalPosition = new Vector3(7f, 0f, 0f);
+		far.GlobalPosition = new Vector3(12f, 0f, 0f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		int enemyCount = UnitRegistry.Opponents(Unit.TeamId.Player).Count;
+		bool counted = enemyCount == 3;
+
+		Unit pick1 = UnitRegistry.FindNearestOpponent(Unit.TeamId.Player, hero.GlobalPosition);
+		bool nearestOk = pick1 == near;
+
+		// maxRange caps the search: nothing lives within 2 m of the hero.
+		bool cappedOk = UnitRegistry.FindNearestOpponent(Unit.TeamId.Player, hero.GlobalPosition, 2f) == null;
+
+		// A dead-but-not-yet-freed unit is skipped, so the next-nearest is returned.
+		near.TakeDamage(999f);   // lethal -> IsDead, lingers DeathLinger before QueueFree
+		bool skipsDead = UnitRegistry.FindNearestOpponent(Unit.TeamId.Player, hero.GlobalPosition) == mid;
+
+		// Enemies see the hero as their nearest opponent (buckets are symmetric).
+		bool enemyViewOk = UnitRegistry.FindNearestOpponent(Unit.TeamId.Enemy, mid.GlobalPosition) == hero;
+
+		// After the corpse frees (> DeathLinger 0.4 s), it leaves the registry entirely.
+		for (int i = 0; i < 40; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		bool unregistered = !UnitRegistry.Opponents(Unit.TeamId.Player).Contains(near)
+			&& UnitRegistry.Opponents(Unit.TeamId.Player).Count == 2;
+
+		GD.Print($"count={enemyCount}(ok={counted}), nearest={(nearestOk ? "near" : "?")}, capped null={cappedOk}, " +
+			$"skipsDead->mid={skipsDead}, enemyView->hero={enemyViewOk}, freedUnregistered={unregistered}");
+
+		bool pass = counted && nearestOk && cappedOk && skipsDead && enemyViewOk && unregistered;
+		GD.Print(pass
+			? "PASS: registry buckets by team, finds nearest, honours range, skips dead, unregisters on free"
+			: "FAIL: registry behaviour wrong");
 		return pass;
 	}
 }

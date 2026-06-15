@@ -1,4 +1,5 @@
 using Godot;
+using System.Collections.Generic;
 
 // A friendly fighter that follows the player in formation and brawls on a LOOSE LEASH:
 // it engages enemies only while one is within LeashRadius of its formation slot, then
@@ -176,20 +177,21 @@ public partial class Ally : Unit
 		Vector3 fwd = -GlobalTransform.Basis.Z;   // pikeman's facing on the flat plane
 		fwd.Y = 0f;
 		bool struck = false;
-		foreach (Node n in GetTree().GetNodesInGroup("units"))
+		IReadOnlyList<Unit> foes = UnitRegistry.Opponents(Team);
+		for (int i = 0; i < foes.Count; i++)
 		{
-			if (n is Unit u && !u.IsDead && u.Team != Team)
-			{
-				Vector3 to = u.GlobalPosition - GlobalPosition;
-				to.Y = 0f;
-				float d = to.Length();
-				if (d > PikeReach || d < 0.0001f)
-					continue;                       // out of reach
-				if (fwd.Dot(to.Normalized()) < BraceFrontDot)
-					continue;                       // not in the pike-front cone
-				u.TakeDamage(PikeDamage, to, BraceRepel);   // braced pike: damage + small repel
-				struck = true;
-			}
+			Unit u = foes[i];
+			if (u == null || !IsInstanceValid(u) || u.IsDead)
+				continue;
+			Vector3 to = u.GlobalPosition - GlobalPosition;
+			to.Y = 0f;
+			float d = to.Length();
+			if (d > PikeReach || d < 0.0001f)
+				continue;                       // out of reach
+			if (fwd.Dot(to.Normalized()) < BraceFrontDot)
+				continue;                       // not in the pike-front cone
+			u.TakeDamage(PikeDamage, to, BraceRepel);   // braced pike: damage + small repel
+			struck = true;
 		}
 
 		if (struck)
@@ -226,18 +228,19 @@ public partial class Ally : Unit
 		float leashSq = LeashRadius * LeashRadius;
 		Unit best = null;
 		float bestSq = float.MaxValue;
-		foreach (Node n in GetTree().GetNodesInGroup("units"))
+		IReadOnlyList<Unit> foes = UnitRegistry.Opponents(Team);
+		for (int i = 0; i < foes.Count; i++)
 		{
-			if (n is Unit u && !u.IsDead && u.Team != Team)
+			Unit u = foes[i];
+			if (u == null || !IsInstanceValid(u) || u.IsDead)
+				continue;
+			if (slot.DistanceSquaredTo(u.GlobalPosition) > leashSq)
+				continue;   // too far from our post — leave it alone
+			float d = GlobalPosition.DistanceSquaredTo(u.GlobalPosition);
+			if (d < bestSq)
 			{
-				if (slot.DistanceSquaredTo(u.GlobalPosition) > leashSq)
-					continue;   // too far from our post — leave it alone
-				float d = GlobalPosition.DistanceSquaredTo(u.GlobalPosition);
-				if (d < bestSq)
-				{
-					bestSq = d;
-					best = u;
-				}
+				bestSq = d;
+				best = u;
 			}
 		}
 		return best;
