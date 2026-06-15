@@ -36,8 +36,9 @@ public partial class UnitTest : Node3D
 		bool bowman = await TestBowmanKite();
 		bool registry = await TestRegistry();
 		bool bounce = await TestKnockbackBounce();
+		bool bumper = await TestBumperKick();
 
-		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce
+		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -640,6 +641,52 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: a flung unit hands its momentum to what it rams and bounces back off it"
 			: $"FAIL: transferred={transferred}, bounced={bounced}");
+		return pass;
+	}
+
+	// Chunk 21 (M6): a pinball bumper. A skeleton shoved straight at a bumper should be KICKED
+	// back out — leaving with MORE speed than it came in with, pointing AWAY from the bumper.
+	// The skeleton is alone on its team so nothing else moves it; only the push + the bumper's
+	// kick act on it. (Real Skeleton instance so it carries the collision shape that trips the
+	// detection ring.) Knockback decays each frame, so we sample the peak outward shove seen.
+	private async Task<bool> TestBumperKick()
+	{
+		GD.Print("=== UnitTest: bumper kick (pinball) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Bumper at the origin; a skeleton 3 m away on +Z, about to be shoved toward it (-Z).
+		var bumper = GD.Load<PackedScene>("res://scenes/Bumper.tscn").Instantiate<Bumper>();
+		AddChild(bumper);
+		bumper.GlobalPosition = Vector3.Zero;
+
+		var unit = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(unit);
+		unit.GlobalPosition = new Vector3(0f, 0f, 3f);
+
+		// Shove it INTO the bumper (toward -Z). The bumper sits between it and the origin.
+		const float pushSpeed = 6f;
+		unit.AddKnockback(new Vector3(0f, 0f, -pushSpeed));
+		GD.Print($"skeleton shoved at {pushSpeed} m/s into the bumper (strength={bumper.BumperStrength}, amplify={bumper.SpeedAmplify})");
+
+		// Step ~1.3 s, watching the unit's knockback. The bumper sits at the origin and the
+		// unit on +Z, so "away" is +Z: a successful kick shows a +Z shove bigger than pushSpeed.
+		float peakOutZ = 0f;
+		for (int i = 0; i < 80; i++)
+		{
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			peakOutZ = Mathf.Max(peakOutZ, unit.CurrentKnockback.Z);
+		}
+
+		bool flungAway = peakOutZ > pushSpeed;   // left pointing away (+Z) AND faster than it arrived
+		GD.Print($"peak outward shove Z={peakOutZ:0.00} vs push {pushSpeed} (flungAway={flungAway})");
+
+		bool pass = flungAway;
+		GD.Print(pass
+			? "PASS: the bumper kicks a unit back out faster than it came in"
+			: $"FAIL: flungAway={flungAway}");
 		return pass;
 	}
 }
