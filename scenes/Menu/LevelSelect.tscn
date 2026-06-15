@@ -84,6 +84,14 @@ theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level4_Onslaught.tscn"
 
+[node name="Level5Button" type="Button" parent="VBox"]
+custom_minimum_size = Vector2(400, 60)
+layout_mode = 2
+text = "5.  Pinball Arena"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")
+ScenePath = "res://scenes/Levels/Level5_PinballArena.tscn"
+
 [node name="ControlsSpacer" type="Control" parent="VBox"]
 custom_minimum_size = Vector2(0, 24)
 layout_mode = 2
