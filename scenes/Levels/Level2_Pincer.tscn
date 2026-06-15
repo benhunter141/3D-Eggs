@@ -79,7 +79,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.6, 1, 0)
 FormationOffset = Vector3(3.6, 0, -2)
 
 [node name="Pikeman6" parent="." instance=ExtResource("3_pikeman")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 4)
 FormationOffset = Vector3(0, 0, 2)
 
 [node name="SwordmanL1" parent="." instance=ExtResource("4_swordman")]

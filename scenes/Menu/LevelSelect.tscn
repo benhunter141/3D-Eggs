@@ -27,9 +27,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -200.0
-offset_top = -180.0
+offset_top = -280.0
 offset_right = 200.0
-offset_bottom = 180.0
+offset_bottom = 280.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 18
@@ -75,3 +75,31 @@ text = "3.  Arrow Storm"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level3_ArrowStorm.tscn"
+
+[node name="Level4Button" type="Button" parent="VBox"]
+custom_minimum_size = Vector2(400, 60)
+layout_mode = 2
+text = "4.  Onslaught"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")
+ScenePath = "res://scenes/Levels/Level4_Onslaught.tscn"
+
+[node name="ControlsSpacer" type="Control" parent="VBox"]
+custom_minimum_size = Vector2(0, 24)
+layout_mode = 2
+
+[node name="ControlsTitle" type="Label" parent="VBox"]
+layout_mode = 2
+text = "CONTROLS"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
+theme_override_font_sizes/font_size = 22
+
+[node name="Controls" type="Label" parent="VBox"]
+layout_mode = 2
+text = "WASD — move captain     Mouse — aim
+Left-Click — pike thrust     Right-Click / Space — brace wall
+R — restart battle"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)
+theme_override_font_sizes/font_size = 18
