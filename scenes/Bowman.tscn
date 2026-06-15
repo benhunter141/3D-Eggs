@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3 uid="uid://dbowman0eggs001"]
+
+[ext_resource type="Script" path="res://scripts/Bowman.cs" id="1_bow"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_bow"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_bow"]
+albedo_color = Color(0.2, 0.42, 0.22, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_bow"]
+radius = 0.4
+height = 1.8
+
+[node name="Bowman" type="CharacterBody3D"]
+script = ExtResource("1_bow")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_bow")
+surface_material_override/0 = SubResource("Mat_bow")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_bow")

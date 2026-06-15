@@ -32,8 +32,9 @@ public partial class UnitTest : Node3D
 		bool stones = await TestStoneThrow();
 		bool pike = await TestPikeBrace();
 		bool swordman = await TestSwordmanCharge();
+		bool bowman = await TestBowmanKite();
 
-		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman
+		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman && bowman
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -374,6 +375,86 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: swordman charge-bursts in and lands a hit"
 			: $"FAIL: burst={burst}, reached={reached}, damaged={damaged}");
+		return pass;
+	}
+
+	// Chunk 14: bowman kite + arrow. Three checks in one run:
+	//   (a) ARROW — a fired arrow damages a player-team unit (opposite team) and frees itself.
+	//   (b) HOLD RANGE — a bowman with a target parked inside its range band stands roughly put
+	//       (never charges into melee) and whittles it down with arrows.
+	//   (c) FLEE — a bowman with a target right on top of it backpedals, opening the distance.
+	// Plain stationary Units stand in for the player-team targets so only the bowman moves.
+	private async Task<bool> TestBowmanKite()
+	{
+		GD.Print("=== UnitTest: bowman kite + arrow ===");
+
+		// Wipe leftover units (and any in-flight projectiles) so nothing perturbs the test.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// (a) Arrow hits an opposite-team unit.
+		var arrowTarget = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(arrowTarget);
+		arrowTarget.GlobalPosition = new Vector3(0f, 0f, -6f);
+		var arrow = GD.Load<PackedScene>("res://scenes/Arrow.tscn").Instantiate<Arrow>();
+		AddChild(arrow);
+		arrow.GlobalPosition = Vector3.Zero;
+		arrow.Launch(arrowTarget.GlobalPosition - arrow.GlobalPosition, Unit.TeamId.Enemy);
+		for (int i = 0; i < 60; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		bool arrowHit = arrowTarget.Health < arrowTarget.MaxHealth && !IsInstanceValid(arrow);
+		GD.Print($"arrow: target HP={arrowTarget.Health}/{arrowTarget.MaxHealth}, arrow freed={!IsInstanceValid(arrow)} (hit={arrowHit})");
+
+		// (b) Hold range: target parked at 12 m (inside the 10–14 m band).
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var holdTarget = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(holdTarget);
+		holdTarget.GlobalPosition = new Vector3(0f, 0f, 12f);
+
+		var holdBow = GD.Load<PackedScene>("res://scenes/Bowman.tscn").Instantiate<Bowman>();
+		AddChild(holdBow);
+		holdBow.GlobalPosition = Vector3.Zero;
+		float holdStartDist = holdBow.GlobalPosition.DistanceTo(holdTarget.GlobalPosition);
+		GD.Print($"hold: start {holdStartDist:0.00} m (band {holdBow.PreferredRangeMin}–{holdBow.PreferredRangeMax}) -> should hold + shoot");
+
+		for (int i = 0; i < 180; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float holdEndDist = holdBow.GlobalPosition.DistanceTo(holdTarget.GlobalPosition);
+		bool stayedInBand = holdEndDist >= holdBow.FleeRange && holdEndDist <= holdBow.PreferredRangeMax + 1.0f;
+		bool shotTarget = holdTarget.Health < holdTarget.MaxHealth;
+		GD.Print($"hold: end {holdEndDist:0.00} m (stayedInBand={stayedInBand}), target HP={holdTarget.Health}/{holdTarget.MaxHealth} (shot={shotTarget})");
+
+		// (c) Flee: target right on top of the bowman (inside FleeRange).
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var meleeTarget = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(meleeTarget);
+		meleeTarget.GlobalPosition = Vector3.Zero;
+
+		var fleeBow = GD.Load<PackedScene>("res://scenes/Bowman.tscn").Instantiate<Bowman>();
+		AddChild(fleeBow);
+		fleeBow.GlobalPosition = new Vector3(0f, 0f, 3f);   // 3 m < FleeRange
+		float fleeStartDist = fleeBow.GlobalPosition.DistanceTo(meleeTarget.GlobalPosition);
+		GD.Print($"flee: start {fleeStartDist:0.00} m (fleeRange={fleeBow.FleeRange}) -> should back off");
+
+		for (int i = 0; i < 90; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float fleeEndDist = fleeBow.GlobalPosition.DistanceTo(meleeTarget.GlobalPosition);
+		bool retreated = fleeEndDist > fleeStartDist + 1.0f;
+		GD.Print($"flee: end {fleeEndDist:0.00} m (retreated={retreated})");
+
+		bool pass = arrowHit && stayedInBand && shotTarget && retreated;
+		GD.Print(pass
+			? "PASS: arrow damages foes; bowman holds its band and shoots, and flees when charged"
+			: $"FAIL: arrowHit={arrowHit}, stayedInBand={stayedInBand}, shot={shotTarget}, retreated={retreated}");
 		return pass;
 	}
 
