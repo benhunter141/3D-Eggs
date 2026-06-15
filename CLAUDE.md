@@ -95,7 +95,9 @@ ended it only listens for the `restart` action (R / gamepad) → `ReloadCurrentS
 `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable
 win/lose UI), `Levels/Level1_HoldTheLine.tscn` (captain + pike wall vs swordmen/bowmen),
-`Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`, `Bowman.tscn`, `Arrow.tscn`,
+`Levels/Level2_Pincer.tscn` (two-flank swordman charge), `Levels/Level3_ArrowStorm.tscn`
+(advance under massed bowman fire), `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
+`Bowman.tscn`, `Arrow.tscn`,
 `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Tests/UnitTest.tscn`. (Legacy `Main.tscn`
 retired in Chunk 15 — git history keeps it.)
 
@@ -113,10 +115,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice.
       Chunk 9 done (5v5 encounter + win/lose/restart). Standalone juice (Chunk 10) is
       **deferred** — it now folds into the per-level tuning passes under M4.5.
-- [~] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
+- [x] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
       a **pikeman captain** leading a **braceable pike wall** across hand-designed
       medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
-      Chunks 11–15 done (Level Select shell; Pike + Pikeman + Brace; Swordman; Bowman + Arrow; Level 1 "Hold the Line"). (Chunks 11–16 in §7.)
+      Chunks 11–16 done (Level Select shell; Pike + Pikeman + Brace; Swordman; Bowman + Arrow;
+      Level 1 "Hold the Line"; Levels 2 "Pincer" & 3 "Arrow Storm" + objective labels).
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
 - [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
@@ -220,9 +223,13 @@ favour of a **level-select front-end + hand-designed phalanx battles**.
   + pikeman wall vs swordmen + bowmen). Tune counts/ranges/charge/brace-repel until it's
   winnable AND brace clearly matters. Repoint LevelSelect button 1 → Level 1; delete the
   retired `Main.tscn`. Headless smoke (scene loads; counts correct).
-- [ ] **Chunk 16 — Levels 2 & 3 + finalize menu.** Build **Pincer** and **Arrow Storm**
-  (reuse the unit sub-scenes, new layouts/counts), enable their LevelSelect buttons, add a
-  one-line objective label per level. Headless smoke each.
+- [x] **Chunk 16 — Levels 2 & 3 + finalize menu.** Built **Pincer**
+  (`scenes/Levels/Level2_Pincer.tscn` — 6 swordmen from two flanks + 2 bowmen; captain +
+  6-pikeman wall in center) and **Arrow Storm** (`scenes/Levels/Level3_ArrowStorm.tscn` —
+  6 bowmen far behind a 3-swordman screen; advance the braced phalanx under fire). Enabled
+  their LevelSelect buttons; added a top-center objective `CanvasLayer` label to all three
+  levels. Headless smoke: both scenes load clean (no errors); Level 2 flank bowmen fire on
+  the wall immediately, Level 3 archers stay quiet (out of range until you close).
 
 Then proceed to M5+ (§6), updating checkboxes and §8 as you go.
 

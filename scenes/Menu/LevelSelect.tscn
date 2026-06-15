@@ -63,15 +63,15 @@ ScenePath = "res://scenes/Levels/Level1_HoldTheLine.tscn"
 [node name="Level2Button" type="Button" parent="VBox"]
 custom_minimum_size = Vector2(400, 60)
 layout_mode = 2
-disabled = true
-text = "2.  Pincer  (locked)"
+text = "2.  Pincer"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
+ScenePath = "res://scenes/Levels/Level2_Pincer.tscn"
 
 [node name="Level3Button" type="Button" parent="VBox"]
 custom_minimum_size = Vector2(400, 60)
 layout_mode = 2
-disabled = true
-text = "3.  Arrow Storm  (locked)"
+text = "3.  Arrow Storm"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
+ScenePath = "res://scenes/Levels/Level3_ArrowStorm.tscn"
