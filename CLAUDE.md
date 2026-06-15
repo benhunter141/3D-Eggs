@@ -113,7 +113,8 @@ ended it only listens for the `restart` action (R / gamepad) → `ReloadCurrentS
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable
 win/lose UI), `Levels/Level1_HoldTheLine.tscn` (captain + pike wall vs swordmen/bowmen),
 `Levels/Level2_Pincer.tscn` (two-flank swordman charge), `Levels/Level3_ArrowStorm.tscn`
-(advance under massed bowman fire), `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
+(advance under massed bowman fire), `Levels/Level4_Onslaught.tscn` (crowd battle —
+phalanx vs ~33-unit host), `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`,
 `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Tests/UnitTest.tscn`,
 `Tests/Crowd.tscn` (M5 stress sweep). (Legacy `Main.tscn`
@@ -138,10 +139,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
       Chunks 11–16 done (Level Select shell; Pike + Pikeman + Brace; Swordman; Bowman + Arrow;
       Level 1 "Hold the Line"; Levels 2 "Pincer" & 3 "Arrow Storm" + objective labels).
-- [~] **M5 — Crowds:** scale to 50–100 units smoothly. Chunks 17–18 done (`UnitRegistry`
+- [x] **M5 — Crowds:** scale to 50–100 units smoothly. Chunks 17–19 done (`UnitRegistry`
       killed the per-frame O(n²) group scans; `Crowd.tscn` stress harness + staggered target
-      re-scan). 50 AND 100 units sit within the 60 FPS budget (median physics ~2.9 / ~4.4 ms
-      throttled). Crowd battle level (Chunk 19) next.
+      re-scan; `Level4_Onslaught.tscn` crowd battle, ~49 units). 50 AND 100 units sit within
+      the 60 FPS budget (median physics ~2.9 / ~4.4 ms throttled). Onslaught balance still
+      needs a user feel-check.
 - [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
 - [ ] **M8 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
@@ -278,9 +280,12 @@ cost first, then add a stress scene to measure, then ship a big battle.
   (even unthrottled 100 floors ~6 ms; `MoveAndSlide` physics, not the registry scan, is now
   the dominant term). All 11 headless `UnitTest` checks still pass. `FaceTowards`-at-rest
   skip wasn't needed — budget already met.
-- [ ] **Chunk 19 — A crowd battle level.** Once 100 units hold framerate, build one large
-  hand-designed level (big phalanx vs a small army) + LevelSelect button. Tune for fun, not
-  just for the counter.
+- [x] **Chunk 19 — A crowd battle level.** `scenes/Levels/Level4_Onslaught.tscn` —
+  captain + 15-pikeman 3×5 block vs a 33-unit host (20 swordmen in 3 waves + 12 bowmen
+  behind), ~49 units total on a wider 70×70 ground with a pulled-back camera (offset
+  0,18,16) + objective label. Added the LevelSelect "4. Onslaught" button. Headless smoke:
+  loads clean, no premature win/lose. **Counts/balance unplayed — user feel-check pending;
+  tune enemy counts / charge / brace-repel if it's un-winnable or trivial.**
 
 Then proceed to M6+ (§6), updating checkboxes and §8 as you go.
 
