@@ -5,12 +5,14 @@ using Godot;
 // falls back to its slot when none are near. Measuring the leash from the SLOT (not the
 // ally) is what stops the squad from scattering — an ally never wanders further than one
 // leash from where it belongs.
-// Two weapon types (Weapon): Fists rush into melee range and punch; Stones hang back and
-// lob a projectile on a cooldown. Both deal damage with NO knockback — only the player's
-// sword shoves. Formation is from Chunk 6; fists from Chunk 7; stones added in Chunk 8.
+// Weapon types (Weapon): Fists rush into melee range and punch; Stones hang back and
+// lob a projectile on a cooldown; Pikes reach far and can BRACE. All deal damage with NO
+// knockback — only the player's sword shoves — with ONE exception: a braced pike repels
+// (small shove) whatever charges its front (Chunk 12). Formation is from Chunk 6; fists
+// from Chunk 7; stones added in Chunk 8; pike + brace in Chunk 12.
 public partial class Ally : Unit
 {
-	public enum WeaponType { Fists, Stones }
+	public enum WeaponType { Fists, Stones, Pike }
 
 	[Export] public float MoveSpeed = 10.0f;     // top follow speed (m/s); > player Speed so it can catch up
 	[Export] public float Acceleration = 60.0f;  // how fast it ramps toward the target velocity
@@ -30,6 +32,13 @@ public partial class Ally : Unit
 	[Export] public float StoneDamage = 12.0f;   // (stones) damage carried by each thrown stone (no knockback)
 	[Export] public float ThrowCooldown = 1.2f;  // (stones) seconds between throws
 	[Export] public PackedScene StoneScene;      // (stones) projectile to spawn; falls back to res://scenes/Stone.tscn
+
+	// --- Pike (long reach + brace) ---
+	[Export] public float PikeReach = 3.0f;      // (pike) thrust / brace reach distance
+	[Export] public float PikeDamage = 10.0f;    // (pike) damage per thrust / brace pulse
+	[Export] public float PikeCooldown = 0.9f;   // (pike) seconds between thrusts / brace pulses
+	[Export] public float BraceRepel = 4.0f;     // (pike, braced ONLY) small shove flung at enemies in the pike-front
+	[Export] public float BraceFrontDot = 0.4f;  // (pike, braced) front cone: enemy must be at least this far "ahead" to be repelled
 
 	// Local-space slot offset relative to the player (forward is -Z, so +Z trails behind).
 	// Set per-ally in the scene; rotated by the player's yaw each frame to get the world slot.
@@ -69,54 +78,62 @@ public partial class Ally : Unit
 		Vector3 desiredVel = Vector3.Zero;
 		bool facingHandled = false;
 
-		Unit target = FindTargetInLeash();
-		if (target != null)
+		// BRACE (pike only, polled each frame — never plumbed from the captain): plant the
+		// line on the slot, face the captain's yaw, and damage + lightly repel anything in
+		// the pike-front. This is the ONE exception to "only the captain's weapon shoves".
+		// Brace overrides normal target-chasing — a braced wall holds, it doesn't pursue.
+		if (Weapon == WeaponType.Pike && Input.IsActionPressed("brace"))
 		{
-			// Combat: chase the in-leash enemy and punch on contact (fists -> no knockback).
-			Vector3 toTarget = target.GlobalPosition - GlobalPosition;
-			toTarget.Y = 0f;
-			float dist = toTarget.Length();
-
-			FaceTowards(target.GlobalPosition, dt);
-			facingHandled = true;
-
-			if (Weapon == WeaponType.Fists)
-			{
-				// Fists: rush into melee range, then punch on cooldown.
-				if (dist > AttackRange)
-					desiredVel = toTarget.Normalized() * MoveSpeed;
-				else if (_attackTimer <= 0f)
-				{
-					target.TakeDamage(AttackDamage);   // fists: damage only, no shove
-					_attackTimer = AttackCooldown;
-					GD.Print($"[Ally] {Name} punched {target.Name} for {AttackDamage}");
-				}
-			}
-			else
-			{
-				// Stones: hang back and pelt; only close in when the target is out of throw range.
-				if (dist > ThrowRange)
-					desiredVel = toTarget.Normalized() * MoveSpeed;
-				else if (_attackTimer <= 0f)
-				{
-					ThrowStoneAt(target);
-					_attackTimer = ThrowCooldown;
-				}
-			}
+			desiredVel = SlotArriveVelocity();   // hold the slot
+			UpdateBracePulse();                  // impale/repel the front on cooldown
+			// facingHandled stays false so FacePlayerYaw below aims the pike at the captain's yaw.
 		}
-		else if (_player != null)
+		else
 		{
-			// No enemy in leash: fall back to the formation slot (Chunk 6 arrive behaviour).
-			Vector3 toSlot = SlotWorldPosition() - GlobalPosition;
-			toSlot.Y = 0f;
-			float dist = toSlot.Length();
-
-			if (dist > StopRadius)
+			Unit target = FindTargetInLeash();
+			if (target != null)
 			{
-				// Full speed when far, scaled down inside ArriveRadius so it settles
-				// into its slot instead of overshooting it.
-				float speed = MoveSpeed * Mathf.Min(1f, dist / ArriveRadius);
-				desiredVel = toSlot.Normalized() * speed;
+				// Combat: chase the in-leash enemy and strike on contact (no knockback).
+				Vector3 toTarget = target.GlobalPosition - GlobalPosition;
+				toTarget.Y = 0f;
+				float dist = toTarget.Length();
+
+				FaceTowards(target.GlobalPosition, dt);
+				facingHandled = true;
+
+				if (Weapon == WeaponType.Stones)
+				{
+					// Stones: hang back and pelt; only close in when the target is out of throw range.
+					if (dist > ThrowRange)
+						desiredVel = toTarget.Normalized() * MoveSpeed;
+					else if (_attackTimer <= 0f)
+					{
+						ThrowStoneAt(target);
+						_attackTimer = ThrowCooldown;
+					}
+				}
+				else
+				{
+					// Fists (AttackRange) or Pike (PikeReach): rush into reach, then strike on cooldown.
+					bool pike = Weapon == WeaponType.Pike;
+					float reach = pike ? PikeReach : AttackRange;
+					float dmg = pike ? PikeDamage : AttackDamage;
+					float cd = pike ? PikeCooldown : AttackCooldown;
+
+					if (dist > reach)
+						desiredVel = toTarget.Normalized() * MoveSpeed;
+					else if (_attackTimer <= 0f)
+					{
+						target.TakeDamage(dmg);   // unbraced strike: damage only, no shove
+						_attackTimer = cd;
+						GD.Print($"[Ally] {Name} struck {target.Name} for {dmg}");
+					}
+				}
+			}
+			else if (_player != null)
+			{
+				// No enemy in leash: fall back to the formation slot (Chunk 6 arrive behaviour).
+				desiredVel = SlotArriveVelocity();
 			}
 		}
 
@@ -130,6 +147,56 @@ public partial class Ally : Unit
 		// in combat, FaceTowards already aimed us at the target.
 		if (!facingHandled && _player != null)
 			FacePlayerYaw(dt);
+	}
+
+	// Velocity that walks us toward our formation slot with arrive-slowdown — full speed
+	// when far, scaled down inside ArriveRadius so we settle instead of overshooting, and
+	// zero once within StopRadius. Shared by the re-form fallback and the brace stance.
+	private Vector3 SlotArriveVelocity()
+	{
+		if (_player == null)
+			return Vector3.Zero;
+		Vector3 toSlot = SlotWorldPosition() - GlobalPosition;
+		toSlot.Y = 0f;
+		float dist = toSlot.Length();
+		if (dist <= StopRadius)
+			return Vector3.Zero;
+		float speed = MoveSpeed * Mathf.Min(1f, dist / ArriveRadius);
+		return toSlot.Normalized() * speed;
+	}
+
+	// Braced-pike pulse: on cooldown, damage AND lightly repel every enemy that sits within
+	// PikeReach inside our front cone. The repel (small knockback) is the phalanx's whole
+	// point and the one sanctioned exception to "only the captain's weapon knocks back".
+	private void UpdateBracePulse()
+	{
+		if (_attackTimer > 0f)
+			return;
+
+		Vector3 fwd = -GlobalTransform.Basis.Z;   // pikeman's facing on the flat plane
+		fwd.Y = 0f;
+		bool struck = false;
+		foreach (Node n in GetTree().GetNodesInGroup("units"))
+		{
+			if (n is Unit u && !u.IsDead && u.Team != Team)
+			{
+				Vector3 to = u.GlobalPosition - GlobalPosition;
+				to.Y = 0f;
+				float d = to.Length();
+				if (d > PikeReach || d < 0.0001f)
+					continue;                       // out of reach
+				if (fwd.Dot(to.Normalized()) < BraceFrontDot)
+					continue;                       // not in the pike-front cone
+				u.TakeDamage(PikeDamage, to, BraceRepel);   // braced pike: damage + small repel
+				struck = true;
+			}
+		}
+
+		if (struck)
+		{
+			_attackTimer = PikeCooldown;
+			GD.Print($"[Ally] {Name} braced pike impaled the front for {PikeDamage} (+repel {BraceRepel})");
+		}
 	}
 
 	// Spawn a Stone at our feet aimed at the target and let it fly (Chunk 8). Added to our

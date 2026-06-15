@@ -114,7 +114,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
       a **pikeman captain** leading a **braceable pike wall** across hand-designed
       medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
-      (Chunks 11–16 in §7.)
+      Chunks 11–12 done (Level Select shell; Pike + Pikeman + Brace). (Chunks 11–16 in §7.)
 - [ ] **M5 — Crowds:** scale to 50–100 units smoothly.
 - [ ] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
@@ -200,7 +200,7 @@ favour of a **level-select front-end + hand-designed phalanx battles**.
   the single Restart button with a reusable **Result menu** (Retry = reload scene, Level
   Select = back to menu) usable by every level. Temporarily route button 1 → old
   `Main.tscn` so routing is testable end-to-end (repointed in Chunk 15).
-- [ ] **Chunk 12 — Pike + Pikeman + Brace.** Add `WeaponType.Pike` to `Ally` (long reach;
+- [x] **Chunk 12 — Pike + Pikeman + Brace.** Add `WeaponType.Pike` to `Ally` (long reach;
   brace stance = hold slot, face captain yaw, damage + small repel of enemies in the
   pike-front). `scenes/Pikeman.tscn`, `scenes/Captain.tscn` (pike-skinned `Player`, longer
   hitbox). Add the `brace` input action (RMB + Space + gamepad) to `project.godot`.

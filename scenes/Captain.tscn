@@ -1,0 +1,70 @@
+[gd_scene load_steps=11 format=3 uid="uid://dcaptain0eggs01"]
+
+[ext_resource type="Script" path="res://scripts/Player.cs" id="1_player"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_cap"]
+radius = 0.5
+height = 2.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_cap"]
+albedo_color = Color(0.85, 0.74, 0.42, 1)
+metallic = 0.2
+roughness = 0.6
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_cap"]
+radius = 0.5
+height = 2.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_capmarker"]
+size = Vector3(0.2, 0.2, 0.7)
+
+[sub_resource type="StandardMaterial3D" id="Mat_capmarker"]
+albedo_color = Color(0.9, 0.2, 0.2, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_capike"]
+size = Vector3(0.09, 0.09, 3.0)
+
+[sub_resource type="StandardMaterial3D" id="Mat_capike"]
+albedo_color = Color(0.5, 0.35, 0.2, 1)
+metallic = 0.3
+roughness = 0.5
+
+[sub_resource type="BoxMesh" id="BoxMesh_capiketip"]
+size = Vector3(0.16, 0.16, 0.4)
+
+[sub_resource type="BoxShape3D" id="BoxShape_capikehit"]
+size = Vector3(0.7, 0.7, 3.0)
+
+[node name="Captain" type="CharacterBody3D"]
+script = ExtResource("1_player")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_cap")
+surface_material_override/0 = SubResource("Mat_cap")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_cap")
+
+[node name="FacingMarker" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -0.75)
+mesh = SubResource("BoxMesh_capmarker")
+surface_material_override/0 = SubResource("Mat_capmarker")
+
+[node name="SwordPivot" type="Node3D" parent="."]
+
+[node name="Sword" type="MeshInstance3D" parent="SwordPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -1.5)
+mesh = SubResource("BoxMesh_capike")
+surface_material_override/0 = SubResource("Mat_capike")
+
+[node name="PikeTip" type="MeshInstance3D" parent="SwordPivot/Sword"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.65)
+mesh = SubResource("BoxMesh_capiketip")
+
+[node name="Hitbox" type="Area3D" parent="SwordPivot"]
+monitoring = false
+monitorable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SwordPivot/Hitbox"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -1.5)
+shape = SubResource("BoxShape_capikehit")

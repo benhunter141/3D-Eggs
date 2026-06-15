@@ -30,8 +30,9 @@ public partial class UnitTest : Node3D
 		bool formation = await TestFormation();
 		bool allyCombat = await TestAllyCombat();
 		bool stones = await TestStoneThrow();
+		bool pike = await TestPikeBrace();
 
-		GD.Print(death && knock && hook && chase && formation && allyCombat && stones
+		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -321,6 +322,75 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: stone-ally pelted the enemy from range without charging in"
 			: $"FAIL: hit={hit}, heldGround={heldGround}");
+		return pass;
+	}
+
+	// Chunk 12: pike reach gate + brace. A BRACED pikeman holds its slot (doesn't chase),
+	// faces the captain's yaw, and damages + repels an enemy planted inside PikeReach in its
+	// front — but an enemy just BEYOND reach is untouched. Plain Units stand in for enemies:
+	// they have no _PhysicsProcess, so a repel impulse stays on their KnockbackVelocity
+	// (never decayed, never applied), making the shove easy to observe.
+	private async Task<bool> TestPikeBrace()
+	{
+		GD.Print("=== UnitTest: pikeman brace (reach gate + repel) ===");
+
+		// Wipe leftover units so nothing else perturbs the test.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Captain anchor at origin, yaw 0 -> facing -Z. The braced pike faces this yaw.
+		var player = new Node3D();
+		AddChild(player);
+		player.AddToGroup("player");
+		player.GlobalPosition = Vector3.Zero;
+		player.Rotation = Vector3.Zero;
+
+		var pike = GD.Load<PackedScene>("res://scenes/Pikeman.tscn").Instantiate<Ally>();
+		pike.FormationOffset = new Vector3(0f, 0f, 2f);   // slot straight behind the captain
+		AddChild(pike);
+		pike.GlobalPosition = pike.SlotWorldPosition();   // parked in its slot
+		pike.Rotation = Vector3.Zero;                     // forward = -Z, aligned with captain yaw
+		GD.Print($"pike weapon={pike.Weapon}, reach={pike.PikeReach}, slot={pike.SlotWorldPosition()}");
+
+		// Hold BRACE for the whole test (polled by the pikeman each frame).
+		Input.ActionPress("brace");
+
+		// HIT case: enemy 2.5 m in front (-Z), inside PikeReach (3 m).
+		var inReach = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		AddChild(inReach);
+		inReach.GlobalPosition = pike.GlobalPosition + new Vector3(0f, 0f, -2.5f);
+
+		// MISS case: enemy 3.6 m in front, just BEYOND PikeReach.
+		var outOfReach = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		AddChild(outOfReach);
+		outOfReach.GlobalPosition = pike.GlobalPosition + new Vector3(0f, 0f, -3.6f);
+
+		Vector3 slotBefore = pike.SlotWorldPosition();
+
+		// ~1.5 s: enough for a couple of brace pulses on cooldown.
+		for (int i = 0; i < 90; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		Input.ActionRelease("brace");
+
+		bool damagedInReach = inReach.Health < inReach.MaxHealth;
+		bool untouchedOut = outOfReach.Health == outOfReach.MaxHealth;
+		// Repel: the in-reach enemy should carry a shove pointing AWAY from the pike (toward -Z).
+		Vector3 kb = inReach.CurrentKnockback;
+		bool repelled = kb.Length() > 0.1f && kb.Z < 0f;
+		// Held the line: braced pike stays planted on its slot, never chases.
+		bool heldSlot = pike.GlobalPosition.DistanceTo(slotBefore) < 0.3f;
+
+		GD.Print($"in-reach HP={inReach.Health}/{inReach.MaxHealth} (damaged={damagedInReach}), " +
+			$"repel kb={kb} (repelled={repelled})");
+		GD.Print($"out-of-reach HP={outOfReach.Health}/{outOfReach.MaxHealth} (untouched={untouchedOut}), " +
+			$"pike {pike.GlobalPosition.DistanceTo(slotBefore):0.00} m from slot (heldSlot={heldSlot})");
+
+		bool pass = damagedInReach && repelled && untouchedOut && heldSlot;
+		GD.Print(pass
+			? "PASS: braced pike impales + repels its front within reach, ignores beyond reach, holds the line"
+			: $"FAIL: damaged={damagedInReach}, repelled={repelled}, untouched={untouchedOut}, heldSlot={heldSlot}");
 		return pass;
 	}
 }
