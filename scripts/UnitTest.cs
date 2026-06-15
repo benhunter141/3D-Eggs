@@ -31,8 +31,9 @@ public partial class UnitTest : Node3D
 		bool allyCombat = await TestAllyCombat();
 		bool stones = await TestStoneThrow();
 		bool pike = await TestPikeBrace();
+		bool swordman = await TestSwordmanCharge();
 
-		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike
+		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -322,6 +323,57 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: stone-ally pelted the enemy from range without charging in"
 			: $"FAIL: hit={hit}, heldGround={heldGround}");
+		return pass;
+	}
+
+	// Chunk 13: a swordman acquires a stationary player-team target, CHARGE-bursts toward it
+	// (closing more ground in the charge window than its walk speed alone could), then closes
+	// the rest of the way and lands a melee hit. A plain Unit stands in for the target so only
+	// the swordman moves.
+	private async Task<bool> TestSwordmanCharge()
+	{
+		GD.Print("=== UnitTest: swordman charge + melee ===");
+
+		// Wipe leftover units so nothing else moves or gets targeted during the run.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var target = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(target);
+		target.GlobalPosition = Vector3.Zero;
+
+		var sword = GD.Load<PackedScene>("res://scenes/Swordman.tscn").Instantiate<Swordman>();
+		AddChild(sword);
+		sword.GlobalPosition = new Vector3(0f, 0f, 10f);
+
+		float startDist = sword.GlobalPosition.DistanceTo(target.GlobalPosition);
+		float walkOnly = sword.MoveSpeed * sword.ChargeDuration; // ground a plain walk covers in the charge window
+		GD.Print($"start dist={startDist:0.00}, chargeDur={sword.ChargeDuration}s, walk-only would close ~{walkOnly:0.00} m");
+
+		// Step exactly the charge window (~60 Hz physics) and measure ground closed.
+		int chargeFrames = Mathf.CeilToInt(sword.ChargeDuration * 60f);
+		for (int i = 0; i < chargeFrames; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float midDist = sword.GlobalPosition.DistanceTo(target.GlobalPosition);
+		float closed = startDist - midDist;
+		bool burst = closed > walkOnly;   // the charge must outrun a plain walk
+		GD.Print($"after charge window: dist={midDist:0.00}, closed={closed:0.00} m (burst beats walk={burst})");
+
+		// Let it finish closing and land a hit.
+		for (int i = 0; i < 140; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float endDist = sword.GlobalPosition.DistanceTo(target.GlobalPosition);
+		bool reached = endDist <= sword.AttackRange + 0.3f;
+		bool damaged = target.Health < target.MaxHealth;
+		GD.Print($"end dist={endDist:0.00}, target HP={target.Health}/{target.MaxHealth} (reached={reached}, damaged={damaged})");
+
+		bool pass = burst && reached && damaged;
+		GD.Print(pass
+			? "PASS: swordman charge-bursts in and lands a hit"
+			: $"FAIL: burst={burst}, reached={reached}, damaged={damaged}");
 		return pass;
 	}
 

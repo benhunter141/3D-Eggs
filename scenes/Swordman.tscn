@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3 uid="uid://dsword0eggs0001"]
+
+[ext_resource type="Script" path="res://scripts/Swordman.cs" id="1_sword"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_sword"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_sword"]
+albedo_color = Color(0.55, 0.15, 0.16, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_sword"]
+radius = 0.4
+height = 1.8
+
+[node name="Swordman" type="CharacterBody3D"]
+script = ExtResource("1_sword")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_sword")
+surface_material_override/0 = SubResource("Mat_sword")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_sword")
