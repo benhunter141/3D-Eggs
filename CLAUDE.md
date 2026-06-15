@@ -159,10 +159,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       the 60 FPS budget (median physics ~2.9 / ~4.4 ms throttled). Onslaught balance still
       needs a user feel-check.
 - [~] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
-      Chunk 20 done (knockback now BOUNCES + transfers on impact — a shoved unit hands part
+      Chunks 20–21 done (knockback now BOUNCES + transfers on impact — a shoved unit hands part
       of its momentum to whatever it rams and rebounds, so one sword-fling chains through a
-      crowd). Bumpers (Chunk 21) + a pinball arena level (Chunk 22) still to come; balance
-      (restitution / transfer / min-bounce) needs a user feel-check.
+      crowd; `Bumper.tscn` static posts KICK touching units back out faster than they came in).
+      A pinball arena level (Chunk 22) still to come; balance (restitution / transfer /
+      min-bounce / bumper strength) needs a user feel-check.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
 - [ ] **M8 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
@@ -322,12 +323,16 @@ first (bounce + momentum transfer), then place bouncy obstacles, then a level th
   See §5 "Pinball collision response". Headless `UnitTest`: a cue unit flung into a stationary
   pin hands it a forward shove and rebounds (12/12 checks pass). **Balance + feel unplayed —
   user feel-check pending (tune `KnockbackBounce`/`Transfer`/`MinBounceSpeed`).**
-- [ ] **Chunk 21 — Bumpers (static bouncy obstacles).** A reusable `scenes/Bumper.tscn`
-  (`StaticBody3D` + `scripts/Bumper.cs`): when a moving unit touches it, fling the unit away
-  from the bumper with an amplified shove (uses `Unit.AddKnockback`), so the arena itself
-  becomes a pinball table. Detect via the unit's `ResolveKnockbackBounce` wall path OR an
-  `Area3D` on the bumper — pick whichever reads cleaner. Headless-test: a unit pushed into a
-  bumper leaves with MORE speed, pointing away.
+- [x] **Chunk 21 — Bumpers (static bouncy obstacles).** `scenes/Bumper.tscn` (`StaticBody3D`
+  solid core + child `Area3D` detection ring) + `scripts/Bumper.cs`: on `Area3D.BodyEntered`,
+  KICK the unit straight out from the bumper centre — outward speed = `max(BumperStrength,
+  incoming * SpeedAmplify)` so even a slow walker is flung and a fast pinball impact leaves
+  faster. Routed through `Unit.AddKnockback` (cancel current shove, then add outward*target),
+  so it's clamped to `MaxKnockback`, decays, and chains like any shove (no damage). Chose the
+  `Area3D` path over the `ResolveKnockbackBounce` wall path because that path only fires for a
+  unit already carrying a shove (> `MinBounceSpeed`); the area kicks anyone who wanders in.
+  Headless `UnitTest`: a skeleton shoved at 6 m/s into a bumper leaves at 12 m/s pointing away
+  (13/13 checks pass). **Balance/feel unplayed — folds into Chunk 22's arena tuning.**
 - [ ] **Chunk 22 — A pinball arena level.** A new `scenes/Levels/` battle built around bumpers
   + tight walls so sword-knockback and chain-bounces ricochet units around the field. Add the
   LevelSelect button + objective label. Headless smoke (loads clean, counts correct).
