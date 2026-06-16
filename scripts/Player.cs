@@ -5,16 +5,32 @@ using System.Collections.Generic;
 // WASD (or left stick) moves; mouse aims; left-click THRUSTS the held weapon straight ahead.
 // Extends Unit so it shares the team/health/damage pipeline with allies and enemies.
 //
-// Weapon swap (M9, Chunk 26): the captain carries one of two weapons, toggled live with
-// `swap_weapon` (Q / gamepad). Each weapon is a profile that drives the hitbox REACH, the
-// per-hit DAMAGE + KNOCKBACK, and the thrust/cooldown feel, plus which mesh is shown:
+// Weapon swap (M9, Chunks 26–27): the captain carries one of several weapons, cycled live
+// with `swap_weapon` (Q / gamepad). Each weapon is a PROFILE — reach, per-hit damage +
+// knockback, and thrust/cooldown feel, plus which mesh is shown. The profiles live in a
+// table keyed by WeaponType (built from the Inspector exports in _Ready), so adding a weapon
+// is one enum entry + one table row + one mesh; the swing code reads one set of runtime
+// fields (filled by ApplyWeapon) regardless of which weapon is up — the same plumbing any
+// unit could be skinned with later.
 //   • Spear — LONG reach, NO knockback: a phalanx poker that out-ranges its foe.
 //   • Sword — SHORT reach, strong KNOCKBACK: the classic sword that flings what it hits.
-// The active values are copied into runtime fields by ApplyWeapon so the swing code reads
-// one set of numbers regardless of which weapon is up.
+//   • Axe   — heavy & SLOW, the biggest single hit, with a modest shove.
+//   • Mace  — the KNOCKBACK specialist: middling damage, the hardest fling of all.
 public partial class Player : Unit
 {
-	public enum WeaponType { Spear, Sword }
+	public enum WeaponType { Spear, Sword, Axe, Mace }
+
+	// One weapon's resolved numbers. The Inspector exports below feed these in _Ready so each
+	// weapon stays tunable while the swing code reads a single uniform set.
+	private readonly struct WeaponProfile
+	{
+		public readonly float Damage, Knockback, Reach, ThrustDistance, SwingDuration, SwingCooldown;
+		public WeaponProfile(float damage, float knockback, float reach, float thrustDistance, float swingDuration, float swingCooldown)
+		{
+			Damage = damage; Knockback = knockback; Reach = reach;
+			ThrustDistance = thrustDistance; SwingDuration = swingDuration; SwingCooldown = swingCooldown;
+		}
+	}
 
 	// --- Tunable feel knobs (editable in the Inspector too) ---
 	[Export] public float Speed = 6.0f;         // top movement speed (m/s) — a notch above the AI, not double
@@ -41,6 +57,23 @@ public partial class Player : Unit
 	[Export] public float SwordSwingDuration = 0.18f;
 	[Export] public float SwordSwingCooldown = 0.30f;
 
+	// Axe profile — heavy & slow: the biggest single hit, with a modest shove. The long
+	// cooldown is the heavy-weapon tax (you commit to each swing).
+	[Export] public float AxeDamage = 70.0f;
+	[Export] public float AxeKnockback = 4.0f;
+	[Export] public float AxeReach = 1.6f;
+	[Export] public float AxeThrustDistance = 0.6f;
+	[Export] public float AxeSwingDuration = 0.28f;
+	[Export] public float AxeSwingCooldown = 0.55f;    // slow
+
+	// Mace profile — the knockback specialist: middling damage, the hardest fling of all.
+	[Export] public float MaceDamage = 28.0f;
+	[Export] public float MaceKnockback = 14.0f;       // strongest shove of any weapon
+	[Export] public float MaceReach = 1.5f;
+	[Export] public float MaceThrustDistance = 0.6f;
+	[Export] public float MaceSwingDuration = 0.22f;
+	[Export] public float MaceSwingCooldown = 0.42f;
+
 	// --- Shared thrust feel ---
 	[Export] public float ThrustExtendFrac = 0.4f;   // fraction of the duration spent jabbing out (rest is the retract)
 	[Export] public float SwordReturnLerp = 12.0f;   // how fast the weapon eases back to rest if interrupted
@@ -54,17 +87,21 @@ public partial class Player : Unit
 	private float _swingDuration;
 	private float _swingCooldown;
 
-	// Read-only views (used by the headless weapon-swap test).
+	// The weapon table + the mesh per weapon, built in _Ready.
+	private Dictionary<WeaponType, WeaponProfile> _profiles;
+	private Dictionary<WeaponType, Node3D> _weaponMeshes;
+
+	// Read-only views (used by the headless weapon tests).
 	public WeaponType CurrentWeapon => _weapon;
 	public float CurrentDamage => _damage;
 	public float CurrentWeaponKnockback => _knockback;   // NOTE: Unit.CurrentKnockback is the live shove Vector3
 	public float CurrentReach => _reach;
+	public float CurrentSwingCooldown => _swingCooldown;                // higher = slower (the axe's tax)
 	public float EffectiveReach => _reach + _thrustDistance;            // how far the tip lands at full lunge
 	public float HitboxLength => _hitboxShape?.Shape is BoxShape3D b ? b.Size.Z : 0f;
+	public static int WeaponCount => System.Enum.GetValues<WeaponType>().Length;
 
 	private Node3D _swordPivot;
-	private Node3D _spearMesh;
-	private Node3D _swordMesh;
 	private Area3D _hitbox;
 	private CollisionShape3D _hitboxShape;
 
@@ -86,10 +123,25 @@ public partial class Player : Unit
 		AddToGroup("player");   // allies find their formation anchor through this group
 
 		_swordPivot = GetNode<Node3D>("SwordPivot");
-		_spearMesh = GetNodeOrNull<Node3D>("SwordPivot/Spear");
-		_swordMesh = GetNodeOrNull<Node3D>("SwordPivot/SwordMesh");
 		_hitbox = GetNode<Area3D>("SwordPivot/Hitbox");
 		_hitboxShape = GetNode<CollisionShape3D>("SwordPivot/Hitbox/CollisionShape3D");
+
+		// Build the weapon table from the Inspector exports, and find each weapon's mesh node
+		// (missing ones are fine — GetNodeOrNull keeps a weapon usable even without its mesh).
+		_profiles = new Dictionary<WeaponType, WeaponProfile>
+		{
+			[WeaponType.Spear] = new WeaponProfile(SpearDamage, SpearKnockback, SpearReach, SpearThrustDistance, SpearSwingDuration, SpearSwingCooldown),
+			[WeaponType.Sword] = new WeaponProfile(SwordDamage, SwordKnockback, SwordReach, SwordThrustDistance, SwordSwingDuration, SwordSwingCooldown),
+			[WeaponType.Axe]   = new WeaponProfile(AxeDamage,   AxeKnockback,   AxeReach,   AxeThrustDistance,   AxeSwingDuration,   AxeSwingCooldown),
+			[WeaponType.Mace]  = new WeaponProfile(MaceDamage,  MaceKnockback,  MaceReach,  MaceThrustDistance,  MaceSwingDuration,  MaceSwingCooldown),
+		};
+		_weaponMeshes = new Dictionary<WeaponType, Node3D>
+		{
+			[WeaponType.Spear] = GetNodeOrNull<Node3D>("SwordPivot/Spear"),
+			[WeaponType.Sword] = GetNodeOrNull<Node3D>("SwordPivot/SwordMesh"),
+			[WeaponType.Axe]   = GetNodeOrNull<Node3D>("SwordPivot/AxeMesh"),
+			[WeaponType.Mace]  = GetNodeOrNull<Node3D>("SwordPivot/MaceMesh"),
+		};
 
 		// Own the hitbox box so resizing it for a weapon never mutates a shared resource.
 		if (_hitboxShape.Shape is BoxShape3D box)
@@ -102,12 +154,15 @@ public partial class Player : Unit
 		SetHitboxActive(false);
 	}
 
-	// Toggle between the two weapons (bound to `swap_weapon`).
+	// Cycle to the next weapon in enum order (bound to `swap_weapon`), wrapping around.
 	public void SwapWeapon()
 	{
-		ApplyWeapon(_weapon == WeaponType.Spear ? WeaponType.Sword : WeaponType.Spear);
-		GD.Print($"[Player] swapped to {_weapon} (reach {_reach:0.0} m, knockback {_knockback:0.0})");
+		ApplyWeapon((WeaponType)(((int)_weapon + 1) % WeaponCount));
+		GD.Print($"[Player] swapped to {_weapon} (reach {_reach:0.0} m, knockback {_knockback:0.0}, cooldown {_swingCooldown:0.00}s)");
 	}
+
+	// Jump straight to a specific weapon (per-level default / tests).
+	public void SetWeapon(WeaponType weapon) => ApplyWeapon(weapon);
 
 	// Load a weapon's profile into the active fields, show its mesh, and resize the thrust
 	// hitbox so its forward length matches the weapon's reach (the box grows out along -Z from
@@ -115,17 +170,19 @@ public partial class Player : Unit
 	private void ApplyWeapon(WeaponType weapon)
 	{
 		_weapon = weapon;
-		bool sword = weapon == WeaponType.Sword;
+		WeaponProfile p = _profiles[weapon];
 
-		_damage         = sword ? SwordDamage : SpearDamage;
-		_knockback      = sword ? SwordKnockback : SpearKnockback;
-		_reach          = sword ? SwordReach : SpearReach;
-		_thrustDistance = sword ? SwordThrustDistance : SpearThrustDistance;
-		_swingDuration  = sword ? SwordSwingDuration : SpearSwingDuration;
-		_swingCooldown  = sword ? SwordSwingCooldown : SpearSwingCooldown;
+		_damage         = p.Damage;
+		_knockback      = p.Knockback;
+		_reach          = p.Reach;
+		_thrustDistance = p.ThrustDistance;
+		_swingDuration  = p.SwingDuration;
+		_swingCooldown  = p.SwingCooldown;
 
-		if (_spearMesh != null) _spearMesh.Visible = !sword;
-		if (_swordMesh != null) _swordMesh.Visible = sword;
+		// Show only the active weapon's mesh.
+		foreach (var (type, mesh) in _weaponMeshes)
+			if (mesh != null)
+				mesh.Visible = type == weapon;
 
 		// Box spans 0..-_reach along the pivot's forward axis, so position it at -_reach/2.
 		if (_hitboxShape?.Shape is BoxShape3D box)

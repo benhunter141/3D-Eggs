@@ -1,4 +1,4 @@
-[gd_scene load_steps=19 format=3 uid="uid://dcaptain0eggs01"]
+[gd_scene load_steps=23 format=3 uid="uid://dcaptain0eggs01"]
 
 [ext_resource type="Script" path="res://scripts/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
@@ -70,6 +70,29 @@ height = 0.11
 radial_segments = 8
 rings = 4
 
+[sub_resource type="CylinderMesh" id="CylinderMesh_axehaft"]
+top_radius = 0.045
+bottom_radius = 0.045
+height = 1.6
+radial_segments = 8
+rings = 1
+
+[sub_resource type="BoxMesh" id="BoxMesh_axehead"]
+size = Vector3(0.06, 0.42, 0.34)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_macehaft"]
+top_radius = 0.045
+bottom_radius = 0.045
+height = 1.2
+radial_segments = 8
+rings = 1
+
+[sub_resource type="SphereMesh" id="SphereMesh_maceball"]
+radius = 0.17
+height = 0.34
+radial_segments = 10
+rings = 6
+
 [sub_resource type="BoxShape3D" id="BoxShape_capikehit"]
 size = Vector3(0.7, 0.7, 3.0)
 
@@ -128,6 +151,34 @@ surface_material_override/0 = SubResource("Mat_grip")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.15)
 mesh = SubResource("SphereMesh_pommel")
 surface_material_override/0 = SubResource("Mat_gold")
+
+[node name="AxeMesh" type="Node3D" parent="SwordPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -0.8)
+visible = false
+
+[node name="Haft" type="MeshInstance3D" parent="SwordPivot/AxeMesh"]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+mesh = SubResource("CylinderMesh_axehaft")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="Head" type="MeshInstance3D" parent="SwordPivot/AxeMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.16, 0, -0.55)
+mesh = SubResource("BoxMesh_axehead")
+surface_material_override/0 = SubResource("Mat_blade")
+
+[node name="MaceMesh" type="Node3D" parent="SwordPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -0.7)
+visible = false
+
+[node name="Haft" type="MeshInstance3D" parent="SwordPivot/MaceMesh"]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+mesh = SubResource("CylinderMesh_macehaft")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="Ball" type="MeshInstance3D" parent="SwordPivot/MaceMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.62)
+mesh = SubResource("SphereMesh_maceball")
+surface_material_override/0 = SubResource("Mat_metal")
 
 [node name="Hitbox" type="Area3D" parent="SwordPivot"]
 monitoring = false

@@ -39,8 +39,9 @@ public partial class UnitTest : Node3D
 		bool bounce = await TestKnockbackBounce();
 		bool bumper = await TestBumperKick();
 		bool weaponSwap = await TestWeaponSwap();
+		bool archetypes = await TestWeaponArchetypes();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -826,11 +827,12 @@ public partial class UnitTest : Node3D
 		GD.Print($"sword: weapon={cap.CurrentWeapon}, knockback={cap.CurrentWeaponKnockback}, " +
 			$"hitboxLen={cap.HitboxLength:0.00} (want {cap.SwordReach}), reach={swordReach:0.00}, meshOk={swordMeshShown}");
 
-		// The spear must genuinely out-range the sword, and a second swap returns to the spear.
+		// The spear must genuinely out-range the sword, and cycling the rest of the way around
+		// (one swap per remaining weapon) wraps back to the spear we started on.
 		bool spearOutreaches = spearReach > swordReach;
-		cap.SwapWeapon();
+		for (int i = 0; i < Player.WeaponCount - 1; i++) cap.SwapWeapon();
 		bool swappedBack = cap.CurrentWeapon == Player.WeaponType.Spear;
-		GD.Print($"spear reach {spearReach:0.00} > sword reach {swordReach:0.00} = {spearOutreaches}; swappedBack={swappedBack}");
+		GD.Print($"spear reach {spearReach:0.00} > sword reach {swordReach:0.00} = {spearOutreaches}; cycled back to spear={swappedBack}");
 
 		bool pass = spearIsSpear && spearNoKnock && spearHitbox && spearMeshShown
 			&& swordIsSword && swordKnocks && swordHitbox && swordMeshShown
@@ -840,6 +842,86 @@ public partial class UnitTest : Node3D
 			: $"FAIL: spear(is={spearIsSpear},noKnock={spearNoKnock},hitbox={spearHitbox},mesh={spearMeshShown}) " +
 			  $"sword(is={swordIsSword},knocks={swordKnocks},hitbox={swordHitbox},mesh={swordMeshShown}) " +
 			  $"outreach={spearOutreaches},back={swappedBack}");
+		return pass;
+	}
+
+	// Chunk 27 (M9): the extra weapon archetypes. Walk every WeaponType through the data-driven
+	// profile table on the real Captain scene and assert each archetype's stats resolve to its
+	// design role: the axe lands the BIGGEST hit and is the SLOWEST (longest cooldown), the mace
+	// flings HARDEST (most knockback), the spear reaches FURTHEST with NO knockback, and every
+	// weapon shows only its own mesh while its hitbox length tracks its reach.
+	private async Task<bool> TestWeaponArchetypes()
+	{
+		GD.Print("=== UnitTest: weapon archetypes (axe/mace + table) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(cap);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Every weapon's mesh node, to confirm only the active one is shown.
+		var meshes = new System.Collections.Generic.Dictionary<Player.WeaponType, Node3D>
+		{
+			[Player.WeaponType.Spear] = cap.GetNode<Node3D>("SwordPivot/Spear"),
+			[Player.WeaponType.Sword] = cap.GetNode<Node3D>("SwordPivot/SwordMesh"),
+			[Player.WeaponType.Axe]   = cap.GetNode<Node3D>("SwordPivot/AxeMesh"),
+			[Player.WeaponType.Mace]  = cap.GetNode<Node3D>("SwordPivot/MaceMesh"),
+		};
+
+		var dmg = new System.Collections.Generic.Dictionary<Player.WeaponType, float>();
+		var knock = new System.Collections.Generic.Dictionary<Player.WeaponType, float>();
+		var reach = new System.Collections.Generic.Dictionary<Player.WeaponType, float>();
+		var cooldown = new System.Collections.Generic.Dictionary<Player.WeaponType, float>();
+		bool allMeshesIsolated = true;
+		bool allHitboxesMatch = true;
+
+		foreach (Player.WeaponType w in System.Enum.GetValues<Player.WeaponType>())
+		{
+			cap.SetWeapon(w);
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+			dmg[w] = cap.CurrentDamage;
+			knock[w] = cap.CurrentWeaponKnockback;
+			reach[w] = cap.CurrentReach;
+			cooldown[w] = cap.CurrentSwingCooldown;
+
+			// Hitbox length tracks the active weapon's reach.
+			if (!Mathf.IsEqualApprox(cap.HitboxLength, cap.CurrentReach, 0.01f))
+				allHitboxesMatch = false;
+
+			// Only this weapon's mesh is visible.
+			foreach (var (type, mesh) in meshes)
+				if (mesh.Visible != (type == w))
+					allMeshesIsolated = false;
+
+			GD.Print($"  {w}: dmg={dmg[w]:0.0}, knockback={knock[w]:0.0}, reach={reach[w]:0.0}, " +
+				$"cooldown={cooldown[w]:0.00}s, hitboxLen={cap.HitboxLength:0.0}");
+		}
+
+		// Each archetype owns its niche, relative to the others.
+		bool axeHardestHit = dmg[Player.WeaponType.Axe] > dmg[Player.WeaponType.Sword]
+			&& dmg[Player.WeaponType.Axe] > dmg[Player.WeaponType.Mace]
+			&& dmg[Player.WeaponType.Axe] > dmg[Player.WeaponType.Spear];
+		bool axeSlowest = cooldown[Player.WeaponType.Axe] > cooldown[Player.WeaponType.Sword]
+			&& cooldown[Player.WeaponType.Axe] > cooldown[Player.WeaponType.Mace]
+			&& cooldown[Player.WeaponType.Axe] > cooldown[Player.WeaponType.Spear];
+		bool maceHardestFling = knock[Player.WeaponType.Mace] > knock[Player.WeaponType.Sword]
+			&& knock[Player.WeaponType.Mace] > knock[Player.WeaponType.Axe]
+			&& knock[Player.WeaponType.Mace] > knock[Player.WeaponType.Spear];
+		bool spearLongestReach = reach[Player.WeaponType.Spear] > reach[Player.WeaponType.Sword]
+			&& reach[Player.WeaponType.Spear] > reach[Player.WeaponType.Axe]
+			&& reach[Player.WeaponType.Spear] > reach[Player.WeaponType.Mace];
+		bool spearNoKnock = Mathf.IsZeroApprox(knock[Player.WeaponType.Spear]);
+
+		bool pass = axeHardestHit && axeSlowest && maceHardestFling && spearLongestReach
+			&& spearNoKnock && allMeshesIsolated && allHitboxesMatch;
+		GD.Print(pass
+			? "PASS: every archetype resolves to its role (axe=heaviest+slowest, mace=hardest fling, spear=longest+no knockback), mesh + hitbox per weapon"
+			: $"FAIL: axeHardestHit={axeHardestHit}, axeSlowest={axeSlowest}, maceHardestFling={maceHardestFling}, " +
+			  $"spearLongestReach={spearLongestReach}, spearNoKnock={spearNoKnock}, meshIsolated={allMeshesIsolated}, hitboxMatch={allHitboxesMatch}");
 		return pass;
 	}
 }
