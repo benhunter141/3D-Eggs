@@ -20,9 +20,6 @@ A **3D twin-stick action game** — **medieval fantasy**, mostly **melee**:
 - **Multiplayer** (play with friends) — last.
 - Built entirely with **free** tools.
 
-**Near-term target — a vertical slice:** player (sword) + 4 allies (2 fists, 2 stones)
-vs 5 skeletons, **5v5**. Allies stay near the player in formation. See §7 for the plan.
-
 Theme: the folder is "3D Eggs" 🥚 but the game is **medieval fantasy** — egg theme
 dropped. Use medieval/neutral names (`Player`, `Ally`, `Enemy` / `Skeleton`).
 
@@ -83,7 +80,7 @@ its LIVE position. A dead/freed cached target forces an immediate re-scan. Alloc
 (no per-frame closures). Cold-process A/B: ~halves the median physics step (100 units
 9.4→4.4 ms). Projectiles (Stone/Arrow) still scan every frame — they need exact proximity.
 
-**Match state:** `GameManager` (node in `Main.tscn`) is the single authority — each
+**Match state:** `GameManager` (node in each level scene) is the single authority — each
 frame it declares LOSE if the player is dead, else WIN once all enemy units are cleared.
 **Lose is checked first** so a late ally kill can't flash VICTORY over GAME OVER. Once
 ended it only listens for the `restart` action (R / gamepad) → `ReloadCurrentScene`.
@@ -118,21 +115,17 @@ folds in `KnockbackVelocity`) — revisit if pinball should toss the captain too
   hold near slot, lob a `Stone` every `ThrowCooldown`, close in only if past `ThrowRange`.
 - `Stone` projectile: aimed straight on launch, proximity-hits enemy-team units, frees
   on hit or `MaxLifetime`.
-- **Squad:** 2 fists (Ally1/2) + 2 stones (Ally3/4) in `Main.tscn`.
 - Direct player-issued ally commands come later (M7).
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
-`Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `FollowCamera.cs`,
-`GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs` (M5 stress harness).
+`Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`,
+`FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable
-win/lose UI), `Levels/Level1_HoldTheLine.tscn` (captain + pike wall vs swordmen/bowmen),
-`Levels/Level2_Pincer.tscn` (two-flank swordman charge), `Levels/Level3_ArrowStorm.tscn`
-(advance under massed bowman fire), `Levels/Level4_Onslaught.tscn` (crowd battle —
-phalanx vs ~33-unit host), `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
-`Bowman.tscn`, `Arrow.tscn`,
-`Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Tests/UnitTest.tscn`,
-`Tests/Crowd.tscn` (M5 stress sweep). (Legacy `Main.tscn`
-retired in Chunk 15 — git history keeps it.)
+win/lose UI), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
+`Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
+`Levels/Level5_PinballArena.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
+`Bowman.tscn`, `Arrow.tscn`, `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Bumper.tscn`,
+`Tests/UnitTest.tscn`, `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
 
@@ -199,185 +192,37 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 
 **Done (detail in code + git log):**
 - [x] **Chunk 1** — Mouse aim + follow camera.
-- [x] **Chunk 2** — Sword swing (arc hitbox + cooldown). *Pending user feel-check.*
+- [x] **Chunk 2** — Sword swing (arc hitbox + cooldown).
 - [x] **Chunk 3** — `Unit`/health foundation + damage dummy.
 - [x] **Chunk 4** — Sword knockback.
 - [x] **Chunk 5** — Skeleton AI (chase + melee) + player can die.
 - [x] **Chunk 6** — Allies + formation (movement only).
 - [x] **Chunk 7** — Ally combat (loose leash) + fists.
 - [x] **Chunk 8** — Stone-throwing allies.
-- [x] **Chunk 9** — 5v5 encounter + win/lose. `GameManager` owns match state (LOSE if
-  player dies, WIN once all skeletons cleared; lose-first so a late ally kill can't show
-  VICTORY over GAME OVER). 5 skeletons in `Main.tscn`; VICTORY/GAME OVER labels; Restart
-  button + `restart` key (R / gamepad).
+- [x] **Chunk 9** — 5v5 encounter + win/lose; `GameManager` match state.
+- [~] **Chunk 10** — Juice & tuning. *Deferred — rolled into per-level tuning; revisit only if asked.*
+- [x] **Chunk 11** — Level Select shell + scene routing; reusable Result menu.
+- [x] **Chunk 12** — Pike + Pikeman + Brace; `brace` input action.
+- [x] **Chunk 13** — Swordman (charge burst + flank-offset + melee, no knockback).
+- [x] **Chunk 14** — Bowman + Arrow (range-band kite, flee melee, fire on cooldown).
+- [x] **Chunk 15** — Level 1 "Hold the Line"; retired `Main.tscn`.
+- [x] **Chunk 16** — Levels 2 "Pincer" & 3 "Arrow Storm"; objective labels; finalized menu.
+- [x] **Chunk 17** — `UnitRegistry`: static bucketed target scanning; replaced all group scans.
+- [x] **Chunk 18** — `Crowd.tscn` stress harness + staggered target re-scan; 50/100 units within budget.
+- [x] **Chunk 19** — Level 4 "Onslaught" (~49-unit crowd battle).
+- [x] **Chunk 20** — Bouncy knockback + impact transfer; `Unit.AddKnockback` / `ResolveKnockbackBounce`.
+- [x] **Chunk 21** — `Bumper.tscn` static obstacles; `Area3D` kick via `Unit.AddKnockback`.
+- [x] **Chunk 22** — Level 5 "Pinball Arena" (walled 44×44 arena + 8 bumpers).
+- [x] **Chunk 23** — Adjustable dynamic zoom (`ZoomBias` on mouse wheel / keys).
 
-**Deferred (do NOT build next — superseded by the pivot below):**
-- [~] **Chunk 10 — Juice & tuning.** Health bars / hit flashes, swing + impact effects,
-  balance pass. Rolled into the per-level tuning of Chunks 15–16; revisit only if asked.
-
----
-
-### ▶ ACTIVE PLAN — Level Select + Phalanx Battles (Chunks 11–16)
-
-**Direction change (locked with the user 2026-06-14):** retire the single 5v5 sandbox in
-favour of a **level-select front-end + hand-designed phalanx battles**.
-- **Control = Captain + phalanx.** You twin-stick **one pikeman captain** (WASD + mouse,
-  click = pike thrust — the existing `Player`). Your pikemen hold a **tight wall** in
-  player-relative slots that rotate with your facing (existing `Ally` formation).
-  **Right-click / Space = BRACE:** the whole line plants, faces your yaw, presents pikes.
-  **Lose = captain dies; Win = all enemies cleared** — `GameManager` logic is unchanged.
-- **Levels replace the 5v5.** Level Select is the new entry scene; old `Main.tscn` is
-  retired (git history keeps it). All levels are fresh medieval scenarios.
-
-**New durable rules (design law — promote into §5 as the chunks land):**
-- **Pike reach + brace-repel.** Pikemen attack at long range (~3 m). The rule "only the
-  captain's weapon knocks back" still holds, with **one exception:** a **braced** pike
-  *repels* (small shove) whatever charges its front — the phalanx's whole point, and it
-  feeds the pinball feel.
-- **Brace is polled, not plumbed.** Every Pikeman reads the `brace` input itself each
-  frame (no captain→squad messaging), keeping the stance decoupled.
-- **Enemy archetypes never knock back.** **Swordman** = charging/flanking melee (curls
-  around the wall to dodge braced pikes); **Bowman** = kiting ranged (holds a range band,
-  flees melee, lobs arrows).
-
-**Unit reference (build each as a reusable sub-scene):**
-- `Captain` (= `Player`, pike skin, longer thrust hitbox; the `FollowCamera` target).
-- `Pikeman` (= `Ally` + `WeaponType.Pike`): reach ~3 m, moderate dmg; **brace** = hold
-  slot, face captain yaw, damage + small repel of enemies in the pike-front.
-- `Swordman` (enemy): chase nearest player-team unit, **charge burst** on acquire,
-  flank-offset approach, melee on contact.
-- `Bowman` (enemy): keep ~10–14 m, flee if a melee unit < ~5 m, fire an `Arrow` on cooldown.
-- `Arrow` (projectile): mirrors `Stone` (straight flight, proximity hit on the *opposite*
-  team, damage no knockback, lifetime). *A later cleanup may unify Stone + Arrow.*
-
-**Level designs (the "few levels"):**
-1. **Hold the Line** — phalanx vs a screen of **swordmen** backed by **bowmen**. Brace to
-   impale charges; push forward between volleys to reach and rout the archers.
-2. **Pincer** — swordmen charge from **two flanks** (few bowmen); pivot the wall (slot
-   rotation) to face each push. Teaches facing.
-3. **Arrow Storm** — many **bowmen** on the far side behind a thin swordman screen; advance
-   the braced phalanx across open ground **under fire** to close. Endurance.
-
-**Chunks (the WORKFLOW box above still applies — build the first `[ ]`):**
-- [x] **Chunk 11 — Level Select shell + scene routing.** `scenes/Menu/LevelSelect.tscn`
-  (title + one button per level; unbuilt ones disabled) becomes the new `run/main_scene`.
-  `scripts/SceneButton.cs` (exported `ScenePath` → `GetTree().ChangeSceneToFile`). Replace
-  the single Restart button with a reusable **Result menu** (Retry = reload scene, Level
-  Select = back to menu) usable by every level. Temporarily route button 1 → old
-  `Main.tscn` so routing is testable end-to-end (repointed in Chunk 15).
-- [x] **Chunk 12 — Pike + Pikeman + Brace.** Add `WeaponType.Pike` to `Ally` (long reach;
-  brace stance = hold slot, face captain yaw, damage + small repel of enemies in the
-  pike-front). `scenes/Pikeman.tscn`, `scenes/Captain.tscn` (pike-skinned `Player`, longer
-  hitbox). Add the `brace` input action (RMB + Space + gamepad) to `project.godot`.
-  Headless-test in `UnitTest.tscn`: reach gate (hits at ~2.8 m, misses at ~3.5 m) +
-  braced pikeman holds slot and damages/repels a unit placed in front.
-- [x] **Chunk 13 — Swordman.** `scripts/Swordman.cs` (charge burst on acquire +
-  flank-offset approach + melee, no knockback) + `scenes/Swordman.tscn` (reskin Skeleton).
-  Headless-test: charge closes a set distance in T s and lands a hit.
-- [x] **Chunk 14 — Bowman + Arrow.** `scripts/Arrow.cs` + `scenes/Arrow.tscn` (Stone-like,
-  hits the opposite team). `scripts/Bowman.cs` (range-band kite, flee melee, fire on
-  cooldown) + `scenes/Bowman.tscn`. Headless-test: arrow damages a player-team unit;
-  bowman retreats when a unit closes and holds range otherwise.
-- [x] **Chunk 15 — Level 1 "Hold the Line" (assemble + tune).** `scenes/Levels/
-  Level1_HoldTheLine.tscn` (ground/light/`FollowCamera`/`GameManager`/Result UI + captain
-  + pikeman wall vs swordmen + bowmen). Tune counts/ranges/charge/brace-repel until it's
-  winnable AND brace clearly matters. Repoint LevelSelect button 1 → Level 1; delete the
-  retired `Main.tscn`. Headless smoke (scene loads; counts correct).
-- [x] **Chunk 16 — Levels 2 & 3 + finalize menu.** Built **Pincer**
-  (`scenes/Levels/Level2_Pincer.tscn` — 6 swordmen from two flanks + 2 bowmen; captain +
-  6-pikeman wall in center) and **Arrow Storm** (`scenes/Levels/Level3_ArrowStorm.tscn` —
-  6 bowmen far behind a 3-swordman screen; advance the braced phalanx under fire). Enabled
-  their LevelSelect buttons; added a top-center objective `CanvasLayer` label to all three
-  levels. Headless smoke: both scenes load clean (no errors); Level 2 flank bowmen fire on
-  the wall immediately, Level 3 archers stay quiet (out of range until you close).
+**M7 — Ally commands:** no chunk breakdown yet — plan when it comes up.
 
 ---
 
-### ▶ ACTIVE PLAN — M5 Crowds (Chunks 17–19)
+### ▶ PLANNED — M8 Camera & Visual Identity Polish (Chunks 24–25)
 
-**Goal:** make 50–100 units run smoothly so battles can scale up. Attack the per-frame
-cost first, then add a stress scene to measure, then ship a big battle.
+**Goal:** cartoony eyes and recognizable weapon meshes — cheap, high-impact identity wins.
 
-- [x] **Chunk 17 — `UnitRegistry` (kill the per-frame group scans).** New static
-  `scripts/UnitRegistry.cs` buckets living units by team; `Unit._Ready`/`_ExitTree`
-  register/unregister. Replaced every `GetNodesInGroup("units")` target scan
-  (Enemy/Swordman/Bowman + Ally leash & brace + Stone/Arrow) with
-  `UnitRegistry.FindNearestOpponent` / `Opponents`. Pure perf refactor — all 11 headless
-  tests still pass, incl. a new registry test (buckets, nearest, max-range, skip-dead,
-  unregister-on-free). See §5 "Target scanning".
-- [x] **Chunk 18 — Stress scene + frame budget.** `scenes/Tests/Crowd.tscn` + `CrowdTest.cs`
-  spawn two armies (Swordman/Bowman vs Pikemen) at a parametric crowd size and report the
-  MEDIAN physics-step ms over a sample window (median, not mean — C# GC pauses inflate the
-  mean at this scale; the min/p90 frame the GC tail). Cold-process A/B (`++ --count=N
-  --rescan=K`) is the trustworthy comparison — within one process the medians drift with run
-  order. Added the staggered target re-scan (`Unit.ShouldRescanTarget()`/`CachedTarget`,
-  `TargetRescanInterval`=6) across Enemy/Swordman/Bowman/Ally. **Numbers (cold-process
-  median physics step, 60 FPS budget = 16.67 ms):** N=50 scan-every-frame 5.7 ms → throttled
-  2.9 ms; N=100 9.4 → 4.4 ms — the throttle ~halves it and both sizes are well within budget
-  (even unthrottled 100 floors ~6 ms; `MoveAndSlide` physics, not the registry scan, is now
-  the dominant term). All 11 headless `UnitTest` checks still pass. `FaceTowards`-at-rest
-  skip wasn't needed — budget already met.
-- [x] **Chunk 19 — A crowd battle level.** `scenes/Levels/Level4_Onslaught.tscn` —
-  captain + 15-pikeman 3×5 block vs a 33-unit host (20 swordmen in 3 waves + 12 bowmen
-  behind), ~49 units total on a wider 70×70 ground with a pulled-back camera (offset
-  0,18,16) + objective label. Added the LevelSelect "4. Onslaught" button. Headless smoke:
-  loads clean, no premature win/lose. **Counts/balance unplayed — user feel-check pending;
-  tune enemy counts / charge / brace-repel if it's un-winnable or trivial.**
-
----
-
-### ▶ ACTIVE PLAN — M6 Pinball Physics (Chunks 20–22)
-
-**Goal:** make collisions *chaotic and bouncy* — the game's stated soul. Build the response
-first (bounce + momentum transfer), then place bouncy obstacles, then a level that revels in it.
-
-- [x] **Chunk 20 — Bouncy knockback + impact transfer (chain reactions).** Pure script in
-  `Unit.cs`: a shoved unit (> `MinBounceSpeed`) hands part of its momentum to whatever it rams
-  (`KnockbackTransfer`, no damage) and bounces the rest back (`KnockbackBounce`); all shove
-  injection routes through a new public `Unit.AddKnockback` (clamped to `MaxKnockback`), and
-  each AI subclass calls `ResolveKnockbackBounce()` after its `MoveAndSlide`. So one sword-fling
-  chains through a crowd. Uses the knockback travel direction (not the unreliable capsule
-  contact normal/positions) as the impact axis for body-vs-body; surface normal only for walls.
-  See §5 "Pinball collision response". Headless `UnitTest`: a cue unit flung into a stationary
-  pin hands it a forward shove and rebounds (12/12 checks pass). **Balance + feel unplayed —
-  user feel-check pending (tune `KnockbackBounce`/`Transfer`/`MinBounceSpeed`).**
-- [x] **Chunk 21 — Bumpers (static bouncy obstacles).** `scenes/Bumper.tscn` (`StaticBody3D`
-  solid core + child `Area3D` detection ring) + `scripts/Bumper.cs`: on `Area3D.BodyEntered`,
-  KICK the unit straight out from the bumper centre — outward speed = `max(BumperStrength,
-  incoming * SpeedAmplify)` so even a slow walker is flung and a fast pinball impact leaves
-  faster. Routed through `Unit.AddKnockback` (cancel current shove, then add outward*target),
-  so it's clamped to `MaxKnockback`, decays, and chains like any shove (no damage). Chose the
-  `Area3D` path over the `ResolveKnockbackBounce` wall path because that path only fires for a
-  unit already carrying a shove (> `MinBounceSpeed`); the area kicks anyone who wanders in.
-  Headless `UnitTest`: a skeleton shoved at 6 m/s into a bumper leaves at 12 m/s pointing away
-  (13/13 checks pass). **Balance/feel unplayed — folds into Chunk 22's arena tuning.**
-- [x] **Chunk 22 — A pinball arena level.** `scenes/Levels/Level5_PinballArena.tscn` — a
-  walled 44×44 arena (four solid perimeter `StaticBody3D` walls) with a cluster of 8 `Bumper`
-  posts in the midfield. Captain + 4-pikeman squad vs a 10-swordman charge (+2 corner bowmen),
-  so sword-knockback flings chargers into bumpers/walls and chain-bounces them around. Added
-  the "5. Pinball Arena" LevelSelect button + objective label. Headless smoke: loads clean, no
-  errors, bumpers fling charging swordmen, no premature win/lose. **Counts/balance unplayed —
-  user feel-check pending.**
-
-M7 (Ally commands, §6) has no chunk breakdown yet — its chunks get planned when it comes up.
-The active build queue continues with M8 below.
-
----
-
-### ▶ PLANNED — M8 Camera & Visual Identity Polish (Chunks 23–25)
-
-**Goal:** sharpen look & feel with cheap, high-impact wins before the bigger systems land.
-
-- [x] **Chunk 23 — Adjustable dynamic zoom.** `FollowCamera` now carries a live, persistent
-  `ZoomBias` (metres) the player nudges with the mouse wheel / `zoom_in` / `zoom_out` (added to
-  `project.godot`: wheel up/down + `=`/`-` keys + D-pad up/down). The bias is added on top of the
-  base distance and re-clamped each frame, so DynamicZoom keeps auto-framing both armies — just
-  shifted by the player's preference — and the fixed-camera levels (1–4) get the same nudge hung
-  off their authored Offset, floored at `MinFixedDistance` so a hard zoom-in can't pass through
-  the captain. The bias core is pure (`StepZoom`/`DesiredDistance`), so a new headless `UnitTest`
-  drives it without a tree: stepping shifts the target distance and stays clamped at both ends in
-  both modes (14/14 checks pass). **Feel (step size / clamp range) unplayed — user feel-check
-  pending.**
 - [ ] **Chunk 24 — Cartoony eyes on units.** Give every `Unit` a pair of simple
   camera-/forward-facing eye visuals (white + pupil), sized per archetype, as a child node.
   Pure visual; no logic. User feel-check for cuteness.
