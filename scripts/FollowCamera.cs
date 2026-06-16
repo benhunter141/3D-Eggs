@@ -11,6 +11,12 @@ using System.Collections.Generic;
 // the target centered (so controls stay intuitive) but slides its distance along the
 // SAME offset direction to fit the farthest tracked unit — zooming out when the fight
 // spreads, back in when it tightens.
+//
+// LIVE PLAYER BIAS (Chunk 23): on top of whatever the mode picks, the player nudges a
+// persistent ZoomBias (metres) live with the mouse wheel / zoom_in / zoom_out — pull the
+// camera out or push it in WITHOUT turning auto-zoom off. The bias is added to the base
+// distance and the result is clamped, so in DynamicZoom mode the auto framing keeps
+// working, just shifted by the player's preference.
 public partial class FollowCamera : Camera3D
 {
 	[Export] public Node3D Target;                            // the player to follow
@@ -26,6 +32,16 @@ public partial class FollowCamera : Camera3D
 	[Export] public float ZoomMargin = 10.0f;                 // extra distance so the farthest unit isn't right on the edge
 	[Export] public float ZoomLerp = 3.5f;                    // how fast the zoom eases (lower = smoother/laggier)
 	[Export] public float MaxTrackRadius = 40.0f;             // ignore units farther than this so one escapee can't max-zoom
+
+	[ExportGroup("Player Zoom Bias")]
+	[Export] public float ZoomStep = 3.0f;                    // metres added/removed per wheel notch / key press
+	[Export] public float ZoomBiasMin = -24.0f;              // most the player can pull IN  (negative = closer)
+	[Export] public float ZoomBiasMax = 24.0f;               // most the player can push OUT (positive = farther)
+	[Export] public float MinFixedDistance = 6.0f;           // hard floor in non-dynamic levels so a hard zoom-in can't pass through the player
+
+	// Player's live zoom preference in metres, clamped to [ZoomBiasMin, ZoomBiasMax].
+	// Negative pulls the camera in, positive pushes it out. Persists across frames.
+	public float ZoomBias { get; private set; } = 0f;
 
 	private Vector3 _offsetDir;     // normalized Offset — the fixed view angle
 	private float _currentDistance; // smoothed camera distance along _offsetDir
@@ -50,19 +66,26 @@ public partial class FollowCamera : Camera3D
 		if (Target == null)
 			return;
 
+		// Live player bias: one step per wheel notch / key press / gamepad press. The
+		// wheel naturally pulses (pressed + released same frame), so JustPressed reads it.
+		if (Input.IsActionJustPressed("zoom_in"))
+			StepZoom(-1f);
+		if (Input.IsActionJustPressed("zoom_out"))
+			StepZoom(+1f);
+
 		// Decide how far back to sit this frame.
 		float distance;
 		if (DynamicZoom)
 		{
 			float spread = FarthestTrackedUnit(Target.GlobalPosition);
-			float desired = Mathf.Clamp(spread * FitScale + ZoomMargin, MinDistance, MaxDistance);
 			float zt = 1f - Mathf.Exp(-ZoomLerp * (float)delta);
-			_currentDistance = Mathf.Lerp(_currentDistance, desired, zt);
+			_currentDistance = Mathf.Lerp(_currentDistance, DesiredDistance(spread), zt);
 			distance = _currentDistance;
 		}
 		else
 		{
-			distance = Offset.Length();
+			// Fixed angle/zoom level, plus the player's live bias. Position lerp smooths the step.
+			distance = DesiredDistance(0f);
 		}
 
 		Vector3 desiredPos = Target.GlobalPosition + _offsetDir * distance;
@@ -72,6 +95,28 @@ public partial class FollowCamera : Camera3D
 
 		// Always aim at the target — keeps it centered for any distance/angle.
 		LookAt(Target.GlobalPosition, Vector3.Up);
+	}
+
+	// Nudge the live player bias by `direction` steps (negative = zoom IN, positive = OUT),
+	// clamped to [ZoomBiasMin, ZoomBiasMax]. Pure state change — safe to call headless.
+	public void StepZoom(float direction)
+	{
+		ZoomBias = Mathf.Clamp(ZoomBias + direction * ZoomStep, ZoomBiasMin, ZoomBiasMax);
+	}
+
+	// The target camera distance this frame (BEFORE the position/zoom smoothing), given the
+	// crowd `spread` (ignored when DynamicZoom is off). Folds in the live ZoomBias and clamps:
+	// dynamic mode keeps the auto framing inside [MinDistance, MaxDistance]; fixed mode hangs
+	// the bias off the authored Offset length down to a MinFixedDistance floor. Pure function
+	// of the camera's exports + ZoomBias, so the headless test can drive it without a tree.
+	public float DesiredDistance(float spread)
+	{
+		if (DynamicZoom)
+		{
+			float baseDist = spread * FitScale + ZoomMargin;
+			return Mathf.Clamp(baseDist + ZoomBias, MinDistance, MaxDistance);
+		}
+		return Mathf.Max(Offset.Length() + ZoomBias, MinFixedDistance);
 	}
 
 	// Distance from `center` to the farthest LIVING unit within MaxTrackRadius (0 if none).

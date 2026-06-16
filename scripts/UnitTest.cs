@@ -27,6 +27,7 @@ public partial class UnitTest : Node3D
 		bool death = TestDamageDeath();
 		bool knock = TestKnockback();
 		bool hook = TestDeathHook();
+		bool zoom = TestZoomBias();
 		bool chase = await TestChase();
 		bool formation = await TestFormation();
 		bool allyCombat = await TestAllyCombat();
@@ -38,7 +39,7 @@ public partial class UnitTest : Node3D
 		bool bounce = await TestKnockbackBounce();
 		bool bumper = await TestBumperKick();
 
-		GD.Print(death && knock && hook && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -116,6 +117,65 @@ public partial class UnitTest : Node3D
 		bool pass = u.IsDead && u.OnDeathCalled && IsInstanceValid(u) && u.IsInsideTree();
 		GD.Print($"dead={u.IsDead}, hookRan={u.OnDeathCalled}, stillInTree={u.IsInsideTree()}");
 		GD.Print(pass ? "PASS: died without being freed" : "FAIL: death hook wrong");
+		return pass;
+	}
+
+	// Chunk 23: the live player zoom bias shifts the camera's target distance and stays
+	// clamped at both ends, in both modes. Pure math on FollowCamera.StepZoom/DesiredDistance
+	// (no tree / input needed) — the part the headless harness can verify; the feel is the
+	// user's call.
+	private bool TestZoomBias()
+	{
+		GD.Print("=== UnitTest: camera zoom bias (Chunk 23) ===");
+
+		var cam = new FollowCamera
+		{
+			DynamicZoom = true,
+			MinDistance = 30f, MaxDistance = 60f,
+			FitScale = 1.5f, ZoomMargin = 10f,
+			ZoomStep = 3f, ZoomBiasMin = -24f, ZoomBiasMax = 24f,
+		};
+
+		const float spread = 20f;                       // base = 20*1.5 + 10 = 40 m (mid-band)
+		float baseDist = cam.DesiredDistance(spread);
+		bool baseOk = Mathf.IsEqualApprox(baseDist, 40f, 0.01f);
+
+		cam.StepZoom(+1f);                              // one notch out
+		float outOne = cam.DesiredDistance(spread);
+		bool shiftsOut = outOne > baseDist;
+
+		for (int i = 0; i < 50; i++) cam.StepZoom(+1f); // saturate outward
+		float far = cam.DesiredDistance(spread);
+		bool clampHi = Mathf.IsEqualApprox(cam.ZoomBias, cam.ZoomBiasMax, 0.01f)
+		             && Mathf.IsEqualApprox(far, cam.MaxDistance, 0.01f);
+
+		for (int i = 0; i < 100; i++) cam.StepZoom(-1f); // saturate inward
+		float near = cam.DesiredDistance(spread);
+		bool clampLo = Mathf.IsEqualApprox(cam.ZoomBias, cam.ZoomBiasMin, 0.01f)
+		             && Mathf.IsEqualApprox(near, cam.MinDistance, 0.01f);
+
+		// Fixed mode: bias hangs off the authored Offset length, floored at MinFixedDistance
+		// so a hard zoom-in can't pass through the player.
+		var fixedCam = new FollowCamera
+		{
+			DynamicZoom = false,
+			Offset = new Vector3(0, 18, 11),            // length ~21.1 m
+			ZoomStep = 3f, ZoomBiasMin = -24f, ZoomBiasMax = 24f, MinFixedDistance = 6f,
+		};
+		float fixedBase = fixedCam.DesiredDistance(0f);
+		bool fixedBaseOk = Mathf.IsEqualApprox(fixedBase, fixedCam.Offset.Length(), 0.01f);
+		for (int i = 0; i < 100; i++) fixedCam.StepZoom(-1f);
+		float fixedNear = fixedCam.DesiredDistance(0f); // 21.1 - 24 = -2.9 -> floored to 6
+		bool fixedFloorOk = Mathf.IsEqualApprox(fixedNear, fixedCam.MinFixedDistance, 0.01f);
+
+		bool pass = baseOk && shiftsOut && clampHi && clampLo && fixedBaseOk && fixedFloorOk;
+		GD.Print($"dynamic: base={baseDist:0.0} outOne={outOne:0.0} far={far:0.0} near={near:0.0}; " +
+		         $"fixed: base={fixedBase:0.0} near={fixedNear:0.0}");
+		GD.Print(pass ? "PASS: zoom bias shifts the target distance and stays clamped"
+		              : "FAIL: zoom bias math wrong");
+
+		cam.Free();
+		fixedCam.Free();
 		return pass;
 	}
 

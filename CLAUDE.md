@@ -166,9 +166,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       built; balance (restitution / transfer / min-bounce / bumper strength / arena counts)
       needs a user feel-check before M6 closes.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
-- [ ] **M8 — Camera & visual identity polish:** adjustable dynamic zoom (zoom levels you can
+- [~] **M8 — Camera & visual identity polish:** adjustable dynamic zoom (zoom levels you can
       nudge live while auto-zoom stays active), cartoony eyes on every unit, visually distinct
-      weapon meshes. Cheap, high-impact feel/identity wins. (Chunks 23–25.)
+      weapon meshes. Cheap, high-impact feel/identity wins. (Chunks 23–25.) Chunk 23 done
+      (live `ZoomBias` on top of auto-zoom). Prior-session WIP already swapped unit bodies to
+      egg meshes + reworked the camera/pinball feel (committed `1dba9a2`); Chunks 24–25 pending.
 - [ ] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
       archetypes with distinct reach / damage / knockback / visuals. (Chunks 26–27.)
 - [ ] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
@@ -366,12 +368,16 @@ The active build queue continues with M8 below.
 
 **Goal:** sharpen look & feel with cheap, high-impact wins before the bigger systems land.
 
-- [ ] **Chunk 23 — Adjustable dynamic zoom.** Keep `FollowCamera`'s existing dynamic/auto
-  zoom but let the player bias it **live**: mouse wheel (+ gamepad / keys) steps a **zoom
-  level** offset the dynamic system adds on top, clamped to min/max — so you can pull out or
-  push in without disabling auto-zoom. Add `zoom_in` / `zoom_out` input actions to
-  `project.godot`. Headless-test: stepping the level shifts the target distance and stays
-  clamped.
+- [x] **Chunk 23 — Adjustable dynamic zoom.** `FollowCamera` now carries a live, persistent
+  `ZoomBias` (metres) the player nudges with the mouse wheel / `zoom_in` / `zoom_out` (added to
+  `project.godot`: wheel up/down + `=`/`-` keys + D-pad up/down). The bias is added on top of the
+  base distance and re-clamped each frame, so DynamicZoom keeps auto-framing both armies — just
+  shifted by the player's preference — and the fixed-camera levels (1–4) get the same nudge hung
+  off their authored Offset, floored at `MinFixedDistance` so a hard zoom-in can't pass through
+  the captain. The bias core is pure (`StepZoom`/`DesiredDistance`), so a new headless `UnitTest`
+  drives it without a tree: stepping shifts the target distance and stays clamped at both ends in
+  both modes (14/14 checks pass). **Feel (step size / clamp range) unplayed — user feel-check
+  pending.**
 - [ ] **Chunk 24 — Cartoony eyes on units.** Give every `Unit` a pair of simple
   camera-/forward-facing eye visuals (white + pupil), sized per archetype, as a child node.
   Pure visual; no logic. User feel-check for cuteness.
