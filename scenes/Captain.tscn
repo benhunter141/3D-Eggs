@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://dcaptain0eggs01"]
+[gd_scene load_steps=12 format=3 uid="uid://dcaptain0eggs01"]
 
 [ext_resource type="Script" path="res://scripts/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
@@ -18,16 +18,28 @@ size = Vector3(0.2, 0.2, 0.7)
 [sub_resource type="StandardMaterial3D" id="Mat_capmarker"]
 albedo_color = Color(0.9, 0.2, 0.2, 1)
 
-[sub_resource type="BoxMesh" id="BoxMesh_capike"]
-size = Vector3(0.09, 0.09, 3.0)
+[sub_resource type="CylinderMesh" id="CylinderMesh_capshaft"]
+top_radius = 0.05
+bottom_radius = 0.05
+height = 3.0
+radial_segments = 8
+rings = 1
 
-[sub_resource type="StandardMaterial3D" id="Mat_capike"]
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
 albedo_color = Color(0.5, 0.35, 0.2, 1)
-metallic = 0.3
-roughness = 0.5
+roughness = 0.85
 
-[sub_resource type="BoxMesh" id="BoxMesh_capiketip"]
-size = Vector3(0.16, 0.16, 0.4)
+[sub_resource type="CylinderMesh" id="ConeMesh_caphead"]
+top_radius = 0.0
+bottom_radius = 0.14
+height = 0.55
+radial_segments = 8
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.78, 0.81, 0.85, 1)
+metallic = 0.6
+roughness = 0.3
 
 [sub_resource type="BoxShape3D" id="BoxShape_capikehit"]
 size = Vector3(0.7, 0.7, 3.0)
@@ -51,14 +63,18 @@ surface_material_override/0 = SubResource("Mat_capmarker")
 
 [node name="SwordPivot" type="Node3D" parent="."]
 
-[node name="Sword" type="MeshInstance3D" parent="SwordPivot"]
+[node name="Sword" type="Node3D" parent="SwordPivot"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -1.5)
-mesh = SubResource("BoxMesh_capike")
-surface_material_override/0 = SubResource("Mat_capike")
 
-[node name="PikeTip" type="MeshInstance3D" parent="SwordPivot/Sword"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.65)
-mesh = SubResource("BoxMesh_capiketip")
+[node name="Shaft" type="MeshInstance3D" parent="SwordPivot/Sword"]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+mesh = SubResource("CylinderMesh_capshaft")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="Head" type="MeshInstance3D" parent="SwordPivot/Sword"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, -1.65)
+mesh = SubResource("ConeMesh_caphead")
+surface_material_override/0 = SubResource("Mat_metal")
 
 [node name="Hitbox" type="Area3D" parent="SwordPivot"]
 monitoring = false

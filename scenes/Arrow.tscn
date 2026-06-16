@@ -1,16 +1,59 @@
-[gd_scene load_steps=4 format=3 uid="uid://darrow0eggs0001"]
+[gd_scene load_steps=9 format=3 uid="uid://darrow0eggs0001"]
 
 [ext_resource type="Script" path="res://scripts/Arrow.cs" id="1_arrow"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_arrow"]
-size = Vector3(0.06, 0.06, 0.7)
+[sub_resource type="CylinderMesh" id="CylinderMesh_arrowshaft"]
+top_radius = 0.018
+bottom_radius = 0.018
+height = 0.7
+radial_segments = 6
+rings = 1
 
-[sub_resource type="StandardMaterial3D" id="Mat_arrow"]
+[sub_resource type="StandardMaterial3D" id="Mat_shaft"]
 albedo_color = Color(0.32, 0.22, 0.12, 1)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="ConeMesh_arrowhead"]
+top_radius = 0.0
+bottom_radius = 0.05
+height = 0.16
+radial_segments = 6
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.78, 0.8, 0.84, 1)
+metallic = 0.6
+roughness = 0.3
+
+[sub_resource type="BoxMesh" id="BoxMesh_fletchH"]
+size = Vector3(0.13, 0.012, 0.14)
+
+[sub_resource type="BoxMesh" id="BoxMesh_fletchV"]
+size = Vector3(0.012, 0.13, 0.14)
+
+[sub_resource type="StandardMaterial3D" id="Mat_fletch"]
+albedo_color = Color(0.8, 0.2, 0.2, 1)
+roughness = 0.7
 
 [node name="Arrow" type="Node3D"]
 script = ExtResource("1_arrow")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-mesh = SubResource("BoxMesh_arrow")
-surface_material_override/0 = SubResource("Mat_arrow")
+[node name="Shaft" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+mesh = SubResource("CylinderMesh_arrowshaft")
+surface_material_override/0 = SubResource("Mat_shaft")
+
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, -0.43)
+mesh = SubResource("ConeMesh_arrowhead")
+surface_material_override/0 = SubResource("Mat_metal")
+
+[node name="FletchH" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.28)
+mesh = SubResource("BoxMesh_fletchH")
+surface_material_override/0 = SubResource("Mat_fletch")
+
+[node name="FletchV" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.28)
+mesh = SubResource("BoxMesh_fletchV")
+surface_material_override/0 = SubResource("Mat_fletch")

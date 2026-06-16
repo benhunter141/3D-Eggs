@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://dsword0eggs0001"]
+[gd_scene load_steps=12 format=3 uid="uid://dsword0eggs0001"]
 
 [ext_resource type="Script" path="res://scripts/Swordman.cs" id="1_sword"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
@@ -9,6 +9,35 @@ albedo_color = Color(0.55, 0.15, 0.16, 1)
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_sword"]
 radius = 0.4
 height = 1.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_blade"]
+size = Vector3(0.1, 0.03, 1.1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_blade"]
+albedo_color = Color(0.82, 0.84, 0.88, 1)
+metallic = 0.7
+roughness = 0.25
+
+[sub_resource type="BoxMesh" id="BoxMesh_guard"]
+size = Vector3(0.34, 0.05, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.8, 0.65, 0.2, 1)
+metallic = 0.5
+roughness = 0.4
+
+[sub_resource type="BoxMesh" id="BoxMesh_grip"]
+size = Vector3(0.05, 0.05, 0.22)
+
+[sub_resource type="StandardMaterial3D" id="Mat_grip"]
+albedo_color = Color(0.2, 0.13, 0.08, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_pommel"]
+radius = 0.055
+height = 0.11
+radial_segments = 8
+rings = 4
 
 [node name="Swordman" type="CharacterBody3D"]
 script = ExtResource("1_sword")
@@ -21,3 +50,26 @@ Height = 1.7
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("CapsuleShape_sword")
+
+[node name="Sword" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.3, -0.35)
+
+[node name="Blade" type="MeshInstance3D" parent="Sword"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.75)
+mesh = SubResource("BoxMesh_blade")
+surface_material_override/0 = SubResource("Mat_blade")
+
+[node name="Guard" type="MeshInstance3D" parent="Sword"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.12)
+mesh = SubResource("BoxMesh_guard")
+surface_material_override/0 = SubResource("Mat_gold")
+
+[node name="Grip" type="MeshInstance3D" parent="Sword"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.02)
+mesh = SubResource("BoxMesh_grip")
+surface_material_override/0 = SubResource("Mat_grip")
+
+[node name="Pommel" type="MeshInstance3D" parent="Sword"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.15)
+mesh = SubResource("SphereMesh_pommel")
+surface_material_override/0 = SubResource("Mat_gold")

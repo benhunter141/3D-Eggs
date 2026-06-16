@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://dpikeman0eggs01"]
+[gd_scene load_steps=9 format=3 uid="uid://dpikeman0eggs01"]
 
 [ext_resource type="Script" path="res://scripts/Ally.cs" id="1_ally"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
@@ -10,14 +10,28 @@ albedo_color = Color(0.36, 0.42, 0.5, 1)
 radius = 0.4
 height = 1.8
 
-[sub_resource type="BoxMesh" id="BoxMesh_pikeshaft"]
-size = Vector3(0.07, 0.07, 3.0)
+[sub_resource type="CylinderMesh" id="CylinderMesh_pikeshaft"]
+top_radius = 0.045
+bottom_radius = 0.045
+height = 3.0
+radial_segments = 8
+rings = 1
 
-[sub_resource type="StandardMaterial3D" id="Mat_pikeshaft"]
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
 albedo_color = Color(0.45, 0.32, 0.18, 1)
+roughness = 0.85
 
-[sub_resource type="BoxMesh" id="BoxMesh_piketip"]
-size = Vector3(0.13, 0.13, 0.35)
+[sub_resource type="CylinderMesh" id="ConeMesh_pikehead"]
+top_radius = 0.0
+bottom_radius = 0.12
+height = 0.5
+radial_segments = 8
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.75, 0.78, 0.82, 1)
+metallic = 0.6
+roughness = 0.35
 
 [node name="Pikeman" type="CharacterBody3D"]
 script = ExtResource("1_ally")
@@ -32,11 +46,15 @@ Height = 1.7
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("CapsuleShape_pike")
 
-[node name="Pike" type="MeshInstance3D" parent="."]
+[node name="Pike" type="Node3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 0.45, -1.3)
-mesh = SubResource("BoxMesh_pikeshaft")
-surface_material_override/0 = SubResource("Mat_pikeshaft")
 
-[node name="PikeTip" type="MeshInstance3D" parent="Pike"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -1.65)
-mesh = SubResource("BoxMesh_piketip")
+[node name="Shaft" type="MeshInstance3D" parent="Pike"]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+mesh = SubResource("CylinderMesh_pikeshaft")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="Head" type="MeshInstance3D" parent="Pike"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, -1.65)
+mesh = SubResource("ConeMesh_pikehead")
+surface_material_override/0 = SubResource("Mat_metal")
