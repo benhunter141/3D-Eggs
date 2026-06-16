@@ -46,6 +46,16 @@ public partial class Unit : CharacterBody3D
 	[Export] public float FlashDuration = 0.12f;              // seconds for one flash to fade out
 	[Export] public float DeathLinger = 0.4f;                 // corpse lingers this long so its death cue can play
 
+	// --- Cartoony eyes (M8, Chunk 24) ---
+	// Every unit grows a pair of googly eyes on the front of its egg in _Ready — pure visual,
+	// no logic. They're built procedurally (no asset files) and sized off the body's EggMesh,
+	// so a fat Captain gets bigger eyes than a skeleton automatically; EyeScale nudges per
+	// archetype if a scene wants to. Eyes are children of the unit root, which already rotates
+	// to face -Z, so they always look where the unit is heading. Whites/pupils share static
+	// unshaded materials + one sphere mesh across every unit to keep crowds cheap.
+	[Export] public bool ShowEyes = true;
+	[Export] public float EyeScale = 1.0f;   // per-archetype multiplier on eye size
+
 	public float Health { get; private set; }
 	public bool IsDead { get; private set; }
 
@@ -81,6 +91,7 @@ public partial class Unit : CharacterBody3D
 		AddToGroup("units");
 		UnitRegistry.Register(this);
 		SetupHitFeedback();
+		SetupEyes();
 	}
 
 	// Leave the registry the moment we leave the tree (death-free, scene reload, etc.) so
@@ -114,6 +125,102 @@ public partial class Unit : CharacterBody3D
 			VolumeDb = -3f,
 		};
 		AddChild(_audio);
+	}
+
+	// Shared, build-once eye assets so 100 units cost two materials + one sphere, not 600.
+	private static SphereMesh _eyeMesh;
+	private static StandardMaterial3D _eyeWhiteMat;
+	private static StandardMaterial3D _eyePupilMat;
+
+	// Grow a pair of cartoony eyes on the front of the egg. Placement is solved against the
+	// egg's profile so the whites sit ON the curved surface (then bulge out a touch), with the
+	// pupils poking forward — pure visual, added as a child of the unit root.
+	private void SetupEyes()
+	{
+		if (!ShowEyes)
+			return;
+
+		// Derive size from the body's EggMesh so each archetype's eyes scale with its body.
+		float width = 1.0f, height = 1.7f, taper = 0.22f;
+		if (_bodyMesh is EggMesh egg)
+		{
+			width = egg.Width;
+			height = egg.Height;
+			taper = egg.Taper;
+		}
+
+		float rx = width * 0.5f;
+		float ry = height * 0.5f;
+		float eyeY = height * 0.16f;                       // a little above the egg's middle
+		float yUnit = ry > 0f ? Mathf.Clamp(eyeY / ry, -1f, 1f) : 0f;
+		float baseR = Mathf.Sqrt(Mathf.Max(0f, 1f - yUnit * yUnit));
+		float ringR = baseR * (1.0f - taper * yUnit);      // matches EggMesh's revolved profile
+		float surfR = rx * ringR;                          // egg radius (xz) at eye height
+
+		float whiteR = width * 0.16f * EyeScale;
+		float pupilR = whiteR * 0.55f;
+		float eyeX = Mathf.Min(surfR * 0.5f, width * 0.20f);                 // sideways spread
+		float frontZ = -Mathf.Sqrt(Mathf.Max(0f, surfR * surfR - eyeX * eyeX)); // front hemisphere (-Z)
+
+		var eyes = new Node3D { Name = "Eyes" };
+		AddChild(eyes);
+
+		foreach (int side in new[] { -1, 1 })
+		{
+			Vector3 onSurface = new Vector3(side * eyeX, eyeY, frontZ);
+			Vector3 outward = new Vector3(side * eyeX, 0f, frontZ);
+			outward = outward.LengthSquared() > 0.0001f ? outward.Normalized() : Vector3.Forward;
+
+			Vector3 whitePos = onSurface + outward * (whiteR * 0.35f);
+			Vector3 pupilPos = whitePos + outward * (whiteR * 0.7f);
+
+			eyes.AddChild(MakeEyePart(whitePos, whiteR, EyeWhiteMat()));
+			eyes.AddChild(MakeEyePart(pupilPos, pupilR, EyePupilMat()));
+		}
+	}
+
+	// One eyeball part: a scaled instance of the shared unit-radius sphere at `pos`.
+	private static MeshInstance3D MakeEyePart(Vector3 pos, float radius, StandardMaterial3D mat)
+	{
+		// Shared sphere has radius 0.5, so a scale of 2*radius gives the wanted radius.
+		var basis = Basis.Identity.Scaled(Vector3.One * (radius * 2f));
+		return new MeshInstance3D
+		{
+			Mesh = EyeMesh(),
+			MaterialOverride = mat,
+			Transform = new Transform3D(basis, pos),
+			// Eyes shouldn't cast/receive shadows — keeps them reading flat and cartoony.
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+		};
+	}
+
+	private static SphereMesh EyeMesh()
+	{
+		if (_eyeMesh == null)
+			_eyeMesh = new SphereMesh { Radius = 0.5f, Height = 1.0f, RadialSegments = 8, Rings = 4 };
+		return _eyeMesh;
+	}
+
+	private static StandardMaterial3D EyeWhiteMat()
+	{
+		if (_eyeWhiteMat == null)
+			_eyeWhiteMat = new StandardMaterial3D
+			{
+				AlbedoColor = new Color(0.98f, 0.98f, 0.98f),
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, // flat cartoony white
+			};
+		return _eyeWhiteMat;
+	}
+
+	private static StandardMaterial3D EyePupilMat()
+	{
+		if (_eyePupilMat == null)
+			_eyePupilMat = new StandardMaterial3D
+			{
+				AlbedoColor = new Color(0.05f, 0.05f, 0.05f),
+				ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			};
+		return _eyePupilMat;
 	}
 
 	// Fade the active flash. Only Unit defines _Process (subclasses use _PhysicsProcess),

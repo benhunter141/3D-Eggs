@@ -170,7 +170,8 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       nudge live while auto-zoom stays active), cartoony eyes on every unit, visually distinct
       weapon meshes. Cheap, high-impact feel/identity wins. (Chunks 23–25.) Chunk 23 done
       (live `ZoomBias` on top of auto-zoom). Prior-session WIP already swapped unit bodies to
-      egg meshes + reworked the camera/pinball feel (committed `1dba9a2`); Chunks 24–25 pending.
+      egg meshes + reworked the camera/pinball feel (committed `1dba9a2`). Chunk 24 done
+      (procedural googly eyes auto-grown on every `Unit`, sized off its EggMesh); Chunk 25–25 pending.
 - [ ] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
       archetypes with distinct reach / damage / knockback / visuals. (Chunks 26–27.)
 - [ ] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
@@ -230,7 +231,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 
 **Goal:** cartoony eyes and recognizable weapon meshes — cheap, high-impact identity wins.
 
-- [ ] **Chunk 24 — Cartoony eyes on units.** Give every `Unit` a pair of simple
+- [x] **Chunk 24 — Cartoony eyes on units.** Give every `Unit` a pair of simple
   camera-/forward-facing eye visuals (white + pupil), sized per archetype, as a child node.
   Pure visual; no logic. User feel-check for cuteness.
 - [ ] **Chunk 25 — Visually distinct weapon meshes.** Replace placeholder weapon visuals with
