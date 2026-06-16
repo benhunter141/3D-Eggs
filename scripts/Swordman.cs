@@ -90,8 +90,9 @@ public partial class Swordman : Unit
 			}
 		}
 
-		// Chase plus any lingering pike/sword knockback.
-		Velocity = chase + KnockbackVelocity;
+		// A strong shove takes over (ride it out and slow down); otherwise chase plus any
+		// lingering knockback that's already small enough to walk through.
+		Velocity = IsKnockbackControlled ? KnockbackVelocity : chase + KnockbackVelocity;
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 	}

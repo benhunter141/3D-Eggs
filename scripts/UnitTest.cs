@@ -669,7 +669,7 @@ public partial class UnitTest : Node3D
 		// Shove it INTO the bumper (toward -Z). The bumper sits between it and the origin.
 		const float pushSpeed = 6f;
 		unit.AddKnockback(new Vector3(0f, 0f, -pushSpeed));
-		GD.Print($"skeleton shoved at {pushSpeed} m/s into the bumper (strength={bumper.BumperStrength}, amplify={bumper.SpeedAmplify})");
+		GD.Print($"skeleton shoved at {pushSpeed} m/s into the bumper (strength={bumper.BumperStrength})");
 
 		// Step ~1.3 s, watching the unit's knockback. The bumper sits at the origin and the
 		// unit on +Z, so "away" is +Z: a successful kick shows a +Z shove bigger than pushSpeed.

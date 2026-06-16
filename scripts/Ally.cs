@@ -15,7 +15,7 @@ public partial class Ally : Unit
 {
 	public enum WeaponType { Fists, Stones, Pike }
 
-	[Export] public float MoveSpeed = 10.0f;     // top follow speed (m/s); > player Speed so it can catch up
+	[Export] public float MoveSpeed = 7.5f;      // top follow speed (m/s); a margin over player Speed so it can catch up
 	[Export] public float Acceleration = 60.0f;  // how fast it ramps toward the target velocity
 	[Export] public float ArriveRadius = 1.5f;   // begin slowing within this distance of the slot
 	[Export] public float StopRadius = 0.12f;    // close enough — hold position
@@ -145,7 +145,9 @@ public partial class Ally : Unit
 		Vector3 horizontal = new Vector3(Velocity.X, 0f, Velocity.Z);
 		horizontal = horizontal.MoveToward(desiredVel, Acceleration * dt);
 
-		Velocity = horizontal + KnockbackVelocity;
+		// A strong shove takes over (ride it out and slow down); otherwise steer plus any
+		// lingering knockback that's already small enough to walk through.
+		Velocity = IsKnockbackControlled ? KnockbackVelocity : horizontal + KnockbackVelocity;
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 

@@ -27,6 +27,7 @@ public partial class Unit : CharacterBody3D
 	[Export] public float KnockbackTransfer = 0.5f;  // fraction of speed handed to a unit we ram
 	[Export] public float MinBounceSpeed = 2.5f;     // shoves slower than this don't bounce/transfer
 	[Export] public float MaxKnockback = 18.0f;      // cap on accumulated shove speed (0 = uncapped)
+	[Export] public float KnockbackControlThreshold = 4.0f; // above this shove speed the unit rides ballistic (its own movement is suppressed) and only regains control once the shove decays back under
 
 	// --- Staggered target re-acquisition (M5 crowds) ---
 	// Re-scanning UnitRegistry for the nearest foe EVERY physics frame is the crowd hotspot:
@@ -53,6 +54,12 @@ public partial class Unit : CharacterBody3D
 
 	// Read-only view for debugging / headless tests.
 	public Vector3 CurrentKnockback => KnockbackVelocity;
+
+	// True while a shove is strong enough to take the wheel: the unit rides the knockback
+	// ballistically (its own steering is suppressed) and only "regains control" once the shove
+	// decays back under KnockbackControlThreshold. Makes a bumper/sword fling read as a clean
+	// launch that slows to a stop, instead of the unit immediately powering back against it.
+	protected bool IsKnockbackControlled => KnockbackVelocity.Length() > KnockbackControlThreshold;
 
 	// Flash state: a per-instance copy of the body material, driven each frame.
 	private MeshInstance3D _bodyMesh;

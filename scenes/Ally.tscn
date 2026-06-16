@@ -1,10 +1,7 @@
 [gd_scene load_steps=7 format=3 uid="uid://dally0eggs00001"]
 
 [ext_resource type="Script" path="res://scripts/Ally.cs" id="1_ally"]
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_ally"]
-radius = 0.4
-height = 1.8
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_ally"]
 albedo_color = Color(0.3, 0.5, 0.85, 1)
@@ -23,8 +20,10 @@ albedo_color = Color(0.1, 0.2, 0.5, 1)
 script = ExtResource("1_ally")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-mesh = SubResource("CapsuleMesh_ally")
-surface_material_override/0 = SubResource("Mat_ally")
+material_override = SubResource("Mat_ally")
+script = ExtResource("2_egg")
+Width = 1.0
+Height = 1.7
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("CapsuleShape_ally")

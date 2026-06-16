@@ -80,7 +80,9 @@ public partial class Bowman : Unit
 			}
 		}
 
-		Velocity = move + KnockbackVelocity;
+		// A strong shove takes over (ride it out and slow down); otherwise kite plus any
+		// lingering knockback that's already small enough to walk through.
+		Velocity = IsKnockbackControlled ? KnockbackVelocity : move + KnockbackVelocity;
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 	}

@@ -166,7 +166,22 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       built; balance (restitution / transfer / min-bounce / bumper strength / arena counts)
       needs a user feel-check before M6 closes.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
-- [ ] **M8 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
+- [ ] **M8 — Camera & visual identity polish:** adjustable dynamic zoom (zoom levels you can
+      nudge live while auto-zoom stays active), cartoony eyes on every unit, visually distinct
+      weapon meshes. Cheap, high-impact feel/identity wins. (Chunks 23–25.)
+- [ ] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
+      archetypes with distinct reach / damage / knockback / visuals. (Chunks 26–27.)
+- [ ] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
+      combat; chocobo faster). (Chunks 28–29.)
+- [ ] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
+      period (15 s for now); HUD for scores / timer / contest. Feeds M12's energy. (Chunks 30–31.)
+- [ ] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
+      draw / hand / discard piles; Unit cards played on a location, Action cards played on a
+      friendly unit who then performs the action; units have HP / Str / Int (Str → weapon &
+      strength actions, Int → magic); beat a series of rooms collecting cards / relics /
+      potions with events; **energy comes from holding KotH points (M11) at period end.**
+      (Chunks 32–37.)
+- [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -342,7 +357,118 @@ first (bounce + momentum transfer), then place bouncy obstacles, then a level th
   errors, bumpers fling charging swordmen, no premature win/lose. **Counts/balance unplayed —
   user feel-check pending.**
 
-Then proceed to M7 (§6), updating checkboxes and §8 as you go.
+M7 (Ally commands, §6) has no chunk breakdown yet — its chunks get planned when it comes up.
+The active build queue continues with M8 below.
+
+---
+
+### ▶ PLANNED — M8 Camera & Visual Identity Polish (Chunks 23–25)
+
+**Goal:** sharpen look & feel with cheap, high-impact wins before the bigger systems land.
+
+- [ ] **Chunk 23 — Adjustable dynamic zoom.** Keep `FollowCamera`'s existing dynamic/auto
+  zoom but let the player bias it **live**: mouse wheel (+ gamepad / keys) steps a **zoom
+  level** offset the dynamic system adds on top, clamped to min/max — so you can pull out or
+  push in without disabling auto-zoom. Add `zoom_in` / `zoom_out` input actions to
+  `project.godot`. Headless-test: stepping the level shifts the target distance and stays
+  clamped.
+- [ ] **Chunk 24 — Cartoony eyes on units.** Give every `Unit` a pair of simple
+  camera-/forward-facing eye visuals (white + pupil), sized per archetype, as a child node.
+  Pure visual; no logic. User feel-check for cuteness.
+- [ ] **Chunk 25 — Visually distinct weapon meshes.** Replace placeholder weapon visuals with
+  recognizable meshes per weapon (spear/pike shaft+tip, sword blade+guard, bow, stone, arrow)
+  so a unit's weapon reads at a glance. Pure visual; reused across the matching scenes.
+
+---
+
+### ▶ PLANNED — M9 Weapons & Loadouts (Chunks 26–27)
+
+**Goal:** make the weapon a real choice — the captain can wield a sword instead of the pike,
+and weapons differ in reach / damage / knockback / look.
+
+- [ ] **Chunk 26 — Player weapon swap (spear ↔ sword).** Give `Player` a `WeaponType`
+  (Spear | Sword) driving hitbox reach, damage, knockback, and thrust/swing feel + the
+  Chunk-25 mesh. Add a `swap_weapon` input to toggle in-game (and/or per-level default).
+  Sword = short reach + knockback (existing sword rules); spear = long reach, no knockback.
+  Headless-test: each weapon's reach + knockback match its profile.
+- [ ] **Chunk 27 — More weapon archetypes.** Add a couple more weapons (e.g. axe = heavy/slow/
+  high-damage, mace = knockback, bow = ranged) as `WeaponType` entries reusing the Chunk-26
+  plumbing + Chunk-25 visuals, so allies/enemies can be skinned with them too. Headless-test:
+  each archetype's stats resolve correctly.
+
+---
+
+### ▶ PLANNED — M10 Mounts (Chunks 28–29)
+
+**Goal:** rideable mounts for speed & charm — a cute donkey and a chocobo.
+
+- [ ] **Chunk 28 — Mount base + Donkey.** `scripts/Mount.cs` + `scenes/Donkey.tscn`:
+  mount/dismount (proximity + `mount` input), mounted state raises move speed & changes the
+  player silhouette (rider on mount), mounted combat still works; dismount drops you beside the
+  mount. Headless-test: mounting raises speed, dismount restores it.
+- [ ] **Chunk 29 — Chocobo mount.** `scenes/Chocobo.tscn` reusing `Mount.cs` — faster than the
+  donkey, distinct look (Chunk-24 eyes), maybe a small hop/dash trait. Headless-test: chocobo
+  top speed > donkey.
+
+---
+
+### ▶ PLANNED — M11 King of the Hill Mode (Chunks 30–31)
+
+**Goal:** a scoring mode where holding ground matters — and the foundation Slay the Eggs (M12)
+draws energy from.
+
+- [ ] **Chunk 30 — Capture zone + period scoring.** `scripts/CapturePoint.cs` +
+  `scenes/CapturePoint.tscn`: an `Area3D` zone tracking which team has units inside; every
+  **period (15 s for now)** it awards a point to the team holding it at period end (contested =
+  no award). Emits a signal / exposes state for HUD + energy hooks. Headless-test: holder at
+  period end scores; contested scores nobody.
+- [ ] **Chunk 31 — KotH mode level + HUD.** `scenes/Levels/KingOfTheHill.tscn` (arena + one or
+  more `CapturePoint`s + squads) + a `CanvasLayer` HUD showing per-team score, period countdown,
+  and contest state; win at a score threshold. Add the LevelSelect button. Headless smoke:
+  loads clean, points tick at period boundaries.
+
+---
+
+### ▶ PLANNED — M12 Slay the Eggs — Card Battler Mode (Chunks 32–37)
+
+**Goal:** a Slay-the-Spire-style PvE mode layered on the battlefield — build a deck and spend
+energy (earned by holding KotH points, M11) to deploy units and trigger actions across a run of
+rooms.
+
+**New durable rules (promote into §5 as chunks land):**
+- **Cards = Units or Actions.** A **Unit card** is played onto a **location** (a battlefield
+  zone / `CapturePoint`-style slot) to spawn that unit for your team. An **Action card** is
+  played onto a **friendly unit**, which then performs the action (move / attack / buff / spell).
+- **Unit stats: HP / Str / Int.** **Str** scales weapon attack power + strength-based actions;
+  **Int** scales magic-based actions. Stats live on `Unit` (or a card-mode component).
+- **Energy from holding ground.** Card energy each period = KotH points your team holds at
+  period end (M11) — territory *is* your economy.
+- **Run = rooms.** PvE like StS: a series of rooms (combat / event), collecting **cards**,
+  **relics**, and **potions** between them.
+
+- [ ] **Chunk 32 — Card model + piles + hand UI.** `scripts/Cards/` data model (Card, Deck) +
+  draw / hand / discard piles with reshuffle; on-screen UI showing all three piles (StS-style:
+  draw count, hand, discard). Headless-test: draw/discard/reshuffle cycle conserves the deck.
+- [ ] **Chunk 33 — Unit & Action cards (play targeting).** Unit cards target a **location**
+  (spawn there); Action cards target a **friendly unit** (it performs the action). Play resolves
+  to a real spawn / a real unit behavior on the battlefield. Headless-test: a unit card spawns at
+  a location; an action card makes its target unit act.
+- [ ] **Chunk 34 — HP / Str / Int stats wired in.** Add Str/Int to units; Str scales weapon
+  damage + strength actions, Int scales magic actions. Headless-test: higher Str → more weapon
+  damage; higher Int → stronger magic action.
+- [ ] **Chunk 35 — Energy from KotH points.** Tie M11 capture-point holdings to per-period card
+  **energy**; you can only play cards your held points afford. Headless-test: holding more points
+  grants more energy; energy gates plays.
+- [ ] **Chunk 36 — Run structure (rooms + rewards + events).** A room map you traverse (combat /
+  event rooms), with post-room rewards (pick a card; find relics / potions) and a few event
+  rooms. Headless-test: completing a room advances the map and offers a reward.
+- [ ] **Chunk 37 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable
+  **potions** (one-shot effects), collected through the run. Headless-test: a relic's modifier
+  applies; a potion consumes and triggers its effect.
+
+---
+
+Then proceed to **M13 — Multiplayer** (§6), updating checkboxes and §8 as you go.
 
 ## 8. Quick Reference
 

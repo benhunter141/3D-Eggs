@@ -48,6 +48,12 @@ public static class UnitRegistry
 	public static IReadOnlyList<Unit> Opponents(Unit.TeamId team) =>
 		team == Unit.TeamId.Player ? Enemies : Players;
 
+	// Living units ON `team` (same caveats as Opponents: live backing store, may hold
+	// dead/freed entries until they leave the tree, callers must skip those). Used by the
+	// dynamic follow-camera to frame both armies at once.
+	public static IReadOnlyList<Unit> OnTeam(Unit.TeamId team) =>
+		team == Unit.TeamId.Player ? Players : Enemies;
+
 	// Nearest living opposing unit to `from`, or null if there is none in range.
 	// `maxRange` caps the search radius (default: unbounded).
 	public static Unit FindNearestOpponent(Unit.TeamId team, Vector3 from, float maxRange = float.MaxValue)
