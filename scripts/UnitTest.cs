@@ -727,27 +727,61 @@ public partial class UnitTest : Node3D
 		AddChild(unit);
 		unit.GlobalPosition = new Vector3(0f, 0f, 3f);
 
+		// A player-team dummy on the FAR side of the bumper so the skeleton (enemy) keeps
+		// chasing toward -Z, straight into and through the bumper — reproducing real play
+		// where a unit drives into a bumper instead of being shoved at it once.
+		var lure = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(lure);
+		lure.GlobalPosition = new Vector3(0f, 0f, -6f);
+
 		// Shove it INTO the bumper (toward -Z). The bumper sits between it and the origin.
 		const float pushSpeed = 6f;
 		unit.AddKnockback(new Vector3(0f, 0f, -pushSpeed));
 		GD.Print($"skeleton shoved at {pushSpeed} m/s into the bumper (strength={bumper.BumperStrength})");
 
-		// Step ~1.3 s, watching the unit's knockback. The bumper sits at the origin and the
-		// unit on +Z, so "away" is +Z: a successful kick shows a +Z shove bigger than pushSpeed.
+		// Step ~1.3 s. Two things to verify on ONE bumper touch:
+		//   (1) it's flung back out faster than it came in (the kick), and
+		//   (2) the kick is the ONLY abrupt velocity change — as the shove decays the unit must
+		//       ease its chase back in, NOT snap it on at a hard threshold. That snap was a bug:
+		//       it jolted the unit (often reversing it) ~half a second after impact, reading as a
+		//       spurious SECOND bump. So after the kick frame, no single frame may swing velZ hard.
 		float peakOutZ = 0f;
+		float maxPostKickJolt = 0f;   // largest single-frame |ΔvelZ| once the unit is riding outward
+		float prevVelZ = unit.Velocity.Z;
+		bool ridingOut = false;       // true once the kick has launched us outward (+Z)
 		for (int i = 0; i < 80; i++)
 		{
 			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			float velZ = unit.Velocity.Z;
 			peakOutZ = Mathf.Max(peakOutZ, unit.CurrentKnockback.Z);
+
+			// Scope the smoothness check to the FIRST touch: once the kick has launched us outward,
+			// measure single-frame velZ swings until that shove fully decays. We stop there so the
+			// unit walking BACK into the bumper for a second, legitimate kick isn't mistaken for the
+			// handoff jolt we're guarding against. The kick frame itself (inward -> outward launch)
+			// is the one allowed abrupt change, so we only start measuring once riding outward.
+			if (ridingOut)
+			{
+				maxPostKickJolt = Mathf.Max(maxPostKickJolt, Mathf.Abs(velZ - prevVelZ));
+				if (unit.CurrentKnockback.Z <= 0.2f)
+					break;   // first kick spent; the single-touch handoff is fully observed
+			}
+			if (velZ > 0.5f)
+				ridingOut = true;
+			prevVelZ = velZ;
 		}
 
 		bool flungAway = peakOutZ > pushSpeed;   // left pointing away (+Z) AND faster than it arrived
-		GD.Print($"peak outward shove Z={peakOutZ:0.00} vs push {pushSpeed} (flungAway={flungAway})");
+		// The smooth handoff ramps velZ by ~Acceleration*dt per frame; a hard snap jumped it by
+		// several m/s in one frame. 1.0 m/s sits well above the smooth ramp, well below the old snap.
+		bool noSecondBump = maxPostKickJolt < 1.0f;
+		GD.Print($"peak outward shove Z={peakOutZ:0.00} vs push {pushSpeed} (flungAway={flungAway}); " +
+			$"max post-kick single-frame velZ jump={maxPostKickJolt:0.00} (noSecondBump={noSecondBump})");
 
-		bool pass = flungAway;
+		bool pass = flungAway && noSecondBump;
 		GD.Print(pass
-			? "PASS: the bumper kicks a unit back out faster than it came in"
-			: $"FAIL: flungAway={flungAway}");
+			? "PASS: bumper kicks the unit out as ONE clean shove that eases back into control (no second bump)"
+			: $"FAIL: flungAway={flungAway}, noSecondBump={noSecondBump}");
 		return pass;
 	}
 

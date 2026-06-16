@@ -145,9 +145,9 @@ public partial class Ally : Unit
 		Vector3 horizontal = new Vector3(Velocity.X, 0f, Velocity.Z);
 		horizontal = horizontal.MoveToward(desiredVel, Acceleration * dt);
 
-		// A strong shove takes over (ride it out and slow down); otherwise steer plus any
-		// lingering knockback that's already small enough to walk through.
-		Velocity = IsKnockbackControlled ? KnockbackVelocity : horizontal + KnockbackVelocity;
+		// A strong shove takes over (ride it out and slow down); as it decays the unit eases its
+		// steer back in (OwnMovementScale) instead of snapping it on — no spurious second bump.
+		Velocity = horizontal * OwnMovementScale + KnockbackVelocity;
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 

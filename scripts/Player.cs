@@ -159,22 +159,20 @@ public partial class Player : Unit
 		Vector2 input = Input.GetVector("move_left", "move_right", "move_up", "move_down");
 		Vector3 direction = new Vector3(input.X, 0f, input.Y);
 
-		if (IsKnockbackControlled)
-		{
-			// Shoved hard (bumper / chained pinball hit): ride it out, no steering until the
-			// shove bleeds back under the control threshold. Own velocity coasts to a stop.
-			_moveVel = _moveVel.MoveToward(Vector3.Zero, Friction * dt);
-		}
-		else
-		{
-			Vector3 target = direction * Speed;
-			_moveVel = direction != Vector3.Zero
-				? _moveVel.MoveToward(target, Acceleration * dt)
-				: _moveVel.MoveToward(Vector3.Zero, Friction * dt);
-		}
+		// Keep tracking intended input velocity every frame (no special "shoved" branch). When a
+		// hard shove is active its authority is scaled out below, but _moveVel stays current so
+		// control returns smoothly as the shove decays — no snap.
+		Vector3 target = direction * Speed;
+		_moveVel = direction != Vector3.Zero
+			? _moveVel.MoveToward(target, Acceleration * dt)
+			: _moveVel.MoveToward(Vector3.Zero, Friction * dt);
 
-		// Flat ground for now — no gravity/vertical motion. Add in the lingering shove only here.
-		Velocity = new Vector3(_moveVel.X, 0f, _moveVel.Z) + KnockbackVelocity;
+		// Flat ground for now — no gravity/vertical motion. A bumper / chained pinball hit reads as
+		// one clean launch: while the shove is strong OwnMovementScale suppresses steering, then
+		// eases it back in PROPORTIONALLY as the shove decays (no hard threshold snap that read as
+		// a second bump). Add in the lingering shove only here.
+		float own = OwnMovementScale;
+		Velocity = new Vector3(_moveVel.X * own, 0f, _moveVel.Z * own) + KnockbackVelocity;
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // captain bounces off walls/bumpers/units like everyone else
 

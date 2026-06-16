@@ -27,7 +27,7 @@ public partial class Unit : CharacterBody3D
 	[Export] public float KnockbackTransfer = 0.5f;  // fraction of speed handed to a unit we ram
 	[Export] public float MinBounceSpeed = 2.5f;     // shoves slower than this don't bounce/transfer
 	[Export] public float MaxKnockback = 18.0f;      // cap on accumulated shove speed (0 = uncapped)
-	[Export] public float KnockbackControlThreshold = 4.0f; // above this shove speed the unit rides ballistic (its own movement is suppressed) and only regains control once the shove decays back under
+	[Export] public float KnockbackControlThreshold = 4.0f; // at/above this shove speed the unit rides ballistic (steering fully suppressed); as the shove decays from here to 0 it eases steering back in proportionally (see OwnMovementScale) — no hard snap
 
 	// --- Staggered target re-acquisition (M5 crowds) ---
 	// Re-scanning UnitRegistry for the nearest foe EVERY physics frame is the crowd hotspot:
@@ -65,11 +65,18 @@ public partial class Unit : CharacterBody3D
 	// Read-only view for debugging / headless tests.
 	public Vector3 CurrentKnockback => KnockbackVelocity;
 
-	// True while a shove is strong enough to take the wheel: the unit rides the knockback
-	// ballistically (its own steering is suppressed) and only "regains control" once the shove
-	// decays back under KnockbackControlThreshold. Makes a bumper/sword fling read as a clean
-	// launch that slows to a stop, instead of the unit immediately powering back against it.
-	protected bool IsKnockbackControlled => KnockbackVelocity.Length() > KnockbackControlThreshold;
+	// How much authority the unit has over its OWN movement right now, 0..1. A shove at or above
+	// KnockbackControlThreshold fully suppresses steering (scale 0) so a bumper/sword fling reads
+	// as a clean launch; as the shove DECAYS the unit eases its steering back in PROPORTIONALLY
+	// (scale climbs 0→1 as |knockback| falls threshold→0). This replaced a hard on/off at the
+	// threshold: snapping steering back to full strength in a single frame jolted the unit (often
+	// reversing it) ~half a second after a bumper hit, which read as a spurious SECOND bump. The
+	// smooth blend turns a bumper touch back into one clean velocity change that decays away.
+	// Subclasses fold this in as: Velocity = ownVelocity * OwnMovementScale + KnockbackVelocity.
+	protected float OwnMovementScale =>
+		KnockbackControlThreshold <= 0f
+			? 1f
+			: Mathf.Clamp(1f - KnockbackVelocity.Length() / KnockbackControlThreshold, 0f, 1f);
 
 	// Flash state: a per-instance copy of the body material, driven each frame.
 	private MeshInstance3D _bodyMesh;

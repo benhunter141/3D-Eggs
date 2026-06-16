@@ -63,9 +63,9 @@ public partial class Enemy : Unit
 			}
 		}
 
-		// A strong shove takes over (ride it out and slow down); otherwise chase plus any
-		// lingering knockback that's already small enough to walk through.
-		Velocity = IsKnockbackControlled ? KnockbackVelocity : chase + KnockbackVelocity;
+		// A strong shove takes over (ride it out and slow down); as it decays the unit eases its
+		// chase back in (OwnMovementScale) instead of snapping it on — no spurious second bump.
+		Velocity = chase * OwnMovementScale + KnockbackVelocity;
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 	}
