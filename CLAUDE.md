@@ -119,7 +119,7 @@ folds in `KnockbackVelocity`) — revisit if pinball should toss the captain too
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`,
-`FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`.
+`EggMesh.cs`, `Eyes.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable
 win/lose UI), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
 `Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
@@ -163,7 +163,8 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       nudge live while auto-zoom stays active), cartoony eyes on every unit, visually distinct
       weapon meshes. Cheap, high-impact feel/identity wins. (Chunks 23–25.) Chunk 23 done
       (live `ZoomBias` on top of auto-zoom). Prior-session WIP already swapped unit bodies to
-      egg meshes + reworked the camera/pinball feel (committed `1dba9a2`); Chunks 24–25 pending.
+      egg meshes + reworked the camera/pinball feel (committed `1dba9a2`). Chunk 24 done
+      (`Eyes.cs` procedural googly eyes on every unit); Chunk 25 pending.
 - [ ] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
       archetypes with distinct reach / damage / knockback / visuals. (Chunks 26–27.)
 - [ ] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
@@ -223,8 +224,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 
 **Goal:** cartoony eyes and recognizable weapon meshes — cheap, high-impact identity wins.
 
-- [ ] **Chunk 24 — Cartoony eyes on units.** Give every `Unit` a pair of simple
-  camera-/forward-facing eye visuals (white + pupil), sized per archetype, as a child node.
+- [x] **Chunk 24 — Cartoony eyes on units.** `Eyes.cs` (procedural, `[Tool]`) builds two
+  forward-facing eyeballs (white sphere + dark pupil) placed on the egg's surface curve and
+  poked out a touch; an `Eyes` child node sits on every unit scene (Captain/Ally/Pikeman/
+  Skeleton/Swordman/Bowman), sized per archetype via exports (Captain larger, Skeletons beady).
   Pure visual; no logic. User feel-check for cuteness.
 - [ ] **Chunk 25 — Visually distinct weapon meshes.** Replace placeholder weapon visuals with
   recognizable meshes per weapon (spear/pike shaft+tip, sword blade+guard, bow, stone, arrow)

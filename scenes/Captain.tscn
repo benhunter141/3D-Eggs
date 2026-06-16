@@ -1,7 +1,8 @@
-[gd_scene load_steps=11 format=3 uid="uid://dcaptain0eggs01"]
+[gd_scene load_steps=12 format=3 uid="uid://dcaptain0eggs01"]
 
 [ext_resource type="Script" path="res://scripts/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Script" path="res://scripts/Eyes.cs" id="3_eyes"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_cap"]
 albedo_color = Color(0.85, 0.74, 0.42, 1)
@@ -48,6 +49,14 @@ shape = SubResource("CapsuleShape_cap")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -0.75)
 mesh = SubResource("BoxMesh_capmarker")
 surface_material_override/0 = SubResource("Mat_capmarker")
+
+[node name="Eyes" type="Node3D" parent="."]
+script = ExtResource("3_eyes")
+EggWidth = 1.2
+EggHeight = 1.9
+EyeHeight = 0.44
+EyeSpread = 0.5
+EyeRadius = 0.19
 
 [node name="SwordPivot" type="Node3D" parent="."]
 

@@ -1,7 +1,8 @@
-[gd_scene load_steps=8 format=3 uid="uid://dpikeman0eggs01"]
+[gd_scene load_steps=9 format=3 uid="uid://dpikeman0eggs01"]
 
 [ext_resource type="Script" path="res://scripts/Ally.cs" id="1_ally"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Script" path="res://scripts/Eyes.cs" id="3_eyes"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_pike"]
 albedo_color = Color(0.36, 0.42, 0.5, 1)
@@ -31,6 +32,9 @@ Height = 1.7
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("CapsuleShape_pike")
+
+[node name="Eyes" type="Node3D" parent="."]
+script = ExtResource("3_eyes")
 
 [node name="Pike" type="MeshInstance3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 0.45, -1.3)

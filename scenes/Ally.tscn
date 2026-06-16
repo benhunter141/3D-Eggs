@@ -1,7 +1,8 @@
-[gd_scene load_steps=7 format=3 uid="uid://dally0eggs00001"]
+[gd_scene load_steps=8 format=3 uid="uid://dally0eggs00001"]
 
 [ext_resource type="Script" path="res://scripts/Ally.cs" id="1_ally"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Script" path="res://scripts/Eyes.cs" id="3_eyes"]
 
 [sub_resource type="StandardMaterial3D" id="Mat_ally"]
 albedo_color = Color(0.3, 0.5, 0.85, 1)
@@ -32,3 +33,6 @@ shape = SubResource("CapsuleShape_ally")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, -0.6)
 mesh = SubResource("BoxMesh_allymarker")
 surface_material_override/0 = SubResource("Mat_allymarker")
+
+[node name="Eyes" type="Node3D" parent="."]
+script = ExtResource("3_eyes")
