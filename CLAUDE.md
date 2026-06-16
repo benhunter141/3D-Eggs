@@ -175,10 +175,13 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       (recognizable weapon meshes: round shaft + cone spearhead pikes, blade+guard+grip+pommel
       sword on Swordman, two-limb+string bow on Bowman, cone-head fletched arrow, faceted stone).
       All three chunks built; balance/feel-check the eyes + weapon looks before fully closing M8.
-- [~] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
+- [x] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
       archetypes with distinct reach / damage / knockback / visuals. (Chunks 26–27.) Chunk 26
       done (player spear↔sword swap: `WeaponType` profiles drive reach/damage/knockback/feel +
-      mesh; `swap_weapon` = Q / gamepad). Chunk 27 (more archetypes) pending.
+      mesh; `swap_weapon` = Q / gamepad). Chunk 27 done (weapon handling refactored to a
+      data-driven `WeaponType→WeaponProfile` table built from exports; `swap_weapon` now cycles
+      ALL weapons; added Axe (heaviest hit, slowest) + Mace (hardest knockback) with new Captain
+      meshes). Built; balance/feel-check the new archetypes when convenient.
 - [ ] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
       combat; chocobo faster). (Chunks 28–29.)
 - [ ] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
@@ -255,7 +258,7 @@ and weapons differ in reach / damage / knockback / look.
   Chunk-25 mesh. Add a `swap_weapon` input to toggle in-game (and/or per-level default).
   Sword = short reach + knockback (existing sword rules); spear = long reach, no knockback.
   Headless-test: each weapon's reach + knockback match its profile.
-- [ ] **Chunk 27 — More weapon archetypes.** Add a couple more weapons (e.g. axe = heavy/slow/
+- [x] **Chunk 27 — More weapon archetypes.** Add a couple more weapons (e.g. axe = heavy/slow/
   high-damage, mace = knockback, bow = ranged) as `WeaponType` entries reusing the Chunk-26
   plumbing + Chunk-25 visuals, so allies/enemies can be skinned with them too. Headless-test:
   each archetype's stats resolve correctly.
