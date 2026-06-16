@@ -105,9 +105,10 @@ theme_override_font_sizes/font_size = 22
 
 [node name="Controls" type="Label" parent="VBox"]
 layout_mode = 2
-text = "WASD — move captain     Mouse — aim
-Left-Click — pike thrust     Right-Click / Space — brace wall
-R — restart battle"
+text = "WASD / Arrows — move captain      Mouse — aim
+Left-Click — attack      Right-Click / Space — brace wall
+Q — swap weapon (spear / sword / axe / mace)
+Mouse Wheel  or  + / −  — zoom      R — restart battle"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)
 theme_override_font_sizes/font_size = 18

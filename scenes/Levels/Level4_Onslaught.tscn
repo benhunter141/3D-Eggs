@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://b3degg0level4on"]
+[gd_scene load_steps=15 format=3 uid="uid://b3degg0level4on"]
 
 [ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="1_camera"]
 [ext_resource type="PackedScene" path="res://scenes/Captain.tscn" id="2_captain"]
@@ -7,6 +7,7 @@
 [ext_resource type="PackedScene" path="res://scenes/Bowman.tscn" id="5_bowman"]
 [ext_resource type="PackedScene" path="res://scenes/Menu/ResultMenu.tscn" id="6_result"]
 [ext_resource type="Script" path="res://scripts/GameManager.cs" id="7_gm"]
+[ext_resource type="PackedScene" path="res://scenes/Hud.tscn" id="8_hud"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat_1"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -218,6 +219,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1, -27)
 script = ExtResource("7_gm")
 
 [node name="ResultMenu" parent="." instance=ExtResource("6_result")]
+
+[node name="Hud" parent="." instance=ExtResource("8_hud")]
 
 [node name="ObjectiveLayer" type="CanvasLayer" parent="."]
 

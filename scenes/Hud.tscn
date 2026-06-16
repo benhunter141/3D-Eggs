@@ -1,0 +1,76 @@
+[gd_scene load_steps=3 format=3 uid="uid://dhud0eggs00001"]
+
+[ext_resource type="Script" path="res://scripts/Hud.cs" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_panel"]
+bg_color = Color(0.08, 0.09, 0.12, 0.74)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.92, 0.88, 0.72, 0.35)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[node name="Hud" type="CanvasLayer"]
+script = ExtResource("1_hud")
+
+[node name="Controls" type="Panel" parent="."]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -228.0
+offset_right = 372.0
+offset_bottom = -16.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_panel")
+
+[node name="VBox" type="VBoxContainer" parent="Controls"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 14.0
+offset_top = 12.0
+offset_right = -14.0
+offset_bottom = -12.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 5
+
+[node name="WeaponLabel" type="Label" parent="Controls/VBox"]
+layout_mode = 2
+text = "WEAPON:  Spear"
+theme_override_colors/font_color = Color(0.97, 0.85, 0.45, 1)
+theme_override_font_sizes/font_size = 22
+
+[node name="SwapHint" type="Label" parent="Controls/VBox"]
+layout_mode = 2
+text = "▶  Press  [ Q ]  to switch weapon"
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="Sep" type="HSeparator" parent="Controls/VBox"]
+layout_mode = 2
+
+[node name="ControlsTitle" type="Label" parent="Controls/VBox"]
+layout_mode = 2
+text = "CONTROLS"
+theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)
+theme_override_font_sizes/font_size = 15
+
+[node name="ControlsList" type="Label" parent="Controls/VBox"]
+layout_mode = 2
+text = "Move — WASD / Arrows
+Aim — Mouse
+Attack — Left-Click
+Brace wall — Right-Click / Space
+Swap weapon — Q
+Zoom — Mouse Wheel / + −
+Restart — R"
+theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 1)
+theme_override_font_sizes/font_size = 16

@@ -126,9 +126,10 @@ folds in `KnockbackVelocity`) — revisit if pinball should toss the captain too
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`,
-`FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`.
-`scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`), `Menu/ResultMenu.tscn` (reusable
-win/lose UI), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
+`FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`, `Hud.cs`.
+`scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
+`Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
+live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
 `Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
 `Levels/Level5_PinballArena.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`, `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Bumper.tscn`,
