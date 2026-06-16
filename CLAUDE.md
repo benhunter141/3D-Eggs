@@ -205,6 +205,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 > 4. Reply with a one-line summary + the exact run command (§8). Don't wait for
 >    confirmation — the user says if something's off, else "go".
 >
+> **Always end EVERY reply with a one-sentence summary line** of the form
+> `Done: Chunk N — <short name>.` (chunk number + its short name). It must be the very
+> last sentence. For work that isn't a numbered chunk, name it succinctly instead
+> (e.g. `Done: in-game controls HUD.`).
+>
 > Keep chunks self-contained and small. Headless-test logic where possible (§4).
 
 **Done (detail in code + git log):**
