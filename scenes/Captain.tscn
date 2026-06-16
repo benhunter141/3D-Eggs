@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://dcaptain0eggs01"]
+[gd_scene load_steps=19 format=3 uid="uid://dcaptain0eggs01"]
 
 [ext_resource type="Script" path="res://scripts/Player.cs" id="1_player"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
@@ -41,6 +41,35 @@ albedo_color = Color(0.78, 0.81, 0.85, 1)
 metallic = 0.6
 roughness = 0.3
 
+[sub_resource type="BoxMesh" id="BoxMesh_blade"]
+size = Vector3(0.1, 0.03, 1.1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_blade"]
+albedo_color = Color(0.82, 0.84, 0.88, 1)
+metallic = 0.7
+roughness = 0.25
+
+[sub_resource type="BoxMesh" id="BoxMesh_guard"]
+size = Vector3(0.34, 0.05, 0.1)
+
+[sub_resource type="StandardMaterial3D" id="Mat_gold"]
+albedo_color = Color(0.8, 0.65, 0.2, 1)
+metallic = 0.5
+roughness = 0.4
+
+[sub_resource type="BoxMesh" id="BoxMesh_grip"]
+size = Vector3(0.05, 0.05, 0.22)
+
+[sub_resource type="StandardMaterial3D" id="Mat_grip"]
+albedo_color = Color(0.2, 0.13, 0.08, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_pommel"]
+radius = 0.055
+height = 0.11
+radial_segments = 8
+rings = 4
+
 [sub_resource type="BoxShape3D" id="BoxShape_capikehit"]
 size = Vector3(0.7, 0.7, 3.0)
 
@@ -63,18 +92,42 @@ surface_material_override/0 = SubResource("Mat_capmarker")
 
 [node name="SwordPivot" type="Node3D" parent="."]
 
-[node name="Sword" type="Node3D" parent="SwordPivot"]
+[node name="Spear" type="Node3D" parent="SwordPivot"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -1.5)
 
-[node name="Shaft" type="MeshInstance3D" parent="SwordPivot/Sword"]
+[node name="Shaft" type="MeshInstance3D" parent="SwordPivot/Spear"]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 mesh = SubResource("CylinderMesh_capshaft")
 surface_material_override/0 = SubResource("Mat_wood")
 
-[node name="Head" type="MeshInstance3D" parent="SwordPivot/Sword"]
+[node name="Head" type="MeshInstance3D" parent="SwordPivot/Spear"]
 transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, -1.65)
 mesh = SubResource("ConeMesh_caphead")
 surface_material_override/0 = SubResource("Mat_metal")
+
+[node name="SwordMesh" type="Node3D" parent="SwordPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, -0.5)
+visible = false
+
+[node name="Blade" type="MeshInstance3D" parent="SwordPivot/SwordMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.75)
+mesh = SubResource("BoxMesh_blade")
+surface_material_override/0 = SubResource("Mat_blade")
+
+[node name="Guard" type="MeshInstance3D" parent="SwordPivot/SwordMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.12)
+mesh = SubResource("BoxMesh_guard")
+surface_material_override/0 = SubResource("Mat_gold")
+
+[node name="Grip" type="MeshInstance3D" parent="SwordPivot/SwordMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.02)
+mesh = SubResource("BoxMesh_grip")
+surface_material_override/0 = SubResource("Mat_grip")
+
+[node name="Pommel" type="MeshInstance3D" parent="SwordPivot/SwordMesh"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.15)
+mesh = SubResource("SphereMesh_pommel")
+surface_material_override/0 = SubResource("Mat_gold")
 
 [node name="Hitbox" type="Area3D" parent="SwordPivot"]
 monitoring = false

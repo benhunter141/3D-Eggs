@@ -175,8 +175,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       (recognizable weapon meshes: round shaft + cone spearhead pikes, blade+guard+grip+pommel
       sword on Swordman, two-limb+string bow on Bowman, cone-head fletched arrow, faceted stone).
       All three chunks built; balance/feel-check the eyes + weapon looks before fully closing M8.
-- [ ] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
-      archetypes with distinct reach / damage / knockback / visuals. (Chunks 26–27.)
+- [~] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
+      archetypes with distinct reach / damage / knockback / visuals. (Chunks 26–27.) Chunk 26
+      done (player spear↔sword swap: `WeaponType` profiles drive reach/damage/knockback/feel +
+      mesh; `swap_weapon` = Q / gamepad). Chunk 27 (more archetypes) pending.
 - [ ] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
       combat; chocobo faster). (Chunks 28–29.)
 - [ ] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
@@ -248,7 +250,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 **Goal:** make the weapon a real choice — the captain can wield a sword instead of the pike,
 and weapons differ in reach / damage / knockback / look.
 
-- [ ] **Chunk 26 — Player weapon swap (spear ↔ sword).** Give `Player` a `WeaponType`
+- [x] **Chunk 26 — Player weapon swap (spear ↔ sword).** Give `Player` a `WeaponType`
   (Spear | Sword) driving hitbox reach, damage, knockback, and thrust/swing feel + the
   Chunk-25 mesh. Add a `swap_weapon` input to toggle in-game (and/or per-level default).
   Sword = short reach + knockback (existing sword rules); spear = long reach, no knockback.

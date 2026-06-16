@@ -2,26 +2,69 @@ using Godot;
 using System.Collections.Generic;
 
 // The player capsule. Twin-stick movement on the flat XZ plane.
-// WASD (or left stick) moves; mouse aims; left-click THRUSTS the pike straight ahead.
+// WASD (or left stick) moves; mouse aims; left-click THRUSTS the held weapon straight ahead.
 // Extends Unit so it shares the team/health/damage pipeline with allies and enemies.
+//
+// Weapon swap (M9, Chunk 26): the captain carries one of two weapons, toggled live with
+// `swap_weapon` (Q / gamepad). Each weapon is a profile that drives the hitbox REACH, the
+// per-hit DAMAGE + KNOCKBACK, and the thrust/cooldown feel, plus which mesh is shown:
+//   • Spear — LONG reach, NO knockback: a phalanx poker that out-ranges its foe.
+//   • Sword — SHORT reach, strong KNOCKBACK: the classic sword that flings what it hits.
+// The active values are copied into runtime fields by ApplyWeapon so the swing code reads
+// one set of numbers regardless of which weapon is up.
 public partial class Player : Unit
 {
+	public enum WeaponType { Spear, Sword }
+
 	// --- Tunable feel knobs (editable in the Inspector too) ---
 	[Export] public float Speed = 6.0f;         // top movement speed (m/s) — a notch above the AI, not double
 	[Export] public float Acceleration = 60.0f; // how fast we ramp up to Speed
 	[Export] public float Friction = 50.0f;     // how fast we slow to a stop
 	[Export] public float TurnSpeed = 480.0f;   // max aim turn rate (deg/s) — caps how fast we (and the phalanx) can pivot
 
-	// --- Pike thrust ---
-	[Export] public float SwordDamage = 40.0f;       // damage per enemy hit per thrust
-	[Export] public float SwordKnockback = 10.0f;    // shove speed (m/s) flung along the hit direction
-	[Export] public float ThrustDistance = 0.9f;     // how far forward (m) the pike lunges at full extension
+	// --- Weapon loadout (Chunk 26) ---
+	[Export] public WeaponType StartingWeapon = WeaponType.Spear;  // which weapon the captain spawns holding (per-level default)
+
+	// Spear profile — long reach, no knockback.
+	[Export] public float SpearDamage = 40.0f;
+	[Export] public float SpearKnockback = 0.0f;       // a pike pokes; it doesn't fling
+	[Export] public float SpearReach = 3.0f;           // hitbox forward length (m) — out-ranges melee
+	[Export] public float SpearThrustDistance = 0.9f;  // extra lunge at full extension
+	[Export] public float SpearSwingDuration = 0.2f;
+	[Export] public float SpearSwingCooldown = 0.35f;
+
+	// Sword profile — short reach, strong knockback (the classic sword rules).
+	[Export] public float SwordDamage = 40.0f;
+	[Export] public float SwordKnockback = 10.0f;      // shove speed (m/s) flung along the hit direction
+	[Export] public float SwordReach = 1.4f;           // hitbox forward length (m) — much shorter than the spear
+	[Export] public float SwordThrustDistance = 0.6f;
+	[Export] public float SwordSwingDuration = 0.18f;
+	[Export] public float SwordSwingCooldown = 0.30f;
+
+	// --- Shared thrust feel ---
 	[Export] public float ThrustExtendFrac = 0.4f;   // fraction of the duration spent jabbing out (rest is the retract)
-	[Export] public float SwingDuration = 0.2f;      // seconds the pike is extended (jab out + retract)
-	[Export] public float SwingCooldown = 0.35f;     // delay after a thrust before the next
-	[Export] public float SwordReturnLerp = 12.0f;   // how fast the pike eases back to rest if interrupted
+	[Export] public float SwordReturnLerp = 12.0f;   // how fast the weapon eases back to rest if interrupted
+
+	// Active profile values, set by ApplyWeapon — the swing code reads only these.
+	private WeaponType _weapon;
+	private float _damage;
+	private float _knockback;
+	private float _reach;
+	private float _thrustDistance;
+	private float _swingDuration;
+	private float _swingCooldown;
+
+	// Read-only views (used by the headless weapon-swap test).
+	public WeaponType CurrentWeapon => _weapon;
+	public float CurrentDamage => _damage;
+	public float CurrentWeaponKnockback => _knockback;   // NOTE: Unit.CurrentKnockback is the live shove Vector3
+	public float CurrentReach => _reach;
+	public float EffectiveReach => _reach + _thrustDistance;            // how far the tip lands at full lunge
+	public float HitboxLength => _hitboxShape?.Shape is BoxShape3D b ? b.Size.Z : 0f;
 
 	private Node3D _swordPivot;
+	private Node3D _spearMesh;
+	private Node3D _swordMesh;
 	private Area3D _hitbox;
 	private CollisionShape3D _hitboxShape;
 
@@ -43,13 +86,58 @@ public partial class Player : Unit
 		AddToGroup("player");   // allies find their formation anchor through this group
 
 		_swordPivot = GetNode<Node3D>("SwordPivot");
+		_spearMesh = GetNodeOrNull<Node3D>("SwordPivot/Spear");
+		_swordMesh = GetNodeOrNull<Node3D>("SwordPivot/SwordMesh");
 		_hitbox = GetNode<Area3D>("SwordPivot/Hitbox");
 		_hitboxShape = GetNode<CollisionShape3D>("SwordPivot/Hitbox/CollisionShape3D");
 
-		// The pike points straight forward (-Z) at rest; the thrust slides it out and back.
+		// Own the hitbox box so resizing it for a weapon never mutates a shared resource.
+		if (_hitboxShape.Shape is BoxShape3D box)
+			_hitboxShape.Shape = (BoxShape3D)box.Duplicate();
+
+		// The weapon points straight forward (-Z) at rest; the thrust slides it out and back.
 		_swordPivot.Rotation = Vector3.Zero;
+		ApplyWeapon(StartingWeapon);   // sets reach/damage/knockback/feel + shows the right mesh
 		SetThrustOffset(0f);
 		SetHitboxActive(false);
+	}
+
+	// Toggle between the two weapons (bound to `swap_weapon`).
+	public void SwapWeapon()
+	{
+		ApplyWeapon(_weapon == WeaponType.Spear ? WeaponType.Sword : WeaponType.Spear);
+		GD.Print($"[Player] swapped to {_weapon} (reach {_reach:0.0} m, knockback {_knockback:0.0})");
+	}
+
+	// Load a weapon's profile into the active fields, show its mesh, and resize the thrust
+	// hitbox so its forward length matches the weapon's reach (the box grows out along -Z from
+	// the pivot). Called on spawn and on every swap.
+	private void ApplyWeapon(WeaponType weapon)
+	{
+		_weapon = weapon;
+		bool sword = weapon == WeaponType.Sword;
+
+		_damage         = sword ? SwordDamage : SpearDamage;
+		_knockback      = sword ? SwordKnockback : SpearKnockback;
+		_reach          = sword ? SwordReach : SpearReach;
+		_thrustDistance = sword ? SwordThrustDistance : SpearThrustDistance;
+		_swingDuration  = sword ? SwordSwingDuration : SpearSwingDuration;
+		_swingCooldown  = sword ? SwordSwingCooldown : SpearSwingCooldown;
+
+		if (_spearMesh != null) _spearMesh.Visible = !sword;
+		if (_swordMesh != null) _swordMesh.Visible = sword;
+
+		// Box spans 0..-_reach along the pivot's forward axis, so position it at -_reach/2.
+		if (_hitboxShape?.Shape is BoxShape3D box)
+		{
+			Vector3 size = box.Size;
+			size.Z = _reach;
+			box.Size = size;
+
+			Vector3 pos = _hitboxShape.Position;
+			pos.Z = -_reach * 0.5f;
+			_hitboxShape.Position = pos;
+		}
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -91,6 +179,11 @@ public partial class Player : Unit
 		ResolveKnockbackBounce();   // captain bounces off walls/bumpers/units like everyone else
 
 		AimAtMouse(dt);
+
+		// Swap weapons between thrusts (not mid-swing, so the hitbox never resizes live).
+		if (!_swinging && Input.IsActionJustPressed("swap_weapon"))
+			SwapWeapon();
+
 		UpdateSwing(dt);
 	}
 
@@ -105,6 +198,7 @@ public partial class Player : Unit
 		if (!_swinging && _cooldownTimer <= 0f && Input.IsActionJustPressed("attack"))
 			StartSwing();
 
+
 		if (!_swinging)
 		{
 			// Idle / post-thrust: ease the pike back to its rest (fully retracted) pose.
@@ -115,14 +209,14 @@ public partial class Player : Unit
 		}
 
 		_swingTimer += dt;
-		float t = Mathf.Clamp(_swingTimer / SwingDuration, 0f, 1f);
+		float t = Mathf.Clamp(_swingTimer / _swingDuration, 0f, 1f);
 		// Jab out quickly over the first ThrustExtendFrac of the window, then retract
 		// over the remainder — a snappy poke, not a wide sweep.
 		float extend = Mathf.Clamp(ThrustExtendFrac, 0.05f, 0.95f);
 		float reach = t < extend
 			? t / extend                       // 0 -> 1 (lunging out)
 			: 1f - (t - extend) / (1f - extend); // 1 -> 0 (pulling back)
-		SetThrustOffset(reach * ThrustDistance);
+		SetThrustOffset(reach * _thrustDistance);
 
 		// Poll overlaps each frame — bodies can enter as the pike extends.
 		// Each body is struck at most once per thrust; only damage enemy-team Units.
@@ -134,12 +228,12 @@ public partial class Player : Unit
 			if (body is Unit unit && unit.Team != Team)
 			{
 				Vector3 hitDir = unit.GlobalPosition - GlobalPosition;
-				unit.TakeDamage(SwordDamage, hitDir, SwordKnockback);  // shove flings them away
-				GD.Print($"[Pike] {Name} thrust {unit.Name} for {SwordDamage} (knockback {SwordKnockback})");
+				unit.TakeDamage(_damage, hitDir, _knockback);  // sword shoves; spear deals no knockback
+				GD.Print($"[{_weapon}] {Name} thrust {unit.Name} for {_damage} (knockback {_knockback})");
 			}
 		}
 
-		if (_swingTimer >= SwingDuration)
+		if (_swingTimer >= _swingDuration)
 			EndSwing();
 	}
 
@@ -154,7 +248,7 @@ public partial class Player : Unit
 	private void EndSwing()
 	{
 		_swinging = false;
-		_cooldownTimer = SwingCooldown;
+		_cooldownTimer = _swingCooldown;
 		SetHitboxActive(false);
 		// Offset is ~0 where the thrust ended (fully retracted); the idle branch eases out any residual.
 	}

@@ -38,8 +38,9 @@ public partial class UnitTest : Node3D
 		bool registry = await TestRegistry();
 		bool bounce = await TestKnockbackBounce();
 		bool bumper = await TestBumperKick();
+		bool weaponSwap = await TestWeaponSwap();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -747,6 +748,64 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: the bumper kicks a unit back out faster than it came in"
 			: $"FAIL: flungAway={flungAway}");
+		return pass;
+	}
+
+	// Chunk 26 (M9): the captain's weapon swap. The spear is a long-reach, no-knockback poker;
+	// the sword is a short-reach, hard-knockback flinger. Spawning with the spear, the swap
+	// toggles to the sword and back, and each weapon's hitbox box LENGTH resizes to its reach
+	// while damage/knockback/feel follow its profile. The real Captain scene is used so the
+	// _Ready wiring (mesh nodes + owned hitbox) is exercised exactly as in play.
+	private async Task<bool> TestWeaponSwap()
+	{
+		GD.Print("=== UnitTest: captain weapon swap (spear <-> sword) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		cap.StartingWeapon = Player.WeaponType.Spear;   // set before _Ready so it spawns with the spear
+		AddChild(cap);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var spearMesh = cap.GetNode<Node3D>("SwordPivot/Spear");
+		var swordMesh = cap.GetNode<Node3D>("SwordPivot/SwordMesh");
+
+		// Spear: long reach, NO knockback, hitbox box length == SpearReach, only the spear shown.
+		bool spearIsSpear = cap.CurrentWeapon == Player.WeaponType.Spear;
+		bool spearNoKnock = Mathf.IsZeroApprox(cap.CurrentWeaponKnockback);
+		bool spearHitbox = Mathf.IsEqualApprox(cap.HitboxLength, cap.SpearReach, 0.01f);
+		bool spearMeshShown = spearMesh.Visible && !swordMesh.Visible;
+		float spearReach = cap.EffectiveReach;
+		GD.Print($"spear: weapon={cap.CurrentWeapon}, knockback={cap.CurrentWeaponKnockback}, " +
+			$"hitboxLen={cap.HitboxLength:0.00} (want {cap.SpearReach}), reach={spearReach:0.00}, meshOk={spearMeshShown}");
+
+		// Swap -> sword: short reach, knockback > 0, hitbox shrinks to SwordReach, sword mesh shown.
+		cap.SwapWeapon();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool swordIsSword = cap.CurrentWeapon == Player.WeaponType.Sword;
+		bool swordKnocks = cap.CurrentWeaponKnockback > 0f;
+		bool swordHitbox = Mathf.IsEqualApprox(cap.HitboxLength, cap.SwordReach, 0.01f);
+		bool swordMeshShown = swordMesh.Visible && !spearMesh.Visible;
+		float swordReach = cap.EffectiveReach;
+		GD.Print($"sword: weapon={cap.CurrentWeapon}, knockback={cap.CurrentWeaponKnockback}, " +
+			$"hitboxLen={cap.HitboxLength:0.00} (want {cap.SwordReach}), reach={swordReach:0.00}, meshOk={swordMeshShown}");
+
+		// The spear must genuinely out-range the sword, and a second swap returns to the spear.
+		bool spearOutreaches = spearReach > swordReach;
+		cap.SwapWeapon();
+		bool swappedBack = cap.CurrentWeapon == Player.WeaponType.Spear;
+		GD.Print($"spear reach {spearReach:0.00} > sword reach {swordReach:0.00} = {spearOutreaches}; swappedBack={swappedBack}");
+
+		bool pass = spearIsSpear && spearNoKnock && spearHitbox && spearMeshShown
+			&& swordIsSword && swordKnocks && swordHitbox && swordMeshShown
+			&& spearOutreaches && swappedBack;
+		GD.Print(pass
+			? "PASS: weapon swap toggles reach, knockback, feel, and mesh per weapon profile"
+			: $"FAIL: spear(is={spearIsSpear},noKnock={spearNoKnock},hitbox={spearHitbox},mesh={spearMeshShown}) " +
+			  $"sword(is={swordIsSword},knocks={swordKnocks},hitbox={swordHitbox},mesh={swordMeshShown}) " +
+			  $"outreach={spearOutreaches},back={swappedBack}");
 		return pass;
 	}
 }
