@@ -117,6 +117,17 @@ public partial class Player : Unit
 	// only at the MoveAndSlide). The captain is now susceptible to shoves like everyone else.
 	private Vector3 _moveVel = Vector3.Zero;
 
+	// --- Mount (M10, Chunk 28) ---
+	// The captain can climb onto a nearby Mount (Donkey, later Chocobo) to ride faster. While
+	// mounted the player keeps its full move/aim/attack pipeline — only the top Speed changes and
+	// the body is lifted onto the mount's back; the Mount mirrors us underneath as one silhouette.
+	[Export] public float MountRange = 3.0f;   // how close a mount must be to climb on (the mount's own range can extend this)
+	private Mount _mount;                        // current mount, or null on foot
+	private float _footSpeed;                    // top Speed on foot, restored on dismount
+	private float _footY;                        // ground Y we stand at on foot, restored on dismount
+	public bool IsMounted => _mount != null;
+	public Mount CurrentMount => _mount;
+
 	public override void _Ready()
 	{
 		base._Ready();   // init Health from MaxHealth
@@ -163,6 +174,76 @@ public partial class Player : Unit
 
 	// Jump straight to a specific weapon (per-level default / tests).
 	public void SetWeapon(WeaponType weapon) => ApplyWeapon(weapon);
+
+	// --- Mount (Chunk 28) ---
+
+	// `mount` toggles: off a mount if riding one, otherwise climb onto the nearest in range.
+	public void ToggleMount()
+	{
+		if (_mount != null)
+			Dismount();
+		else
+			TryMount();
+	}
+
+	// Climb onto the nearest unridden mount within range. Returns true if we mounted. Public so the
+	// headless test can drive it without faking input. Riding raises our top Speed to the mount's,
+	// lifts us onto its back, and hands the mount to us as our carried silhouette.
+	public bool TryMount()
+	{
+		if (_mount != null)
+			return false;
+
+		Mount best = null;
+		float bestSq = float.MaxValue;
+		foreach (Node n in GetTree().GetNodesInGroup("mounts"))
+		{
+			if (n is not Mount m || m.IsRidden)
+				continue;
+			float range = Mathf.Max(MountRange, m.MountRange);
+			float dSq = GlobalPosition.DistanceSquaredTo(m.GlobalPosition);
+			if (dSq <= range * range && dSq < bestSq)
+			{
+				bestSq = dSq;
+				best = m;
+			}
+		}
+		if (best == null)
+			return false;
+
+		_mount = best;
+		_footSpeed = Speed;
+		_footY = GlobalPosition.Y;
+		Speed = best.MountSpeed;
+
+		// Hop onto the mount: snap to its spot, lifted one RiderHeight up. From here the Mount
+		// mirrors our position/yaw each frame, so we ride as one.
+		GlobalPosition = new Vector3(best.GlobalPosition.X, best.GlobalPosition.Y + best.RiderHeight, best.GlobalPosition.Z);
+		best.OnMounted(this);
+
+		GD.Print($"[Player] mounted {best.Name} (speed {_footSpeed:0.0} -> {Speed:0.0})");
+		return true;
+	}
+
+	// Climb off: drop back to foot speed and ground height, a step to the side of the mount.
+	public void Dismount()
+	{
+		if (_mount == null)
+			return;
+
+		Mount m = _mount;
+		_mount = null;
+		Speed = _footSpeed;
+		m.OnDismounted();
+
+		// Step off to our left so we don't stand inside the steed; back down to ground height.
+		Vector3 side = GlobalTransform.Basis.X.Normalized();
+		Vector3 p = m.GlobalPosition + side * Mathf.Max(1.0f, m.MountRange * 0.5f);
+		p.Y = _footY;
+		GlobalPosition = p;
+
+		GD.Print($"[Player] dismounted {m.Name} (speed -> {Speed:0.0})");
+	}
 
 	// Load a weapon's profile into the active fields, show its mesh, and resize the thrust
 	// hitbox so its forward length matches the weapon's reach (the box grows out along -Z from
@@ -234,6 +315,10 @@ public partial class Player : Unit
 		ResolveKnockbackBounce();   // captain bounces off walls/bumpers/units like everyone else
 
 		AimAtMouse(dt);
+
+		// Climb onto / off a nearby mount (read once here so it never double-fires across mounts).
+		if (Input.IsActionJustPressed("mount"))
+			ToggleMount();
 
 		// Swap weapons between thrusts (not mid-swing, so the hitbox never resizes live).
 		if (!_swinging && Input.IsActionJustPressed("swap_weapon"))

@@ -1,7 +1,8 @@
-[gd_scene load_steps=15 format=3 uid="uid://b3degg0level1hl"]
+[gd_scene load_steps=16 format=3 uid="uid://b3degg0level1hl"]
 
 [ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="1_camera"]
 [ext_resource type="PackedScene" path="res://scenes/Captain.tscn" id="2_captain"]
+[ext_resource type="PackedScene" path="res://scenes/Donkey.tscn" id="9_donkey"]
 [ext_resource type="PackedScene" path="res://scenes/Pikeman.tscn" id="3_pikeman"]
 [ext_resource type="PackedScene" path="res://scenes/Swordman.tscn" id="4_swordman"]
 [ext_resource type="PackedScene" path="res://scenes/Bowman.tscn" id="5_bowman"]
@@ -52,6 +53,9 @@ shape = SubResource("BoxShape_ground")
 
 [node name="Captain" parent="." instance=ExtResource("2_captain")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 10)
+
+[node name="Donkey" parent="." instance=ExtResource("9_donkey")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0, 10)
 
 [node name="Camera3D" type="Camera3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 14, 14)

@@ -22,7 +22,7 @@ anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -228.0
+offset_top = -250.0
 offset_right = 372.0
 offset_bottom = -16.0
 grow_vertical = 0
@@ -70,6 +70,7 @@ Aim — Mouse
 Attack — Left-Click
 Brace wall — Right-Click / Space
 Swap weapon — Q
+Mount / dismount — E
 Zoom — Mouse Wheel / + −
 Restart — R"
 theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 1)

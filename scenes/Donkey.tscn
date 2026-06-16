@@ -1,0 +1,122 @@
+[gd_scene load_steps=12 format=3 uid="uid://ddonkey0eggs001"]
+
+[ext_resource type="Script" path="res://scripts/Mount.cs" id="1_mount"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_body"]
+albedo_color = Color(0.55, 0.5, 0.46, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Mat_dark"]
+albedo_color = Color(0.3, 0.27, 0.25, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_leg"]
+top_radius = 0.09
+bottom_radius = 0.09
+height = 1.0
+radial_segments = 8
+rings = 1
+
+[sub_resource type="CylinderMesh" id="ConeMesh_ear"]
+top_radius = 0.0
+bottom_radius = 0.07
+height = 0.5
+radial_segments = 8
+rings = 1
+
+[sub_resource type="SphereMesh" id="SphereMesh_white"]
+radius = 0.09
+height = 0.18
+radial_segments = 8
+rings = 4
+
+[sub_resource type="StandardMaterial3D" id="Mat_white"]
+albedo_color = Color(0.97, 0.97, 0.97, 1)
+shading_mode = 0
+
+[sub_resource type="SphereMesh" id="SphereMesh_pupil"]
+radius = 0.05
+height = 0.1
+radial_segments = 8
+rings = 4
+
+[sub_resource type="StandardMaterial3D" id="Mat_pupil"]
+albedo_color = Color(0.05, 0.05, 0.05, 1)
+shading_mode = 0
+
+[sub_resource type="BoxShape3D" id="BoxShape_col"]
+size = Vector3(1.1, 1.5, 2.2)
+
+[node name="Donkey" type="CharacterBody3D"]
+script = ExtResource("1_mount")
+MountSpeed = 9.0
+RiderHeight = 1.6
+
+[node name="Body" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 1.2, 0)
+material_override = SubResource("Mat_body")
+script = ExtResource("2_egg")
+Width = 1.0
+Height = 2.0
+
+[node name="LegFL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.5, -0.6)
+mesh = SubResource("CylinderMesh_leg")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="LegFR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.5, -0.6)
+mesh = SubResource("CylinderMesh_leg")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="LegBL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.5, 0.6)
+mesh = SubResource("CylinderMesh_leg")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="LegBR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.5, 0.6)
+mesh = SubResource("CylinderMesh_leg")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="Head" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.75, -1.0)
+material_override = SubResource("Mat_body")
+script = ExtResource("2_egg")
+Width = 0.5
+Height = 0.9
+
+[node name="EarL" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.985, 0.174, 0, -0.174, 0.985, 0, 0, 0, 1, -0.14, 2.2, -1.0)
+mesh = SubResource("ConeMesh_ear")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="EarR" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.985, -0.174, 0, 0.174, 0.985, 0, 0, 0, 1, 0.14, 2.2, -1.0)
+mesh = SubResource("ConeMesh_ear")
+surface_material_override/0 = SubResource("Mat_dark")
+
+[node name="EyeWhiteL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 1.92, -1.3)
+mesh = SubResource("SphereMesh_white")
+material_override = SubResource("Mat_white")
+
+[node name="EyeWhiteR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 1.92, -1.3)
+mesh = SubResource("SphereMesh_white")
+material_override = SubResource("Mat_white")
+
+[node name="PupilL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.15, 1.94, -1.37)
+mesh = SubResource("SphereMesh_pupil")
+material_override = SubResource("Mat_pupil")
+
+[node name="PupilR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.15, 1.94, -1.37)
+mesh = SubResource("SphereMesh_pupil")
+material_override = SubResource("Mat_pupil")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("BoxShape_col")

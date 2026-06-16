@@ -107,7 +107,7 @@ theme_override_font_sizes/font_size = 22
 layout_mode = 2
 text = "WASD / Arrows — move captain      Mouse — aim
 Left-Click — attack      Right-Click / Space — brace wall
-Q — swap weapon (spear / sword / axe / mace)
+Q — swap weapon (spear / sword / axe / mace)      E — mount / dismount
 Mouse Wheel  or  + / −  — zoom      R — restart battle"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)

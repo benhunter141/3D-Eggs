@@ -40,8 +40,9 @@ public partial class UnitTest : Node3D
 		bool bumper = await TestBumperKick();
 		bool weaponSwap = await TestWeaponSwap();
 		bool archetypes = await TestWeaponArchetypes();
+		bool mount = await TestMount();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -922,6 +923,61 @@ public partial class UnitTest : Node3D
 			? "PASS: every archetype resolves to its role (axe=heaviest+slowest, mace=hardest fling, spear=longest+no knockback), mesh + hitbox per weapon"
 			: $"FAIL: axeHardestHit={axeHardestHit}, axeSlowest={axeSlowest}, maceHardestFling={maceHardestFling}, " +
 			  $"spearLongestReach={spearLongestReach}, spearNoKnock={spearNoKnock}, meshIsolated={allMeshesIsolated}, hitboxMatch={allHitboxesMatch}");
+		return pass;
+	}
+
+	// Chunk 28 (M10): mounting. The captain climbs onto a nearby Donkey — its top Speed rises to the
+	// mount's MountSpeed, it registers as the mount's rider, and the mount's collision switches off
+	// while carried. Dismounting restores the foot speed and ground height and frees the mount again.
+	// A mount placed out of range can't be climbed. Real Captain + Donkey scenes so the _Ready wiring
+	// (groups, collision lookup) runs exactly as in play.
+	private async Task<bool> TestMount()
+	{
+		GD.Print("=== UnitTest: mount + dismount (donkey) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(cap);
+		cap.GlobalPosition = new Vector3(0f, 1f, 0f);
+
+		var donkey = GD.Load<PackedScene>("res://scenes/Donkey.tscn").Instantiate<Mount>();
+		AddChild(donkey);
+		donkey.GlobalPosition = new Vector3(1.5f, 0f, 0f);   // within MountRange of the captain
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		float footSpeed = cap.Speed;
+		bool mounted = cap.TryMount();
+		float rideSpeed = cap.Speed;
+		bool faster = rideSpeed > footSpeed;
+		bool ridden = donkey.IsRidden && donkey.Rider == cap && cap.IsMounted && cap.CurrentMount == donkey;
+		GD.Print($"mount: success={mounted}, speed {footSpeed:0.0} -> {rideSpeed:0.0} (faster={faster}), ridden={ridden}");
+
+		// Let a couple of physics frames run so the mount slides under the rider as it would in play.
+		for (int i = 0; i < 4; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		bool carriedUnder = Mathf.IsEqualApprox(donkey.GlobalPosition.X, cap.GlobalPosition.X, 0.05f)
+			&& Mathf.IsEqualApprox(donkey.GlobalPosition.Z, cap.GlobalPosition.Z, 0.05f)
+			&& cap.GlobalPosition.Y > donkey.GlobalPosition.Y;   // rider sits above the steed
+		GD.Print($"carried: donkey under rider={carriedUnder} (cap Y={cap.GlobalPosition.Y:0.0}, donkey Y={donkey.GlobalPosition.Y:0.0})");
+
+		cap.Dismount();
+		bool restored = Mathf.IsEqualApprox(cap.Speed, footSpeed, 0.01f) && !cap.IsMounted && !donkey.IsRidden;
+		bool onGround = Mathf.IsEqualApprox(cap.GlobalPosition.Y, 1f, 0.05f);   // back to foot height
+		GD.Print($"dismount: speed restored to {cap.Speed:0.0} ({restored}), back on ground Y={cap.GlobalPosition.Y:0.0} ({onGround})");
+
+		// Out of range: shove the donkey far away — the captain can't climb on.
+		donkey.GlobalPosition = new Vector3(40f, 0f, 0f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool cantReach = !cap.TryMount() && !cap.IsMounted;
+		GD.Print($"out of range: mount refused={cantReach}");
+
+		bool pass = mounted && faster && ridden && carriedUnder && restored && onGround && cantReach;
+		GD.Print(pass
+			? "PASS: captain mounts a nearby donkey (faster, carried), dismounts (speed/height restored), can't mount one out of range"
+			: $"FAIL: mounted={mounted}, faster={faster}, ridden={ridden}, carried={carriedUnder}, restored={restored}, onGround={onGround}, cantReach={cantReach}");
 		return pass;
 	}
 }

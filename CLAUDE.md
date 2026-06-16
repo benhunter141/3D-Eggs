@@ -124,8 +124,18 @@ folds in `KnockbackVelocity`) — revisit if pinball should toss the captain too
   on hit or `MaxLifetime`.
 - Direct player-issued ally commands come later (M7).
 
+**Mounts (M10, Chunk 28).** A `Mount` (`CharacterBody3D`, NOT a `Unit` — mounts don't fight/take
+damage) joins the `mounts` group. The **Player** owns the `mount` input (read once, so it never
+double-fires across mounts): `TryMount()` climbs onto the nearest unridden mount within range
+(`Mathf.Max(player.MountRange, mount.MountRange)`), `Dismount()` steps off beside it. While ridden
+the player's top `Speed` becomes the mount's `MountSpeed`, the player is lifted `RiderHeight` onto
+the mount's back, and the mount mirrors the rider's position/yaw each frame with its own collision
+DISABLED — captain + steed read as one silhouette, and the full move/aim/attack pipeline keeps
+working (mounted combat). Dismount restores foot `Speed` + ground height. Concrete mounts are just
+scenes with their own `MountSpeed`/look (Donkey now; Chocobo = faster, Chunk 29).
+
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
-`Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`,
+`Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
 `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`, `Hud.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
 `Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
@@ -133,7 +143,7 @@ live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.ts
 `Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
 `Levels/Level5_PinballArena.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`, `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Bumper.tscn`,
-`Tests/UnitTest.tscn`, `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
+`Donkey.tscn`, `Tests/UnitTest.tscn`, `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
 
@@ -183,8 +193,12 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       data-driven `WeaponType→WeaponProfile` table built from exports; `swap_weapon` now cycles
       ALL weapons; added Axe (heaviest hit, slowest) + Mace (hardest knockback) with new Captain
       meshes). Built; balance/feel-check the new archetypes when convenient.
-- [ ] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
-      combat; chocobo faster). (Chunks 28–29.)
+- [~] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
+      combat; chocobo faster). (Chunks 28–29.) Chunk 28 done (`Mount` base + `Donkey.tscn`: walk up
+      and press `mount` = E / gamepad B to climb on — riding raises the captain's top Speed to the
+      mount's `MountSpeed`, carries the steed under the rider as one silhouette, and keeps the full
+      move/aim/attack pipeline; dismount drops you beside it at foot speed/height. One donkey added
+      to Level 1 to try). Chocobo (Chunk 29) next.
 - [ ] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
       period (15 s for now); HUD for scores / timer / contest. Feeds M12's energy. (Chunks 30–31.)
 - [ ] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
@@ -275,7 +289,7 @@ and weapons differ in reach / damage / knockback / look.
 
 **Goal:** rideable mounts for speed & charm — a cute donkey and a chocobo.
 
-- [ ] **Chunk 28 — Mount base + Donkey.** `scripts/Mount.cs` + `scenes/Donkey.tscn`:
+- [x] **Chunk 28 — Mount base + Donkey.** `scripts/Mount.cs` + `scenes/Donkey.tscn`:
   mount/dismount (proximity + `mount` input), mounted state raises move speed & changes the
   player silhouette (rider on mount), mounted combat still works; dismount drops you beside the
   mount. Headless-test: mounting raises speed, dismount restores it.
