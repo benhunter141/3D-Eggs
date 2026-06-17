@@ -52,8 +52,9 @@ public partial class UnitTest : Node3D
 		bool relicsPotions = TestRelicsPotions();
 		bool endzone = TestEndzone();
 		bool march = await TestMarch();
+		bool deckTuning = TestDeckTuning();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1142,6 +1143,38 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: piles cycle draw->hand->discard and reshuffle conserves the deck"
 			: "FAIL: deck pile bookkeeping wrong");
+		return pass;
+	}
+
+	// Chunk 43 (M12.5): endzone-mode tuning. The starter deck is reweighted to be UNIT-HEAVY (deploy a
+	// force) and the card battle's default round is shortened to 5 s. Pure model — synchronous: count
+	// the starter deck's kinds and read CardBattle's script default RoundSeconds.
+	private bool TestDeckTuning()
+	{
+		GD.Print("=== UnitTest: endzone deck + round tuning (Chunk 43) ===");
+
+		var starter = CardLibrary.StarterDeck();
+		int units = 0, actions = 0;
+		foreach (Card c in starter)
+		{
+			if (c.Kind == Card.CardKind.Unit) units++;
+			else actions++;
+		}
+		bool unitMajority = units > actions;
+
+		// CardBattle's script default round length (the .tscn also sets it explicitly to match).
+		var battle = new CardBattle();
+		float defaultRound = battle.RoundSeconds;
+		bool fiveSecond = Mathf.IsEqualApprox(defaultRound, 5f);
+		battle.Free();
+
+		GD.Print($"starter: {units} Unit / {actions} Action (unit-majority={unitMajority}); " +
+			$"default RoundSeconds={defaultRound:0} (5s={fiveSecond})");
+
+		bool pass = unitMajority && fiveSecond;
+		GD.Print(pass
+			? "PASS: starter deck is unit-heavy and the default round is 5 s"
+			: "FAIL: deck/round tuning wrong");
 		return pass;
 	}
 

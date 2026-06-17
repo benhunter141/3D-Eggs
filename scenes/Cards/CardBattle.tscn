@@ -54,6 +54,7 @@ corner_radius_bottom_left = 8
 [node name="CardBattle" type="Node3D"]
 process_mode = 3
 script = ExtResource("1_cb")
+RoundSeconds = 5.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Env_1")

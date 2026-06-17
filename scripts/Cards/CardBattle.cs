@@ -23,7 +23,7 @@ public partial class CardBattle : Node3D, ICardField
 	[Export] public int HandSize = 5;
 	[Export] public int BaseEnergy = 3;         // energy granted each round before counting held ground
 	[Export] public int EnergyPerPoint = 1;     // extra energy per capture point held at the pause
-	[Export] public float RoundSeconds = 15f;   // length of a PLAY phase before it auto-pauses (Chunk 34)
+	[Export] public float RoundSeconds = 5f;    // length of a PLAY phase before it auto-pauses (Chunk 34; 5 s for the endzone auto-battler, Chunk 43)
 
 	// Football-pitch layout (M12.5, Chunk 40). The pitch is 28 wide (X, ±FieldHalfWidth) × 44 long (Z),
 	// with a player endzone at the NEAR (+Z) end and an enemy endzone at the FAR (−Z) end. These bounds

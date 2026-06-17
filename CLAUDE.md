@@ -253,10 +253,9 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions
       (Chunks 32–39, all done). Balance/feel-check pending.
-- [~] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
+- [x] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
       smaller fully on-screen field with two endzones; deploy units in your endzone and they
-      march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43).
-      Pitch + endzones + camera reframe (Chunk 40) + endzone-gated placement (Chunk 41) + forward-march AI (Chunk 42) done; 5 s turns + unit-heavy deck (Chunk 43) pending.
+      march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43, all done).
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -467,7 +466,7 @@ opts in.
   unit (`SpawnUnit`) — with the march direction set by team. **Headless-test:** a march-mode
   unit with no foe in range moves toward its goal direction; with a foe inside `AggroRange`
   it stops marching and engages. Feel-check the advance pacing.
-- [ ] **Chunk 43 — Mode tuning: 5 s turns + unit-heavy starter deck.** Default `RoundSeconds`
+- [x] **Chunk 43 — Mode tuning: 5 s turns + unit-heavy starter deck.** Default `RoundSeconds`
   to **5** (script default + explicit on `CardBattle.tscn`). Reweight `CardLibrary.StarterDeck()`
   to be **mostly Unit cards** (units the clear majority, a few actions) so the opening deck
   is about deploying a force. **Headless-test:** the starter deck is majority Unit; default
