@@ -41,8 +41,9 @@ public partial class UnitTest : Node3D
 		bool weaponSwap = await TestWeaponSwap();
 		bool archetypes = await TestWeaponArchetypes();
 		bool mount = await TestMount();
+		bool chocobo = await TestChocobo();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -978,6 +979,56 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: captain mounts a nearby donkey (faster, carried), dismounts (speed/height restored), can't mount one out of range"
 			: $"FAIL: mounted={mounted}, faster={faster}, ridden={ridden}, carried={carriedUnder}, restored={restored}, onGround={onGround}, cantReach={cantReach}");
+		return pass;
+	}
+
+	// Chunk 29 (M10): the chocobo mount. It reuses the same Mount plumbing as the donkey but is the
+	// SPEEDIER steed: its MountSpeed out-paces the donkey's, so riding a chocobo lends the captain a
+	// higher top speed than riding a donkey would. We compare the two scenes' MountSpeed directly and
+	// confirm an actual mount of each yields the faster ride for the chocobo. Real scenes so the
+	// _Ready wiring (groups, collision lookup) runs exactly as in play.
+	private async Task<bool> TestChocobo()
+	{
+		GD.Print("=== UnitTest: chocobo mount (faster than donkey) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Compare the two mounts' top speeds straight off their scenes.
+		var donkey = GD.Load<PackedScene>("res://scenes/Donkey.tscn").Instantiate<Mount>();
+		var chocobo = GD.Load<PackedScene>("res://scenes/Chocobo.tscn").Instantiate<Mount>();
+		AddChild(donkey);
+		AddChild(chocobo);
+		donkey.GlobalPosition = new Vector3(20f, 0f, 0f);    // parked out of the way
+		chocobo.GlobalPosition = new Vector3(1.5f, 0f, 0f);  // within MountRange of the captain below
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool fasterScene = chocobo.MountSpeed > donkey.MountSpeed;
+		GD.Print($"scene speeds: donkey={donkey.MountSpeed:0.0}, chocobo={chocobo.MountSpeed:0.0} (chocobo faster={fasterScene})");
+
+		// Mount the chocobo: the captain's ride speed should equal the chocobo's MountSpeed, which
+		// is itself faster than what the donkey would have lent.
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(cap);
+		cap.GlobalPosition = new Vector3(0f, 1f, 0f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		float footSpeed = cap.Speed;
+		bool mounted = cap.TryMount();
+		bool rodeChocobo = cap.CurrentMount == chocobo;
+		float chocoRide = cap.Speed;
+		bool rideMatchesChocobo = Mathf.IsEqualApprox(chocoRide, chocobo.MountSpeed, 0.01f);
+		bool rideBeatsDonkey = chocoRide > donkey.MountSpeed && chocoRide > footSpeed;
+		GD.Print($"mounted chocobo={mounted && rodeChocobo}, ride speed={chocoRide:0.0} " +
+			$"(matches chocobo={rideMatchesChocobo}, beats donkey ride={rideBeatsDonkey})");
+
+		cap.Dismount();
+
+		bool pass = fasterScene && mounted && rodeChocobo && rideMatchesChocobo && rideBeatsDonkey;
+		GD.Print(pass
+			? "PASS: the chocobo is the faster steed — riding it tops the donkey's ride speed"
+			: $"FAIL: fasterScene={fasterScene}, mounted={mounted && rodeChocobo}, rideMatches={rideMatchesChocobo}, beatsDonkey={rideBeatsDonkey}");
 		return pass;
 	}
 }

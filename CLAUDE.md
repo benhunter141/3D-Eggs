@@ -143,7 +143,7 @@ live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.ts
 `Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
 `Levels/Level5_PinballArena.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`, `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Bumper.tscn`,
-`Donkey.tscn`, `Tests/UnitTest.tscn`, `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
+`Donkey.tscn`, `Chocobo.tscn`, `Tests/UnitTest.tscn`, `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
 
@@ -193,12 +193,14 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       data-driven `WeaponType→WeaponProfile` table built from exports; `swap_weapon` now cycles
       ALL weapons; added Axe (heaviest hit, slowest) + Mace (hardest knockback) with new Captain
       meshes). Built; balance/feel-check the new archetypes when convenient.
-- [~] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
+- [x] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
       combat; chocobo faster). (Chunks 28–29.) Chunk 28 done (`Mount` base + `Donkey.tscn`: walk up
       and press `mount` = E / gamepad B to climb on — riding raises the captain's top Speed to the
       mount's `MountSpeed`, carries the steed under the rider as one silhouette, and keeps the full
-      move/aim/attack pipeline; dismount drops you beside it at foot speed/height. One donkey added
-      to Level 1 to try). Chocobo (Chunk 29) next.
+      move/aim/attack pipeline; dismount drops you beside it at foot speed/height). Chunk 29 done
+      (`Chocobo.tscn` reuses `Mount.cs` — faster steed, `MountSpeed` 13 vs the donkey's 9, with a
+      distinct tall yellow look: beak, crest + tail feathers, googly eyes). A donkey and a chocobo
+      flank the spawn in Level 1 to compare. Balance/feel-check the chocobo speed when convenient.
 - [ ] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
       period (15 s for now); HUD for scores / timer / contest. Feeds M12's energy. (Chunks 30–31.)
 - [ ] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
@@ -293,9 +295,10 @@ and weapons differ in reach / damage / knockback / look.
   mount/dismount (proximity + `mount` input), mounted state raises move speed & changes the
   player silhouette (rider on mount), mounted combat still works; dismount drops you beside the
   mount. Headless-test: mounting raises speed, dismount restores it.
-- [ ] **Chunk 29 — Chocobo mount.** `scenes/Chocobo.tscn` reusing `Mount.cs` — faster than the
-  donkey, distinct look (Chunk-24 eyes), maybe a small hop/dash trait. Headless-test: chocobo
-  top speed > donkey.
+- [x] **Chunk 29 — Chocobo mount.** `scenes/Chocobo.tscn` reusing `Mount.cs` — faster than the
+  donkey (`MountSpeed` 13 vs 9), distinct look (taller upright yellow body, orange beak/legs,
+  crest + tail feathers, googly eyes). Headless-test: chocobo `MountSpeed` > donkey and riding
+  it tops the donkey's ride speed. One added beside the donkey in Level 1 to try.
 
 ---
 
