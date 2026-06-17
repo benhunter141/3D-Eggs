@@ -84,6 +84,14 @@ public partial class CardBattle : Node3D, ICardField
 		_camera = GetNode<Camera3D>("Camera3D");
 		_units = GetNode<Node3D>("Units");
 
+		// Football-pitch auto-battler (M12.5, Chunk 42): every unit on the pitch MARCHES toward the
+		// opposing endzone unless a foe comes within AggroRange. Enable it on the seed enemies here;
+		// each card-spawned unit is enabled in SpawnUnit. Only this mode opts in — other levels keep
+		// their real formations / global chase untouched.
+		foreach (Node n in _units.GetChildren())
+			if (n is Unit seed)
+				EnableMarch(seed);
+
 		_round = new RoundLoop(RoundSeconds);
 		_round.PhaseChanged += OnPhaseChanged;
 		BuildDevPanel();
@@ -262,10 +270,23 @@ public partial class CardBattle : Node3D, ICardField
 			return null;
 		_units.AddChild(node);
 		node.GlobalPosition = location + Vector3.Up;   // lift onto the ground like the level scenes
-		// Chunk 39: SpawnStrength relics make every deployed unit hit harder.
-		if (_run != null && node is Unit unit)
-			unit.Strength += _run.Inventory.SpawnStrengthBonus;
+		if (node is Unit unit)
+		{
+			// Chunk 39: SpawnStrength relics make every deployed unit hit harder.
+			if (_run != null)
+				unit.Strength += _run.Inventory.SpawnStrengthBonus;
+			EnableMarch(unit);                         // Chunk 42: march toward the enemy endzone
+		}
 		return node as ICardUnit;
+	}
+
+	// Turn on forward-march for one pitch unit (Chunk 42), aiming it at the OPPOSING endzone: enemies
+	// march toward the near player endzone (+Z = Vector3.Back), friendlies toward the far enemy endzone
+	// (−Z = Vector3.Forward). CapturePoints and other non-Unit children are left alone by the caller.
+	private static void EnableMarch(Unit unit)
+	{
+		unit.MarchMode = true;
+		unit.MarchGoalDirection = unit.Team == Unit.TeamId.Enemy ? Vector3.Back : Vector3.Forward;
 	}
 
 	private void OnCardSelected(Card card)

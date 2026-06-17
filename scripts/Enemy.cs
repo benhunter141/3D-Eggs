@@ -40,7 +40,7 @@ public partial class Enemy : Unit
 		// Throttled nearest-foe pick (M5): re-scan only every few frames, but keep chasing the
 		// cached target's live position every frame.
 		if (ShouldRescanTarget())
-			CachedTarget = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+			CachedTarget = ScanNearestOpponent();
 		Unit target = LiveTarget;
 		if (target != null)
 		{
@@ -61,6 +61,12 @@ public partial class Enemy : Unit
 				_attackTimer = AttackCooldown;
 				GD.Print($"[Enemy] {Name} hit {target.Name} for {AttackDamage}");
 			}
+		}
+		else if (MarchMode)
+		{
+			// Football-pitch auto-battler (Chunk 42): no foe in aggro range — advance to the enemy endzone.
+			chase = MarchVelocity(MoveSpeed);
+			FaceTowards(GlobalPosition + MarchGoalDirection, dt);
 		}
 
 		// A strong shove takes over (ride it out and slow down); as it decays the unit eases its

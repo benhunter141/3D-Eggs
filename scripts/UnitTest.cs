@@ -51,8 +51,9 @@ public partial class UnitTest : Node3D
 		bool runMap = TestRunMap();
 		bool relicsPotions = TestRelicsPotions();
 		bool endzone = TestEndzone();
+		bool march = await TestMarch();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1596,6 +1597,68 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: points inside the endzone are accepted, points outside are rejected"
 			: "FAIL: endzone bounds test wrong");
+		return pass;
+	}
+
+	// Chunk 42 (M12.5): the opt-in forward-march AI. (a) A march-mode unit with NO foe in range walks
+	// toward its goal direction (−Z); (b) the same unit with a foe parked inside AggroRange — placed on
+	// +Z, OPPOSITE the march goal — stops advancing and engages it (moves toward the foe and damages it),
+	// proving the aggro check overrides the march. Real Enemy (Skeleton) instances so the registry +
+	// chase/attack pipeline runs exactly as in play.
+	private async Task<bool> TestMarch()
+	{
+		GD.Print("=== UnitTest: forward-march AI (Chunk 42) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// (a) No foe anywhere: the marcher advances toward its goal direction (−Z).
+		var marcher = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		marcher.MarchMode = true;
+		marcher.MarchGoalDirection = Vector3.Forward;   // (0,0,−1) — toward the far endzone
+		marcher.AggroRange = 8f;
+		AddChild(marcher);
+		marcher.GlobalPosition = Vector3.Zero;
+		float startZ = marcher.GlobalPosition.Z;
+
+		for (int i = 0; i < 60; i++)   // ~1 s
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float marchedZ = marcher.GlobalPosition.Z;
+		bool advanced = marchedZ < startZ - 1f;   // moved meaningfully along −Z toward the goal
+		GD.Print($"march: z {startZ:0.00} -> {marchedZ:0.00} (advanced={advanced})");
+
+		// (b) Foe inside AggroRange, on +Z (the OPPOSITE direction to the march goal): the marcher must
+		// break off and engage — moving toward the foe (+Z) and damaging it, not marching away (−Z).
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var engager = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		engager.MarchMode = true;
+		engager.MarchGoalDirection = Vector3.Forward;   // would walk −Z if it saw no foe
+		engager.AggroRange = 8f;
+		AddChild(engager);
+		engager.GlobalPosition = Vector3.Zero;
+
+		var foe = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(foe);
+		foe.GlobalPosition = new Vector3(0f, 0f, 5f);   // +Z, well within AggroRange
+		float engagerStartZ = engager.GlobalPosition.Z;
+
+		for (int i = 0; i < 120; i++)   // ~2 s to close and strike
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		bool movedToFoe = engager.GlobalPosition.Z > engagerStartZ + 0.5f;   // went +Z toward the foe, not −Z
+		bool damagedFoe = foe.Health < foe.MaxHealth;
+		GD.Print($"engage: marcher z->{engager.GlobalPosition.Z:0.00} (movedToFoe={movedToFoe}), " +
+			$"foe HP={foe.Health}/{foe.MaxHealth} (damaged={damagedFoe})");
+
+		bool pass = advanced && movedToFoe && damagedFoe;
+		GD.Print(pass
+			? "PASS: a march-mode unit advances with no foe near, and breaks off to engage one in aggro range"
+			: $"FAIL: advanced={advanced}, movedToFoe={movedToFoe}, damagedFoe={damagedFoe}");
 		return pass;
 	}
 }

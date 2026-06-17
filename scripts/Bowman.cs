@@ -52,7 +52,7 @@ public partial class Bowman : Unit
 		// Throttled nearest-foe pick (M5): re-scan only every few frames, but keep kiting the
 		// cached target's live position every frame.
 		if (ShouldRescanTarget())
-			CachedTarget = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+			CachedTarget = ScanNearestOpponent();
 		Unit target = LiveTarget;
 		if (target != null)
 		{
@@ -78,6 +78,12 @@ public partial class Bowman : Unit
 				FireArrowAt(target);
 				_fireTimer = FireCooldown;
 			}
+		}
+		else if (MarchMode)
+		{
+			// Football-pitch auto-battler (Chunk 42): no foe in aggro range — advance to the player endzone.
+			move = MarchVelocity(MoveSpeed);
+			FaceTowards(GlobalPosition + MarchGoalDirection, dt);
 		}
 
 		// A strong shove takes over (ride it out and slow down); as it decays the unit eases its

@@ -41,6 +41,17 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	protected Unit CachedTarget;     // last picked target; reused between re-scans
 	private int _rescanCounter = -1; // counts down to the next re-scan; <0 until phase is seeded
 
+	// --- Forward-march AI (M12.5, Chunk 42) ---
+	// An OPT-IN auto-battler behaviour for the football-pitch card mode: when MarchMode is on and no
+	// opponent sits within AggroRange, the unit ADVANCES toward the opposing endzone (MarchGoalDirection,
+	// set per team by CardBattle) instead of standing in formation / chasing the globally-nearest foe;
+	// the instant a foe comes within AggroRange it engages with its normal chase/attack. OFF by default,
+	// so every other level keeps its real formations + global chase exactly as before. Wired into
+	// Ally/Enemy/Swordman/Bowman _PhysicsProcess as a fallback path that only fires when MarchMode is set.
+	[Export] public bool MarchMode = false;
+	[Export] public float AggroRange = 8.0f;             // (march only) break off the advance to engage a foe within this range
+	public Vector3 MarchGoalDirection = Vector3.Zero;    // unit vector toward the enemy endzone (set per team by CardBattle)
+
 	// --- Hit feedback (juice) ---
 	[Export] public Color FlashColor = new Color(1f, 1f, 1f); // colour the body pops toward on a hit
 	[Export] public float FlashDuration = 0.12f;              // seconds for one flash to fade out
@@ -463,6 +474,23 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	// (not CachedTarget directly) so a target that died between re-scans reads as no target.
 	protected Unit LiveTarget =>
 		CachedTarget != null && IsInstanceValid(CachedTarget) && !CachedTarget.IsDead ? CachedTarget : null;
+
+	// Re-scan UnitRegistry for our nearest opponent — globally as ever, or (in MarchMode) capped to
+	// AggroRange so we only pick up a foe worth breaking the advance for. The shared scan body for the
+	// AI subclasses: in march mode a null result means "nothing close — keep marching" (Chunk 42).
+	protected Unit ScanNearestOpponent() =>
+		MarchMode
+			? UnitRegistry.FindNearestOpponent(Team, GlobalPosition, AggroRange)
+			: UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+
+	// Flat velocity toward the march goal (the opposing endzone) at `speed`; zero if no goal direction
+	// was set. Subclasses use this as the no-foe fallback while MarchMode is on (Chunk 42).
+	protected Vector3 MarchVelocity(float speed)
+	{
+		Vector3 dir = MarchGoalDirection;
+		dir.Y = 0f;
+		return dir.LengthSquared() > 0.0001f ? dir.Normalized() * speed : Vector3.Zero;
+	}
 
 	// Kick the flash up to `amount` (keep the brighter value if already flashing).
 	private void Flash(float amount)

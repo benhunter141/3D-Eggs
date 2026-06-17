@@ -59,7 +59,7 @@ public partial class Swordman : Unit
 		// Throttled nearest-foe pick (M5): re-scan only every few frames, but keep chasing the
 		// cached target's live position every frame.
 		if (ShouldRescanTarget())
-			CachedTarget = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+			CachedTarget = ScanNearestOpponent();
 		Unit target = LiveTarget;
 
 		// Fresh acquire (had nobody last frame, have someone now) -> kick off a charge burst.
@@ -88,6 +88,12 @@ public partial class Swordman : Unit
 				_attackTimer = AttackCooldown;
 				GD.Print($"[Swordman] {Name} hit {target.Name} for {AttackDamage}");
 			}
+		}
+		else if (MarchMode)
+		{
+			// Football-pitch auto-battler (Chunk 42): no foe in aggro range — advance to the player endzone.
+			chase = MarchVelocity(MoveSpeed);
+			FaceTowards(GlobalPosition + MarchGoalDirection, dt);
 		}
 
 		// A strong shove takes over (ride it out and slow down); as it decays the unit eases its

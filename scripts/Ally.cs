@@ -92,9 +92,13 @@ public partial class Ally : Unit
 		else
 		{
 			// Throttled leash scan (M5): re-pick our in-leash target only every few frames,
-			// but keep engaging the cached target's live position every frame.
+			// but keep engaging the cached target's live position every frame. In MarchMode
+			// (Chunk 42) we instead pick the nearest foe within AggroRange — there's no captain
+			// slot to leash to on the pitch — and fall back to marching when none is near.
 			if (ShouldRescanTarget())
-				CachedTarget = FindTargetInLeash();
+				CachedTarget = MarchMode
+					? UnitRegistry.FindNearestOpponent(Team, GlobalPosition, AggroRange)
+					: FindTargetInLeash();
 			Unit target = LiveTarget;
 			if (target != null)
 			{
@@ -135,6 +139,13 @@ public partial class Ally : Unit
 						GD.Print($"[Ally] {Name} struck {target.Name} for {hit:0.0}");
 					}
 				}
+			}
+			else if (MarchMode)
+			{
+				// Football-pitch auto-battler (Chunk 42): no foe in aggro range — advance to the enemy endzone.
+				desiredVel = MarchVelocity(MoveSpeed);
+				FaceTowards(GlobalPosition + MarchGoalDirection, dt);
+				facingHandled = true;
 			}
 			else if (_player != null)
 			{
