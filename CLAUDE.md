@@ -180,8 +180,8 @@ only move, never appear/vanish; the headless test leans on it. Shuffles are seed
 for deterministic tests; `CardLibrary.StarterDeck()` is the shared opening deck. `CardBattle` (a
 `CanvasLayer`, `CardBattle.tscn`) is a thin VIEW: draw-count panel (bottom-left), the live hand as
 clickable card-buttons (centre, Unit=blue / Action=amber), discard-count panel (bottom-right), plus
-Draw / End-Turn controls and an Energy readout. For now clicking a card just discards it (so the cycle
-reads); real play/targeting = Chunk 33, energy gating = Chunk 35.
+Draw / End-Turn controls and an Energy readout. Clicking a card then a target plays it (Chunk 33);
+the round/pause loop = Chunk 34, energy gating = Chunk 37.
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
@@ -202,79 +202,23 @@ Each milestone must be playable before moving on. **Don't start multiplayer unti
 M1–M5 feel great** — networking many physics bodies is the hardest part.
 
 - [x] **M0 — Setup:** env verified, project builds, ground + player capsule visible.
-- [~] **M1 — Twin-stick melee feel ⭐:** WASD move, mouse aim, click-swing sword.
-      Chunks 1–2 built; Chunk 2 swing still pending the user's feel-check. Tune til fun.
+- [~] **M1 — Twin-stick melee feel ⭐:** WASD move, mouse aim, click-swing sword (Chunks 1–2). Swing feel-check pending.
 - [x] **M2 — Skeletons:** chase, take damage, die; sword knockback; player can die.
-- [x] **M3 — Allies in formation:** loose-leash followers that fight (fists + stones)
-      and re-form.
-- [~] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose; juice.
-      Chunk 9 done (5v5 encounter + win/lose/restart). Standalone juice (Chunk 10) is
-      **deferred** — it now folds into the per-level tuning passes under M4.5.
-- [x] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; the player twin-sticks
-      a **pikeman captain** leading a **braceable pike wall** across hand-designed
-      medieval levels vs **swordmen + bowmen**. Replaces the single 5v5 sandbox.
-      Chunks 11–16 done (Level Select shell; Pike + Pikeman + Brace; Swordman; Bowman + Arrow;
-      Level 1 "Hold the Line"; Levels 2 "Pincer" & 3 "Arrow Storm" + objective labels).
-- [x] **M5 — Crowds:** scale to 50–100 units smoothly. Chunks 17–19 done (`UnitRegistry`
-      killed the per-frame O(n²) group scans; `Crowd.tscn` stress harness + staggered target
-      re-scan; `Level4_Onslaught.tscn` crowd battle, ~49 units). 50 AND 100 units sit within
-      the 60 FPS budget (median physics ~2.9 / ~4.4 ms throttled). Onslaught balance still
-      needs a user feel-check.
-- [~] **M6 — Deeper pinball physics:** bumpers, bouncier impacts — the chaotic soul.
-      Chunks 20–22 done (knockback now BOUNCES + transfers on impact — a shoved unit hands part
-      of its momentum to whatever it rams and rebounds, so one sword-fling chains through a
-      crowd; `Bumper.tscn` static posts KICK touching units back out faster than they came in;
-      `Level5_PinballArena.tscn` is a walled bumper arena that revels in it). All three chunks
-      built; balance (restitution / transfer / min-bounce / bumper strength / arena counts)
-      needs a user feel-check before M6 closes.
+- [x] **M3 — Allies in formation:** loose-leash followers that fight (fists + stones) and re-form.
+- [~] **M4 — 5v5 vertical slice:** player + 4 allies vs 5 skeletons; win/lose/restart (Chunk 9). Standalone juice (Chunk 10) deferred into per-level tuning.
+- [x] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; pikeman captain leads a braceable pike wall vs swordmen + bowmen across hand-designed levels (Chunks 11–16).
+- [x] **M5 — Crowds:** `UnitRegistry` + staggered re-scan kill the O(n²) group scans; 50/100 units within the 60 FPS budget (Chunks 17–19). Onslaught balance feel-check pending.
+- [~] **M6 — Deeper pinball physics:** bouncy/transferring knockback + `Bumper` posts + Pinball Arena (Chunks 20–22). Balance feel-check pending.
 - [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
-- [x] **M8 — Camera & visual identity polish:** adjustable dynamic zoom (zoom levels you can
-      nudge live while auto-zoom stays active), cartoony eyes on every unit, visually distinct
-      weapon meshes. Cheap, high-impact feel/identity wins. (Chunks 23–25.) Chunk 23 done
-      (live `ZoomBias` on top of auto-zoom). Prior-session WIP already swapped unit bodies to
-      egg meshes + reworked the camera/pinball feel (committed `1dba9a2`). Chunk 24 done
-      (procedural googly eyes auto-grown on every `Unit`, sized off its EggMesh). Chunk 25 done
-      (recognizable weapon meshes: round shaft + cone spearhead pikes, blade+guard+grip+pommel
-      sword on Swordman, two-limb+string bow on Bowman, cone-head fletched arrow, faceted stone).
-      All three chunks built; balance/feel-check the eyes + weapon looks before fully closing M8.
-- [x] **M9 — Weapons & loadouts:** swap the captain's spear for a sword; multiple weapon
-      archetypes with distinct reach / damage / knockback / visuals. (Chunks 26–27.) Chunk 26
-      done (player spear↔sword swap: `WeaponType` profiles drive reach/damage/knockback/feel +
-      mesh; `swap_weapon` = Q / gamepad). Chunk 27 done (weapon handling refactored to a
-      data-driven `WeaponType→WeaponProfile` table built from exports; `swap_weapon` now cycles
-      ALL weapons; added Axe (heaviest hit, slowest) + Mace (hardest knockback) with new Captain
-      meshes). Built; balance/feel-check the new archetypes when convenient.
-- [x] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
-      combat; chocobo faster). (Chunks 28–29.) Chunk 28 done (`Mount` base + `Donkey.tscn`: walk up
-      and press `mount` = E / gamepad B to climb on — riding raises the captain's top Speed to the
-      mount's `MountSpeed`, carries the steed under the rider as one silhouette, and keeps the full
-      move/aim/attack pipeline; dismount drops you beside it at foot speed/height). Chunk 29 done
-      (`Chocobo.tscn` reuses `Mount.cs` — faster steed, `MountSpeed` 13 vs the donkey's 9, with a
-      distinct tall yellow look: beak, crest + tail feathers, googly eyes). A donkey and a chocobo
-      flank the spawn in Level 1 to compare. Balance/feel-check the chocobo speed when convenient.
-- [x] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
-      period (15 s for now); HUD for scores / timer / contest. Feeds M12's energy. (Chunks 30–31.)
-      Chunk 30 done (`CapturePoint` Area3D zone: counts living units per team via
-      `GetOverlappingBodies`, awards a point to the sole holder at period end, contested = no
-      award; colour-coded disc + PeriodEnded/StateChanged signals for HUD/energy hooks). Chunk 31
-      done (`KingOfTheHill.tscn` + `KothManager` CanvasLayer: phalanx vs swordmen/bowmen around one
-      central CapturePoint, live score/period-countdown/contest HUD, win at 3 held periods or an
-      enemy wipeout, lose on death or enemy 3; battle 6 on LevelSelect). Balance/feel-check when
-      convenient.
-- [~] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
-      draw / hand / discard piles; Unit cards played on a location, Action cards played on a
-      friendly unit who then performs the action; units have HP / Str / Int (Str → weapon &
-      strength actions, Int → magic); beat a series of rooms collecting cards / relics /
-      potions with events; **energy comes from holding KotH points (M11) at period end.**
-      (Chunks 32–37.) Chunk 32 done (`scripts/Cards/` — `Card`/`Deck` pure model with
-      draw/hand/discard piles + auto-reshuffle; `CardBattle.tscn` StS-style hand UI showing all
-      three piles; battle 7 "Slay the Eggs (WIP)" on LevelSelect). Chunk 33 done (`Cards/CardPlay.cs`
-      — `ICardField`/`ICardUnit` + `CardPlay.Play` resolver routes a card to its target by Kind: Unit
-      cards SPAWN at a clicked ground location, Action cards make a clicked FRIENDLY unit act;
-      `CardBattle` is now a real 3D battlefield — click a card then click the ground/a unit, energy is
-      spent (not yet gated), `Unit` implements `ICardUnit` with Charge/Rally/Firebolt/Brace effects).
-      Headless-tested: the pile cycle conserves the deck; unit/action cards reach the right target and
-      the guards (no field / no unit / enemy target) reject.
+- [x] **M8 — Camera & visual identity polish:** live zoom bias, googly eyes on every unit, recognizable weapon meshes (Chunks 23–25). Eyes/weapon feel-check pending.
+- [x] **M9 — Weapons & loadouts:** data-driven `WeaponType→WeaponProfile`; `swap_weapon` (Q) cycles spear/sword/axe/mace with distinct reach/damage/knockback/mesh (Chunks 26–27). Archetype balance feel-check pending.
+- [x] **M10 — Mounts:** rideable Donkey + faster Chocobo (mount/dismount via `mount`, mounted combat); both flank the Level 1 spawn (Chunks 28–29). Chocobo-speed feel-check pending.
+- [x] **M11 — King of the Hill mode:** central `CapturePoint` scores its holder each period; `KothManager` HUD + match authority; battle 6 on LevelSelect (Chunks 30–31). Feeds M12 energy. Balance feel-check pending.
+- [~] **M12 — Slay the Eggs (card battler mode):** StS-style PvE on the battlefield — draw/hand/discard
+      piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
+      runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
+      units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions.
+      (Chunks 32–39.) Chunks 32–33 done (model + piles + hand UI; play targeting). Next: Chunk 34 round/pause loop.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -386,7 +330,7 @@ draws energy from.
 
 ---
 
-### ▶ PLANNED — M12 Slay the Eggs — Card Battler Mode (Chunks 32–37)
+### ▶ PLANNED — M12 Slay the Eggs — Card Battler Mode (Chunks 32–39)
 
 **Goal:** a Slay-the-Spire-style PvE mode layered on the battlefield — build a deck and spend
 energy (earned by holding KotH points, M11) to deploy units and trigger actions across a run of
@@ -396,10 +340,14 @@ rooms.
 - **Cards = Units or Actions.** A **Unit card** is played onto a **location** (a battlefield
   zone / `CapturePoint`-style slot) to spawn that unit for your team. An **Action card** is
   played onto a **friendly unit**, which then performs the action (move / attack / buff / spell).
+- **Round = timed real-time play + tactical pause.** Play runs in real time for `RoundSeconds`
+  (default 15, dev-tunable) — units move/fight and the player may play cards live — then the mode
+  **pauses** (battlefield frozen) so the player can play more cards; pressing **End Turn** resumes
+  the next round and restarts the timer. The pause is also where per-period energy is awarded (Chunk 37).
 - **Unit stats: HP / Str / Int.** **Str** scales weapon attack power + strength-based actions;
   **Int** scales magic-based actions. Stats live on `Unit` (or a card-mode component).
-- **Energy from holding ground.** Card energy each period = KotH points your team holds at
-  period end (M11) — territory *is* your economy.
+- **Energy from holding ground.** Card energy each round = KotH points your team holds at the
+  pause (M11) — territory *is* your economy.
 - **Run = rooms.** PvE like StS: a series of rooms (combat / event), collecting **cards**,
   **relics**, and **potions** between them.
 
@@ -410,16 +358,27 @@ rooms.
   (spawn there); Action cards target a **friendly unit** (it performs the action). Play resolves
   to a real spawn / a real unit behavior on the battlefield. Headless-test: a unit card spawns at
   a location; an action card makes its target unit act.
-- [ ] **Chunk 34 — HP / Str / Int stats wired in.** Add Str/Int to units; Str scales weapon
+- [ ] **Chunk 34 — Round loop: timed real-time play + tactical pause.** The card battle alternates a
+  **PLAY phase** (real time for `RoundSeconds`, default 15; units move/fight and cards are playable
+  live) → a **PAUSE phase** (battlefield simulation frozen — e.g. `GetTree().Paused = true` with
+  `CardBattle`'s `ProcessMode = Always` so its UI keeps running; cards still playable) → the existing
+  **End Turn** control resumes the next PLAY phase and resets the timer. A phase state machine
+  (`RoundManager` or on `CardBattle`) drives it; HUD shows the current phase + countdown to the next
+  pause. Headless-test the state machine: timer expiry flips PLAY→PAUSE; End Turn flips PAUSE→PLAY and
+  resets the timer; cards remain playable in both phases.
+- [ ] **Chunk 35 — Dev panel: live round-length control.** A toggleable in-mode dev panel to adjust
+  `RoundSeconds` live while testing (numeric readout + +/- buttons or a slider, default 15) plus a
+  manual pause/resume toggle for debugging. Pure dev tool; user feel-check.
+- [ ] **Chunk 36 — HP / Str / Int stats wired in.** Add Str/Int to units; Str scales weapon
   damage + strength actions, Int scales magic actions. Headless-test: higher Str → more weapon
   damage; higher Int → stronger magic action.
-- [ ] **Chunk 35 — Energy from KotH points.** Tie M11 capture-point holdings to per-period card
-  **energy**; you can only play cards your held points afford. Headless-test: holding more points
-  grants more energy; energy gates plays.
-- [ ] **Chunk 36 — Run structure (rooms + rewards + events).** A room map you traverse (combat /
+- [ ] **Chunk 37 — Energy from KotH points.** Tie M11 capture-point holdings to per-round card
+  **energy** (awarded at the pause); you can only play cards your held points afford. Headless-test:
+  holding more points grants more energy; energy gates plays.
+- [ ] **Chunk 38 — Run structure (rooms + rewards + events).** A room map you traverse (combat /
   event rooms), with post-room rewards (pick a card; find relics / potions) and a few event
   rooms. Headless-test: completing a room advances the map and offers a reward.
-- [ ] **Chunk 37 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable
+- [ ] **Chunk 39 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable
   **potions** (one-shot effects), collected through the run. Headless-test: a relic's modifier
   applies; a potion consumes and triggers its effect.
 
