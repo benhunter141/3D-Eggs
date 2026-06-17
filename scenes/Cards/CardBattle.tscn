@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://bcardbattle0egg1"]
+[gd_scene load_steps=16 format=3 uid="uid://bcardbattle0egg1"]
 
 [ext_resource type="Script" path="res://scripts/Cards/CardBattle.cs" id="1_cb"]
 [ext_resource type="Script" path="res://scripts/SceneButton.cs" id="2_btn"]
@@ -20,13 +20,24 @@ ambient_light_source = 3
 tonemap_mode = 2
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
-size = Vector2(50, 50)
+size = Vector2(28, 44)
 
 [sub_resource type="StandardMaterial3D" id="Mat_ground"]
 albedo_color = Color(0.21, 0.28, 0.22, 1)
 
 [sub_resource type="BoxShape3D" id="BoxShape_ground"]
-size = Vector3(50, 0.2, 50)
+size = Vector3(28, 0.2, 44)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_endzone"]
+size = Vector2(28, 8)
+
+[sub_resource type="StandardMaterial3D" id="Mat_player_zone"]
+transparency = 1
+albedo_color = Color(0.3, 0.55, 1, 0.28)
+
+[sub_resource type="StandardMaterial3D" id="Mat_enemy_zone"]
+transparency = 1
+albedo_color = Color(1, 0.38, 0.32, 0.28)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_pile"]
 bg_color = Color(0.08, 0.09, 0.12, 0.85)
@@ -61,36 +72,46 @@ surface_material_override/0 = SubResource("Mat_ground")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
 shape = SubResource("BoxShape_ground")
 
+[node name="PlayerEndzone" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, 18)
+mesh = SubResource("PlaneMesh_endzone")
+surface_material_override/0 = SubResource("Mat_player_zone")
+
+[node name="EnemyEndzone" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.02, -18)
+mesh = SubResource("PlaneMesh_endzone")
+surface_material_override/0 = SubResource("Mat_enemy_zone")
+
 [node name="Camera3D" type="Camera3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 21, 19)
+transform = Transform3D(1, 0, 0, 0, 0.64279, 0.76604, 0, -0.76604, 0.64279, 0, 30, 23)
 
 [node name="Units" type="Node3D" parent="."]
 process_mode = 1
 
 [node name="Swordman1" parent="Units" instance=ExtResource("3_sword")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -13)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -16)
 
 [node name="Swordman2" parent="Units" instance=ExtResource("3_sword")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, -13.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, -16.5)
 
 [node name="Swordman3" parent="Units" instance=ExtResource("3_sword")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, -13.5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, -16.5)
 
 [node name="Swordman4" parent="Units" instance=ExtResource("3_sword")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, -13)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, -16)
 
 [node name="Bowman1" parent="Units" instance=ExtResource("4_bow")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1, -17)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1, -20)
 
 [node name="Bowman2" parent="Units" instance=ExtResource("4_bow")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1, -17)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1, -20)
 
 [node name="CapturePointLeft" parent="Units" groups=["capture_points"] instance=ExtResource("5_cap")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0, -7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 0, 0)
 PeriodSeconds = 15.0
 
 [node name="CapturePointRight" parent="Units" groups=["capture_points"] instance=ExtResource("5_cap")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, -7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 0, 0)
 PeriodSeconds = 15.0
 
 [node name="Ui" type="CanvasLayer" parent="."]

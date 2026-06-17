@@ -25,6 +25,14 @@ public partial class CardBattle : Node3D, ICardField
 	[Export] public int EnergyPerPoint = 1;     // extra energy per capture point held at the pause
 	[Export] public float RoundSeconds = 15f;   // length of a PLAY phase before it auto-pauses (Chunk 34)
 
+	// Football-pitch layout (M12.5, Chunk 40). The pitch is 28 wide (X, ±FieldHalfWidth) × 44 long (Z),
+	// with a player endzone at the NEAR (+Z) end and an enemy endzone at the FAR (−Z) end. These bounds
+	// define the player endzone rectangle — x ∈ [−FieldHalfWidth, FieldHalfWidth], z ∈ [EndzoneFarZ,
+	// EndzoneNearZ] — and back the endzone-gated placement (Chunk 41) and forward-march goals (Chunk 42).
+	[Export] public float FieldHalfWidth = 14f;        // X extent of the pitch (±)
+	[Export] public float PlayerEndzoneNearZ = 22f;    // +Z edge of the player endzone (near the camera)
+	[Export] public float PlayerEndzoneFarZ = 14f;     // inner (−Z) edge of the player endzone
+
 	private readonly Deck _deck = new();
 	private RoundLoop _round;        // PLAY/PAUSE state machine (Chunk 34)
 	private EnergyPool _energy;      // KotH-fed energy economy + play gate (Chunk 37)

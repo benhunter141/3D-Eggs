@@ -253,9 +253,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions
       (Chunks 32–39, all done). Balance/feel-check pending.
-- [ ] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
+- [~] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
       smaller fully on-screen field with two endzones; deploy units in your endzone and they
       march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43).
+      Pitch + endzones + camera reframe done (Chunk 40); placement/march/tuning pending.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -441,7 +442,7 @@ Only `CardBattle` is touched — the other levels (real formations, global enemy
 stay exactly as they are, so every new behavior is **off by default** and `CardBattle`
 opts in.
 
-- [ ] **Chunk 40 — Football field: smaller arena + endzones + camera reframe.** Shrink the
+- [x] **Chunk 40 — Football field: smaller arena + endzones + camera reframe.** Shrink the
   `CardBattle.tscn` ground from 50×50 to a smaller pitch (longer along Z than wide — march
   lanes), and add two translucent ground strips: a **player endzone** at the near end (+Z,
   toward camera) and an **enemy endzone** at the far end (−Z). Reframe `Camera3D` (raise /
