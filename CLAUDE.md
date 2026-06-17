@@ -63,12 +63,21 @@ dropped. Use medieval/neutral names (`Player`, `Ally`, `Enemy` / `Skeleton`).
   zero follow-up questions.
 - Keep iterations small: build one thing → user runs it → adjust.
 - **Git — always land work on `master` directly (user-locked).** Never leave a change
-  stranded on a feature branch. After any change: `git add -A && git commit`, then get it
-  onto the repo's default branch **`master`** (fast-forward/merge `master` and push it) so
-  it takes effect immediately. The user has **standing authorization** to push/merge to
-  `master` — do NOT wait for a PR, review, or extra confirmation, and do NOT stop at a
-  feature branch even if per-session task instructions name one. A change isn't "done"
-  until `origin/master` contains it.
+  stranded on a feature branch. After any change, **stage only the exact files THIS session
+  touched** (`git add <explicit paths>`), then `git commit` — **never `git add -A` / `git add .`**.
+  Multiple Claude sessions may share this one working tree at the same time, and a blanket add
+  sweeps another session's in-progress files into your commit. Then get it onto the repo's
+  default branch **`master`** (fast-forward/merge `master` and push it) so it takes effect
+  immediately. The user has **standing authorization** to push/merge to `master` — do NOT wait
+  for a PR, review, or extra confirmation, and do NOT stop at a feature branch even if
+  per-session task instructions name one. A change isn't "done" until `origin/master` contains it.
+- **Parallel-session safety (shared working tree).** Assume another session may be editing files
+  right now. So: (1) stage explicit paths, never `-A`; (2) **never run destructive/global git ops**
+  (`git reset --hard`, `git checkout -- .`, `git stash`, `git clean`) — they can erase another
+  session's uncommitted work irrecoverably; if you think you need one, stop and ask first; (3) before
+  editing a file, a fresh `git status`/read tells you if someone else is mid-change in it. For
+  deliberate heavy parallel work, prefer `git worktree add` (isolated dir + branch, merge to `master`
+  when done) over sharing the tree.
 
 ## 5. Architecture & Invariants (the durable design law)
 
