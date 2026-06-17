@@ -256,7 +256,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
       smaller fully on-screen field with two endzones; deploy units in your endzone and they
       march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43).
-      Pitch + endzones + camera reframe (Chunk 40) + endzone-gated placement (Chunk 41) done; march/tuning pending.
+      Pitch + endzones + camera reframe (Chunk 40) + endzone-gated placement (Chunk 41) + forward-march AI (Chunk 42) done; 5 s turns + unit-heavy deck (Chunk 43) pending.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -457,7 +457,7 @@ opts in.
   the bounds test into a tiny pure helper (e.g. an `Endzone` struct with `Contains`, in
   `scripts/Cards/`) so it's headless-testable. **Headless-test:** a point inside the endzone
   is accepted, a point outside is rejected.
-- [ ] **Chunk 42 — Forward-march unit AI (advance to enemy endzone unless aggro'd).** Add a
+- [x] **Chunk 42 — Forward-march unit AI (advance to enemy endzone unless aggro'd).** Add a
   shared opt-in march behavior on `Unit` (e.g. `MarchMode` + a per-team `MarchDirection` and
   an `AggroRange`): when no opponent is within `AggroRange`, the unit walks toward the
   OPPOSING endzone (friendly → −Z, enemy → +Z); when one is in range it engages with its
