@@ -44,8 +44,9 @@ public partial class UnitTest : Node3D
 		bool chocobo = await TestChocobo();
 		bool capturePoint = await TestCapturePoint();
 		bool cardDeck = TestCardDeck();
+		bool cardPlay = await TestCardPlay();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1134,6 +1135,72 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: piles cycle draw->hand->discard and reshuffle conserves the deck"
 			: "FAIL: deck pile bookkeeping wrong");
+		return pass;
+	}
+
+	// Chunk 33 (M12): card PLAY targeting. CardResolver bridges the pure card model to the
+	// battlefield — a UNIT card spawns its friendly unit at a location, and an ACTION card makes
+	// a friendly unit ACT. We verify both: (a) a Unit card spawns a player-team unit at the chosen
+	// spot (registered + in the tree); (b) a Charge action shoves its target forward along its
+	// facing; (c) a Rally/Attack action damages the target's nearest foe. Real scenes so the
+	// spawned units carry their full _Ready wiring (registry, weapon, collision).
+	private async Task<bool> TestCardPlay()
+	{
+		GD.Print("=== UnitTest: card play targeting (Chunk 33) ===");
+
+		// Wipe leftovers and let them actually free/unregister so the registry is clean.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		for (int i = 0; i < 3; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var starter = CardLibrary.StarterDeck();
+		Card unitCard = starter.Find(c => c.Kind == Card.CardKind.Unit);
+		Card chargeCard = starter.Find(c => c.Action == Card.ActionKind.Charge);
+		Card rallyCard = starter.Find(c => c.Action == Card.ActionKind.Attack);
+
+		// (a) UNIT card -> spawn at a location, on the player team, registered + in the tree.
+		Vector3 loc = new Vector3(3f, 0f, -2f);
+		Unit spawned = CardResolver.SpawnUnit(unitCard, loc, this);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool spawnedOk = spawned != null && IsInstanceValid(spawned) && spawned.IsInsideTree();
+		bool teamOk = spawned != null && spawned.Team == Unit.TeamId.Player;
+		bool placedOk = spawned != null
+			&& Mathf.IsEqualApprox(spawned.GlobalPosition.X, loc.X, 0.05f)
+			&& Mathf.IsEqualApprox(spawned.GlobalPosition.Z, loc.Z, 0.05f);
+		bool registeredOk = spawned != null && UnitRegistry.OnTeam(Unit.TeamId.Player).Contains(spawned);
+		GD.Print($"unit card '{unitCard?.Title}': spawned={spawnedOk}, team={spawned?.Team} (player={teamOk}), " +
+			$"at ({spawned?.GlobalPosition.X:0.0},{spawned?.GlobalPosition.Z:0.0}) placed={placedOk}, registered={registeredOk}");
+
+		// (b) CHARGE action -> the target lunges forward (-Z at yaw 0) by ~ChargeImpulse. Read the
+		// shove immediately after playing it (no physics frame between, so it hasn't decayed).
+		Unit charger = CardResolver.SpawnUnit(unitCard, Vector3.Zero, this);
+		charger.Rotation = Vector3.Zero;   // forward = -Z
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool acted = CardResolver.PerformAction(chargeCard, charger);
+		Vector3 kb = charger.CurrentKnockback;
+		bool chargedForward = acted && kb.Z < -1f
+			&& Mathf.IsEqualApprox(kb.Length(), CardResolver.ChargeImpulse, 0.5f);
+		GD.Print($"charge action '{chargeCard?.Title}': acted={acted}, knockback={kb} len={kb.Length():0.0} " +
+			$"(want ~{CardResolver.ChargeImpulse}, forward -Z={chargedForward})");
+
+		// (c) RALLY/ATTACK action -> the target damages its nearest foe.
+		Unit attacker = CardResolver.SpawnUnit(unitCard, new Vector3(-6f, 0f, 0f), this);
+		var foe = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		AddChild(foe);
+		foe.GlobalPosition = new Vector3(-5f, 0f, 0f);   // 1 m from the attacker, well within ActionRange
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		float foeBefore = foe.Health;
+		bool struck = CardResolver.PerformAction(rallyCard, attacker);
+		bool damagedFoe = foe.Health < foeBefore;
+		GD.Print($"attack action '{rallyCard?.Title}': struck={struck}, foe HP {foeBefore}->{foe.Health} (damaged={damagedFoe})");
+
+		bool pass = spawnedOk && teamOk && placedOk && registeredOk
+			&& chargedForward && struck && damagedFoe;
+		GD.Print(pass
+			? "PASS: unit cards spawn at a location; action cards make a friendly unit charge / strike"
+			: $"FAIL: spawned={spawnedOk}, team={teamOk}, placed={placedOk}, registered={registeredOk}, " +
+			  $"charged={chargedForward}, struck={struck}, damagedFoe={damagedFoe}");
 		return pass;
 	}
 }

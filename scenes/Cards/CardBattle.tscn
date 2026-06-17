@@ -1,7 +1,30 @@
-[gd_scene load_steps=4 format=3 uid="uid://bcardbattle0egg1"]
+[gd_scene load_steps=11 format=3 uid="uid://bcardbattle0egg1"]
 
 [ext_resource type="Script" path="res://scripts/Cards/CardBattle.cs" id="1_cb"]
 [ext_resource type="Script" path="res://scripts/SceneButton.cs" id="2_btn"]
+[ext_resource type="PackedScene" path="res://scenes/Skeleton.tscn" id="3_skel"]
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat_1"]
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+
+[sub_resource type="Sky" id="Sky_1"]
+sky_material = SubResource("SkyMat_1")
+
+[sub_resource type="Environment" id="Env_1"]
+background_mode = 2
+sky = SubResource("Sky_1")
+ambient_light_source = 3
+tonemap_mode = 2
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(50, 50)
+
+[sub_resource type="StandardMaterial3D" id="Mat_ground"]
+albedo_color = Color(0.19, 0.22, 0.27, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape_ground"]
+size = Vector3(50, 0.2, 50)
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_pile"]
 bg_color = Color(0.08, 0.09, 0.12, 0.85)
@@ -15,52 +38,93 @@ corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
 
-[node name="CardBattle" type="CanvasLayer"]
+[node name="CardBattle" type="Node3D"]
 script = ExtResource("1_cb")
 
-[node name="Root" type="Control" parent="."]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.330366, 0.378522, 0, 0.753, 0.658, -0.5, -0.569794, 0.652695, 0, 10, 0)
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("PlaneMesh_ground")
+surface_material_override/0 = SubResource("Mat_ground")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape_ground")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 19, 17)
+fov = 60.0
+
+[node name="Battlefield" type="Node3D" parent="."]
+
+[node name="Skeleton1" parent="Battlefield" instance=ExtResource("3_skel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 1, -10)
+
+[node name="Skeleton2" parent="Battlefield" instance=ExtResource("3_skel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -12)
+
+[node name="Skeleton3" parent="Battlefield" instance=ExtResource("3_skel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1, -10)
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="Root" type="Control" parent="Hud"]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-
-[node name="Background" type="ColorRect" parent="Root"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
 mouse_filter = 2
-color = Color(0.1, 0.11, 0.14, 1)
 
-[node name="Title" type="Label" parent="Root"]
+[node name="Title" type="Label" parent="Hud/Root"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 22.0
-offset_bottom = 70.0
+offset_top = 18.0
+offset_bottom = 58.0
 grow_horizontal = 2
+mouse_filter = 2
 text = "SLAY THE EGGS"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
-theme_override_font_sizes/font_size = 44
+theme_override_font_sizes/font_size = 36
 
-[node name="EnergyLabel" type="Label" parent="Root"]
+[node name="EnergyLabel" type="Label" parent="Hud/Root"]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 84.0
-offset_bottom = 118.0
+offset_top = 62.0
+offset_bottom = 90.0
 grow_horizontal = 2
+mouse_filter = 2
 text = "ENERGY   3 / 3"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
-theme_override_font_sizes/font_size = 24
+theme_override_font_sizes/font_size = 22
 
-[node name="DrawPanel" type="Panel" parent="Root"]
+[node name="PromptLabel" type="Label" parent="Hud/Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 96.0
+offset_bottom = 124.0
+grow_horizontal = 2
+mouse_filter = 2
+text = "Click the battlefield to play the card."
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(1, 0.85, 0.55, 1)
+theme_override_font_sizes/font_size = 20
+
+[node name="DrawPanel" type="Panel" parent="Hud/Root"]
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -72,13 +136,14 @@ offset_bottom = -24.0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBox_pile")
 
-[node name="DrawCount" type="Label" parent="Root/DrawPanel"]
+[node name="DrawCount" type="Label" parent="Hud/Root/DrawPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 text = "DRAW
 0"
 horizontal_alignment = 1
@@ -86,7 +151,7 @@ vertical_alignment = 1
 theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 1)
 theme_override_font_sizes/font_size = 22
 
-[node name="DiscardPanel" type="Panel" parent="Root"]
+[node name="DiscardPanel" type="Panel" parent="Hud/Root"]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -101,13 +166,14 @@ grow_horizontal = 0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBox_pile")
 
-[node name="DiscardCount" type="Label" parent="Root/DiscardPanel"]
+[node name="DiscardCount" type="Label" parent="Hud/Root/DiscardPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 text = "DISCARD
 0"
 horizontal_alignment = 1
@@ -115,7 +181,7 @@ vertical_alignment = 1
 theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 1)
 theme_override_font_sizes/font_size = 22
 
-[node name="HandBox" type="HBoxContainer" parent="Root"]
+[node name="HandBox" type="HBoxContainer" parent="Hud/Root"]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -130,7 +196,7 @@ grow_vertical = 0
 alignment = 1
 theme_override_constants/separation = 12
 
-[node name="Buttons" type="HBoxContainer" parent="Root"]
+[node name="Buttons" type="HBoxContainer" parent="Hud/Root"]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -143,19 +209,19 @@ grow_vertical = 0
 alignment = 1
 theme_override_constants/separation = 24
 
-[node name="DrawButton" type="Button" parent="Root/Buttons"]
+[node name="DrawButton" type="Button" parent="Hud/Root/Buttons"]
 custom_minimum_size = Vector2(180, 48)
 layout_mode = 2
 text = "Draw  (+1)"
 theme_override_font_sizes/font_size = 22
 
-[node name="EndTurnButton" type="Button" parent="Root/Buttons"]
+[node name="EndTurnButton" type="Button" parent="Hud/Root/Buttons"]
 custom_minimum_size = Vector2(180, 48)
 layout_mode = 2
 text = "End Turn"
 theme_override_font_sizes/font_size = 22
 
-[node name="BackButton" type="Button" parent="Root"]
+[node name="BackButton" type="Button" parent="Hud/Root"]
 custom_minimum_size = Vector2(160, 44)
 layout_mode = 1
 anchors_preset = 0

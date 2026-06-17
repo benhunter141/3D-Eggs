@@ -163,13 +163,28 @@ only move, never appear/vanish; the headless test leans on it. Shuffles are seed
 for deterministic tests; `CardLibrary.StarterDeck()` is the shared opening deck. `CardBattle` (a
 `CanvasLayer`, `CardBattle.tscn`) is a thin VIEW: draw-count panel (bottom-left), the live hand as
 clickable card-buttons (centre, Unit=blue / Action=amber), discard-count panel (bottom-right), plus
-Draw / End-Turn controls and an Energy readout. For now clicking a card just discards it (so the cycle
-reads); real play/targeting = Chunk 33, energy gating = Chunk 35.
+Draw / End-Turn controls and an Energy readout. Energy gating = Chunk 35.
+
+**Cards: play targeting via `CardResolver` (M12, Chunk 33).** `CardResolver` (`scripts/Cards/`) is the
+ONLY card code that touches Godot/units — it bridges the pure `Card`/`Deck` model to the battlefield,
+keeping the model plain-C# + headless-testable. Each `Card` carries WHAT it does as data: a `UnitKind`
+(`Spawns`: Pikeman | Swordman | Bowman) on Unit cards, and an `ActionKind` (`Action`: Charge | Attack |
+Brace | Firebolt) on Action cards. `CardResolver.SpawnUnit(card, location, parent)` instantiates the
+card's friendly unit on the player team at a battlefield point (Unit cards deploy **Allies** — Pikeman
+uses `Pikeman.tscn`; Swordman/Bowman reuse `Ally.tscn` skinned Fists/Stones, since the enemy-scripted
+Swordman/Bowman scenes are team-locked). `CardResolver.PerformAction(card, friendlyUnit)` makes the
+unit act via the same public Unit APIs the game already uses — **Charge** = `AddKnockback` forward
+(self-lunge), **Attack/Firebolt** = damage nearest foe via `UnitRegistry.FindNearestOpponent` (no
+shove), **Brace** = damage + small repel of the nearest foe; returns false (refusing the play) if there's
+no valid target / no foe in range. `CardBattle` is now a `Node3D` BATTLEFIELD (ground + Camera3D + a few
+Skeletons) under the card HUD (`CanvasLayer`): click a hand card to pick it up, then left-click the field
+(ray→ground plane) — Unit card spawns there, Action card acts on the nearest friendly to the click;
+right-click / re-clicking the held card cancels. Str/Int scaling of these effects = Chunk 34.
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
 `CapturePoint.cs`, `KothManager.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`,
-`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardBattle.cs`.
+`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardResolver.cs`, `Cards/CardBattle.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
 `Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
 live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
@@ -251,8 +266,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       potions with events; **energy comes from holding KotH points (M11) at period end.**
       (Chunks 32–37.) Chunk 32 done (`scripts/Cards/` — `Card`/`Deck` pure model with
       draw/hand/discard piles + auto-reshuffle; `CardBattle.tscn` StS-style hand UI showing all
-      three piles; battle 7 "Slay the Eggs (WIP)" on LevelSelect). Headless-tested: the pile
-      cycle conserves the deck.
+      three piles; battle 7 "Slay the Eggs (WIP)" on LevelSelect). Chunk 33 done (`CardResolver`
+      bridges the pure card model to a real battlefield: `CardBattle.tscn` is now a 3D arena under
+      the card HUD — pick a hand card, then click the field; a Unit card spawns its friendly unit
+      there, an Action card makes the nearest friendly unit charge / strike). Headless-tested: the
+      pile cycle conserves the deck; unit cards spawn at a location and action cards make a unit act.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -384,7 +402,7 @@ rooms.
 - [x] **Chunk 32 — Card model + piles + hand UI.** `scripts/Cards/` data model (Card, Deck) +
   draw / hand / discard piles with reshuffle; on-screen UI showing all three piles (StS-style:
   draw count, hand, discard). Headless-test: draw/discard/reshuffle cycle conserves the deck.
-- [ ] **Chunk 33 — Unit & Action cards (play targeting).** Unit cards target a **location**
+- [x] **Chunk 33 — Unit & Action cards (play targeting).** Unit cards target a **location**
   (spawn there); Action cards target a **friendly unit** (it performs the action). Play resolves
   to a real spawn / a real unit behavior on the battlefield. Headless-test: a unit card spawns at
   a location; an action card makes its target unit act.
