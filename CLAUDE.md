@@ -252,7 +252,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions
-      (Chunks 32–39, all done). Balance/feel-check pending. Next milestone: M13 multiplayer.
+      (Chunks 32–39, all done). Balance/feel-check pending.
+- [ ] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
+      smaller fully on-screen field with two endzones; deploy units in your endzone and they
+      march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43).
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -426,6 +429,48 @@ rooms.
 - [x] **Chunk 39 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable
   **potions** (one-shot effects), collected through the run. Headless-test: a relic's modifier
   applies; a potion consumes and triggers its effect.
+
+---
+
+### ▶ PLANNED — M12.5 Endzone Auto-Battler Reshape (Chunks 40–43)
+
+**Goal:** reshape "Slay the Eggs" into a football-pitch auto-battler — a smaller, fully
+on-screen field with two **endzones**; you deploy units in YOUR endzone and they **march
+toward the enemy endzone unless aggro'd**; faster 5 s turns; a unit-heavy starter deck.
+Only `CardBattle` is touched — the other levels (real formations, global enemy chase) must
+stay exactly as they are, so every new behavior is **off by default** and `CardBattle`
+opts in.
+
+- [ ] **Chunk 40 — Football field: smaller arena + endzones + camera reframe.** Shrink the
+  `CardBattle.tscn` ground from 50×50 to a smaller pitch (longer along Z than wide — march
+  lanes), and add two translucent ground strips: a **player endzone** at the near end (+Z,
+  toward camera) and an **enemy endzone** at the far end (−Z). Reframe `Camera3D` (raise /
+  pull back / tilt — and/or FOV) so the WHOLE pitch is visible in front of it, including the
+  near edge by the camera (today it clips off-screen). Move the seed swordmen/bowmen into the
+  far enemy endzone. Store the player-endzone bounds on `CardBattle` for Chunks 41–42. Pure
+  visual + layout; **user feel-check** that the field is fully on-screen and uncramped.
+- [ ] **Chunk 41 — Endzone-gated unit placement.** Unit cards may only be placed inside the
+  PLAYER endzone. `TryPlayAtLocation` validates the ground-ray point against the endzone
+  bounds and rejects an out-of-zone click with a prompt ("Place units in your endzone") —
+  the card stays pending so the player can re-aim. Action-card targeting is unchanged. Pull
+  the bounds test into a tiny pure helper (e.g. an `Endzone` struct with `Contains`, in
+  `scripts/Cards/`) so it's headless-testable. **Headless-test:** a point inside the endzone
+  is accepted, a point outside is rejected.
+- [ ] **Chunk 42 — Forward-march unit AI (advance to enemy endzone unless aggro'd).** Add a
+  shared opt-in march behavior on `Unit` (e.g. `MarchMode` + a per-team `MarchDirection` and
+  an `AggroRange`): when no opponent is within `AggroRange`, the unit walks toward the
+  OPPOSING endzone (friendly → −Z, enemy → +Z); when one is in range it engages with its
+  existing chase/attack. Wire it into `Ally`, `Enemy`, `Swordman`, `Bowman` _PhysicsProcess
+  as a fallback path; default OFF so other levels keep global chase / real formations.
+  `CardBattle` turns it ON for every unit — the seed enemies (in `_Ready`) and every spawned
+  unit (`SpawnUnit`) — with the march direction set by team. **Headless-test:** a march-mode
+  unit with no foe in range moves toward its goal direction; with a foe inside `AggroRange`
+  it stops marching and engages. Feel-check the advance pacing.
+- [ ] **Chunk 43 — Mode tuning: 5 s turns + unit-heavy starter deck.** Default `RoundSeconds`
+  to **5** (script default + explicit on `CardBattle.tscn`). Reweight `CardLibrary.StarterDeck()`
+  to be **mostly Unit cards** (units the clear majority, a few actions) so the opening deck
+  is about deploying a force. **Headless-test:** the starter deck is majority Unit; default
+  round length is 5 s.
 
 ---
 
