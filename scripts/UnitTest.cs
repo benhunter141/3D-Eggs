@@ -42,8 +42,9 @@ public partial class UnitTest : Node3D
 		bool archetypes = await TestWeaponArchetypes();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
+		bool capturePoint = await TestCapturePoint();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1029,6 +1030,62 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: the chocobo is the faster steed — riding it tops the donkey's ride speed"
 			: $"FAIL: fasterScene={fasterScene}, mounted={mounted && rodeChocobo}, rideMatches={rideMatchesChocobo}, beatsDonkey={rideBeatsDonkey}");
+		return pass;
+	}
+
+	// Chunk 30 (M11): capture zone + period scoring. A CapturePoint zone awards a point to the
+	// team that HOLDS it alone at period end; if BOTH teams have units inside (contested), nobody
+	// scores. Real scene instances (Skeleton + Captain) so they carry collision shapes the Area3D
+	// can detect. Short period (0.5 s) to keep the test fast.
+	private async Task<bool> TestCapturePoint()
+	{
+		GD.Print("=== UnitTest: capture point (hold + contested) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cp = GD.Load<PackedScene>("res://scenes/CapturePoint.tscn").Instantiate<CapturePoint>();
+		cp.PeriodSeconds = 0.5f;
+		AddChild(cp);
+		cp.GlobalPosition = Vector3.Zero;
+
+		// A lone enemy inside the zone — should hold it and score at period end.
+		var enemy = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(enemy);
+		enemy.GlobalPosition = new Vector3(1f, 0f, 0f);
+
+		// ~40 frames ≈ 0.67 s: a few frames for the physics server to register the overlap,
+		// then the 0.5 s period fires and awards a point.
+		for (int i = 0; i < 40; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		bool enemyScored = cp.EnemyScore >= 1;
+		bool playerZero = cp.PlayerScore == 0;
+		GD.Print($"hold: enemy score={cp.EnemyScore} (scored={enemyScored}), " +
+			$"player score={cp.PlayerScore} (zero={playerZero}), state={cp.State}");
+
+		// Add a player unit too → contested. Neither side should score this period.
+		var player = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(player);
+		player.GlobalPosition = new Vector3(-1f, 0f, 0f);
+
+		int enemyBefore = cp.EnemyScore;
+		int playerBefore = cp.PlayerScore;
+
+		for (int i = 0; i < 40; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		bool noNewEnemy = cp.EnemyScore == enemyBefore;
+		bool noNewPlayer = cp.PlayerScore == playerBefore;
+		bool contested = cp.State == CapturePoint.ZoneState.Contested;
+		GD.Print($"contested: enemy score={cp.EnemyScore} (noNew={noNewEnemy}), " +
+			$"player score={cp.PlayerScore} (noNew={noNewPlayer}), state={cp.State} (contested={contested})");
+
+		bool pass = enemyScored && playerZero && noNewEnemy && noNewPlayer && contested;
+		GD.Print(pass
+			? "PASS: holder at period end scores; contested scores nobody"
+			: $"FAIL: enemyScored={enemyScored}, playerZero={playerZero}, noNewEnemy={noNewEnemy}, noNewPlayer={noNewPlayer}, contested={contested}");
 		return pass;
 	}
 }
