@@ -237,7 +237,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions.
-      (Chunks 32–39.) Chunks 32–37 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel; HP/Str/Int stats; KotH-fed energy + play gating). Next: Chunk 38 run structure (rooms + rewards).
+      (Chunks 32–39.) Chunks 32–38 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel; HP/Str/Int stats; KotH-fed energy + play gating; run structure — rooms/rewards). Next: Chunk 39 relics & potions.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -401,9 +401,13 @@ rooms.
   `CardBattle` refills it from the live count of player-held `capture_points` at every pause and GATES
   plays (unaffordable cards are disabled / refused). Two `CapturePoint`s added to `CardBattle.tscn`.
   Headless-tested: holding more points grants more energy; energy gates plays.
-- [ ] **Chunk 38 — Run structure (rooms + rewards + events).** A room map you traverse (combat /
-  event rooms), with post-room rewards (pick a card; find relics / potions) and a few event
-  rooms. Headless-test: completing a room advances the map and offers a reward.
+- [x] **Chunk 38 — Run structure (rooms + rewards + events).** `scripts/Cards/RunMap.cs` (pure model):
+  a fixed-shape sequence of rooms (Combat / Event / Boss) you traverse; `CompleteCurrentRoom()` marks
+  the room cleared, advances the map, and returns a `RoomReward` (card choices); `TakeReward()` adds a
+  chosen card to the run's growing `Collection` (the deck carried between rooms, seeded from the starter
+  deck) or skips. `CardLibrary.RewardPool()` is the reward card pool. `CardBattle` is a thin view:
+  room-track HUD, a paused-only "Clear Room" control that pops a reward picker, each new room reloads
+  the battle deck from `Collection`, plus a run-complete banner. Headless-tested.
 - [ ] **Chunk 39 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable
   **potions** (one-shot effects), collected through the run. Headless-test: a relic's modifier
   applies; a potion consumes and triggers its effect.

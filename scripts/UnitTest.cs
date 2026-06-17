@@ -48,8 +48,9 @@ public partial class UnitTest : Node3D
 		bool roundLoop = TestRoundLoop();
 		bool unitStats = await TestUnitStats();
 		bool cardEnergy = TestCardEnergy();
+		bool runMap = TestRunMap();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1411,6 +1412,82 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: holding more points grants more energy, and energy gates plays (can't afford -> can't play)"
 			: "FAIL: card energy economy / gating wrong");
+		return pass;
+	}
+
+	// Chunk 38 (M12): the run structure. A run is a fixed-shape sequence of rooms (combat / event /
+	// boss) you traverse; CLEARING the current room advances the map AND hands back a reward to offer,
+	// and TAKING a reward grows the run's carried deck (Collection). Pure model — synchronous,
+	// deterministic under a seed.
+	private bool TestRunMap()
+	{
+		GD.Print("=== UnitTest: run structure (rooms + rewards) (Chunk 38) ===");
+
+		var run = new RunMap(seed: 99);
+
+		// Fresh run: positioned at the first room, nothing cleared, deck seeded from the starter deck,
+		// and the room mix includes both an event and a boss (the shape isn't all combat).
+		int startCollection = run.Collection.Count;
+		bool startsAtFirst = run.CurrentIndex == 0 && !run.IsComplete && run.Current != null
+			&& run.RoomNumber == 1 && run.RoomCount == run.Rooms.Count;
+		bool seededDeck = startCollection == CardLibrary.StarterDeck().Count;
+		bool hasEvent = run.Rooms.Exists(r => r.Type == RunMap.RoomType.Event);
+		bool hasBoss = run.Rooms.Exists(r => r.Type == RunMap.RoomType.Boss);
+		GD.Print($"start: room {run.RoomNumber}/{run.RoomCount} '{run.Current.Title}' ({run.Current.Type}); " +
+			$"deck={startCollection} (seeded={seededDeck}), hasEvent={hasEvent}, hasBoss={hasBoss}");
+
+		// Clear the first room: it's marked cleared, the map advances, and a reward with choices is offered.
+		RunMap.Room first = run.Current;
+		RunMap.RoomReward reward = run.CompleteCurrentRoom();
+		bool advanced = first.Cleared && run.CurrentIndex == 1 && reward != null
+			&& reward.Choices.Count > 0 && !reward.Resolved;
+		GD.Print($"cleared room 1: cleared={first.Cleared}, index->{run.CurrentIndex}, " +
+			$"reward '{reward?.Prompt}' with {reward?.Choices.Count} choices");
+
+		// Take a card: it's added to the run deck and the reward resolves (and can't be taken twice).
+		int beforeTake = run.Collection.Count;
+		run.TakeReward(reward, reward.Choices[0]);
+		bool tookCard = run.Collection.Count == beforeTake + 1 && reward.Resolved && reward.Chosen != null;
+		run.TakeReward(reward, reward.Choices[0]);   // idempotent: a resolved reward does nothing
+		bool takeIdempotent = run.Collection.Count == beforeTake + 1;
+		GD.Print($"took a card: deck {beforeTake}->{run.Collection.Count} (tookCard={tookCard}), idempotent={takeIdempotent}");
+
+		// Skipping a reward resolves it without growing the deck.
+		RunMap.RoomReward r2 = run.CompleteCurrentRoom();
+		int beforeSkip = run.Collection.Count;
+		run.TakeReward(r2, null);
+		bool skipped = r2.Resolved && r2.Chosen == null && run.Collection.Count == beforeSkip;
+		GD.Print($"skipped reward: resolved={r2.Resolved}, deck unchanged={skipped} ({run.Collection.Count})");
+
+		// Clear out the rest of the run: every CompleteCurrentRoom offers a reward until the map ends,
+		// then it returns null and Current is null (run complete).
+		int rewardsOffered = 2;   // the two above
+		while (!run.IsComplete)
+		{
+			RunMap.RoomReward rr = run.CompleteCurrentRoom();
+			if (rr != null) rewardsOffered++;
+		}
+		bool finished = run.IsComplete && run.Current == null
+			&& run.CurrentIndex == run.RoomCount && run.Rooms.TrueForAll(r => r.Cleared);
+		bool noRewardWhenDone = run.CompleteCurrentRoom() == null;
+		bool everyRoomOfferedReward = rewardsOffered == run.RoomCount;
+		GD.Print($"finished run: complete={run.IsComplete}, current null={run.Current == null}, " +
+			$"all cleared={run.Rooms.TrueForAll(r => r.Cleared)}, rewards offered={rewardsOffered}/{run.RoomCount}, " +
+			$"no-reward-when-done={noRewardWhenDone}");
+
+		// Same seed => same room shape (deterministic runs for tests).
+		var run2 = new RunMap(seed: 99);
+		bool deterministic = run2.RoomCount == run.RoomCount;
+		for (int i = 0; i < run2.RoomCount && deterministic; i++)
+			deterministic = run2.Rooms[i].Type == run.Rooms[i].Type && run2.Rooms[i].Title == run.Rooms[i].Title;
+
+		bool pass = startsAtFirst && seededDeck && hasEvent && hasBoss && advanced && tookCard
+			&& takeIdempotent && skipped && finished && noRewardWhenDone && everyRoomOfferedReward && deterministic;
+		GD.Print(pass
+			? "PASS: rooms traverse with combat/event/boss; clearing advances the map + offers a reward; rewards grow the run deck"
+			: $"FAIL: startsAtFirst={startsAtFirst}, seededDeck={seededDeck}, hasEvent={hasEvent}, hasBoss={hasBoss}, " +
+			  $"advanced={advanced}, tookCard={tookCard}, idempotent={takeIdempotent}, skipped={skipped}, " +
+			  $"finished={finished}, noRewardDone={noRewardWhenDone}, everyRoomReward={everyRoomOfferedReward}, deterministic={deterministic}");
 		return pass;
 	}
 }

@@ -28,6 +28,8 @@ public partial class CardBattle : Node3D, ICardField
 	private readonly Deck _deck = new();
 	private RoundLoop _round;        // PLAY/PAUSE state machine (Chunk 34)
 	private EnergyPool _energy;      // KotH-fed energy economy + play gate (Chunk 37)
+	private RunMap _run;             // room map + run deck + rewards (Chunk 38)
+	private RunMap.RoomReward _pendingReward;   // reward awaiting a pick (non-null = reward screen open)
 	private Card _pending;          // card awaiting a target click (null = nothing selected)
 
 	private Label _energyLabel;
@@ -48,6 +50,13 @@ public partial class CardBattle : Node3D, ICardField
 	private Label _devRoundLabel;
 	private Button _devPauseButton;
 
+	// Chunk 38 run UI — built in code: a room track, a Clear-Room control, and a reward picker.
+	private Label _runTrackLabel;
+	private Button _clearRoomButton;
+	private Control _rewardPanel;
+	private Label _rewardPrompt;
+	private VBoxContainer _rewardChoices;
+
 	public override void _Ready()
 	{
 		_energyLabel = GetNode<Label>("Ui/Root/EnergyLabel");
@@ -66,12 +75,15 @@ public partial class CardBattle : Node3D, ICardField
 		_round = new RoundLoop(RoundSeconds);
 		_round.PhaseChanged += OnPhaseChanged;
 		BuildDevPanel();
+		BuildRunUi();
 
-		_deck.LoadStarter(CardLibrary.StarterDeck());
+		_run = new RunMap();                       // the run: rooms + the deck we carry between them
+		_deck.LoadStarter(_run.Collection);        // first battle's deck = the run's starting collection
 		_energy = new EnergyPool(BaseEnergy, EnergyPerPoint);
 		_energy.Refill(CountPlayerHeldPoints());   // opening allowance (no ground held yet -> base)
 		_deck.Draw(HandSize);
 		OnPhaseChanged(_round.Current);   // sync the opening PAUSED state (freeze + button + HUD)
+		UpdateRunHud();
 		Refresh();
 	}
 
@@ -122,8 +134,10 @@ public partial class CardBattle : Node3D, ICardField
 	{
 		bool paused = phase == RoundLoop.Phase.Pause;
 		GetTree().Paused = paused;
-		_endTurnButton.Disabled = !paused;
+		_endTurnButton.Disabled = !paused || _pendingReward != null;
 		_endTurnButton.Text = paused ? "End Turn  ▶" : "Round in play…";
+		if (_clearRoomButton != null)   // clearing a room is a between-rounds (paused) action
+			_clearRoomButton.Disabled = !paused || _pendingReward != null || (_run != null && _run.IsComplete);
 		UpdateDevPauseLabel();
 		UpdatePhaseHud();
 	}
@@ -139,6 +153,9 @@ public partial class CardBattle : Node3D, ICardField
 		}
 
 		if (@event is not InputEventMouseButton mb || !mb.Pressed)
+			return;
+
+		if (_pendingReward != null)   // reward screen open: ignore battlefield aim clicks
 			return;
 
 		if (mb.ButtonIndex == MouseButton.Right)
@@ -216,6 +233,8 @@ public partial class CardBattle : Node3D, ICardField
 
 	private void OnCardSelected(Card card)
 	{
+		if (_pendingReward != null)   // reward screen open: no card play
+			return;
 		_pending = card;
 		UpdatePrompt();
 	}
@@ -230,6 +249,8 @@ public partial class CardBattle : Node3D, ICardField
 	// Draw one more card (watch the draw count fall, and the discard reshuffle in when it hits 0).
 	private void OnDrawOne()
 	{
+		if (_pendingReward != null)   // reward screen open: lock the deck
+			return;
 		_deck.Draw(1);
 		Refresh();
 	}
@@ -398,6 +419,167 @@ public partial class CardBattle : Node3D, ICardField
 			_devPauseButton.Text = _round.Current == RoundLoop.Phase.Play ? "⏸  Pause" : "▶  Resume";
 	}
 
+	// ── Chunk 38 run structure ─────────────────────────────────────────────────────────────────────
+	// Built in code (like the dev panel) so the scene stays simple: a room-track readout under the
+	// prompt, a Clear-Room control next to End Turn, and a hidden reward picker that pops when a room
+	// is cleared. The run model (RunMap) is the authority; this is a thin view over it.
+	private void BuildRunUi()
+	{
+		Control root = GetNode<Control>("Ui/Root");
+
+		// Room track — sits just under the aim-prompt line, top-centre.
+		_runTrackLabel = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+		};
+		_runTrackLabel.SetAnchorsPreset(Control.LayoutPreset.TopWide);
+		_runTrackLabel.OffsetTop = 166; _runTrackLabel.OffsetBottom = 196;
+		_runTrackLabel.AddThemeFontSizeOverride("font_size", 18);
+		_runTrackLabel.AddThemeColorOverride("font_color", new Color(0.92f, 0.88f, 0.72f));
+		root.AddChild(_runTrackLabel);
+
+		// Clear-Room control — appended to the existing button row (Draw / End Turn / Clear Room).
+		_clearRoomButton = new Button
+		{
+			CustomMinimumSize = new Vector2(200, 48),
+			Text = "Clear Room  ▶",
+		};
+		_clearRoomButton.AddThemeFontSizeOverride("font_size", 22);
+		_clearRoomButton.Pressed += OnClearRoom;
+		GetNode<HBoxContainer>("Ui/Root/Buttons").AddChild(_clearRoomButton);
+
+		// Reward picker — centred overlay, hidden until a room is cleared.
+		var panel = new PanelContainer { Visible = false };
+		panel.SetAnchorsPreset(Control.LayoutPreset.Center);
+		panel.OffsetLeft = -330; panel.OffsetRight = 330;
+		panel.OffsetTop = -210; panel.OffsetBottom = 210;
+		root.AddChild(panel);
+		_rewardPanel = panel;
+
+		var box = new VBoxContainer();
+		box.AddThemeConstantOverride("separation", 14);
+		panel.AddChild(box);
+
+		_rewardPrompt = new Label
+		{
+			HorizontalAlignment = HorizontalAlignment.Center,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			CustomMinimumSize = new Vector2(620, 0),
+		};
+		_rewardPrompt.AddThemeFontSizeOverride("font_size", 22);
+		_rewardPrompt.AddThemeColorOverride("font_color", new Color(0.92f, 0.88f, 0.72f));
+		box.AddChild(_rewardPrompt);
+
+		_rewardChoices = new VBoxContainer();
+		_rewardChoices.AddThemeConstantOverride("separation", 8);
+		box.AddChild(_rewardChoices);
+	}
+
+	// "Room X/N — Title  (Type)", or a finished banner once the run is complete.
+	private void UpdateRunHud()
+	{
+		if (_runTrackLabel == null || _run == null)
+			return;
+		if (_run.IsComplete)
+		{
+			_runTrackLabel.Text = "RUN COMPLETE — victory!";
+			return;
+		}
+		RunMap.Room room = _run.Current;
+		_runTrackLabel.Text = $"ROOM {_run.RoomNumber}/{_run.RoomCount}   •   {room.Title}   ({room.Type})";
+	}
+
+	// Clear the current room (only while paused, no reward open). Advances the map in the model and
+	// pops the reward picker. With no room left the run is over.
+	private void OnClearRoom()
+	{
+		if (_round.Current != RoundLoop.Phase.Pause || _pendingReward != null || _run.IsComplete)
+			return;
+		_pending = null;
+		RunMap.RoomReward reward = _run.CompleteCurrentRoom();
+		UpdateRunHud();
+		OpenReward(reward);
+	}
+
+	// Show the reward picker: a button per card choice plus a Skip. Picking resolves the reward and
+	// starts the next room (or ends the run). While it's open, play/turn controls are locked.
+	private void OpenReward(RunMap.RoomReward reward)
+	{
+		_pendingReward = reward;
+		foreach (Node c in _rewardChoices.GetChildren())
+			c.QueueFree();
+
+		_rewardPrompt.Text = reward.Prompt;
+		foreach (Card card in reward.Choices)
+		{
+			Card choice = card;   // capture per-iteration for the closure
+			var b = new Button
+			{
+				CustomMinimumSize = new Vector2(600, 56),
+				Text = $"{choice.Title}   ·   {choice.Kind}   ·   Cost {choice.EnergyCost}\n{choice.Description}",
+				AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			};
+			b.AddThemeFontSizeOverride("font_size", 16);
+			b.AddThemeColorOverride("font_color",
+				choice.Kind == Card.CardKind.Unit
+					? new Color(0.6f, 0.8f, 1.0f)
+					: new Color(1.0f, 0.85f, 0.55f));
+			b.Pressed += () => ChooseReward(choice);
+			_rewardChoices.AddChild(b);
+		}
+
+		var skip = new Button { CustomMinimumSize = new Vector2(600, 44), Text = "Skip (take nothing)" };
+		skip.AddThemeFontSizeOverride("font_size", 16);
+		skip.Pressed += () => ChooseReward(null);
+		_rewardChoices.AddChild(skip);
+
+		_rewardPanel.Visible = true;
+		_endTurnButton.Disabled = true;
+		_clearRoomButton.Disabled = true;
+		UpdatePrompt();
+		Refresh();   // dim hand cards while the picker is up (energy unchanged, but keep state honest)
+	}
+
+	// Apply the pick (null = skip), close the picker, and roll into the next room — or finish the run.
+	private void ChooseReward(Card chosen)
+	{
+		_run.TakeReward(_pendingReward, chosen);
+		_pendingReward = null;
+		_rewardPanel.Visible = false;
+		if (_run.IsComplete)
+			FinishRun();
+		else
+			StartRoom();
+		UpdateRunHud();
+	}
+
+	// Begin the next room: rebuild the battle deck from the (now grown) run collection, refill energy
+	// and deal a fresh hand, and ensure we're paused so the player sets up before End Turn.
+	private void StartRoom()
+	{
+		if (_round.Current == RoundLoop.Phase.Play)
+			_round.EndPlayPhase();              // back to PAUSE (no round bump) for setup
+		_deck.LoadStarter(_run.Collection);
+		_energy.Refill(CountPlayerHeldPoints());
+		_deck.Draw(HandSize);
+		OnPhaseChanged(_round.Current);         // re-sync button/freeze state now the reward is closed
+		UpdatePrompt();
+		Refresh();
+	}
+
+	// Run won: freeze setup, lock the round/clear controls, and let the prompt celebrate.
+	private void FinishRun()
+	{
+		if (_round.Current == RoundLoop.Phase.Play)
+			_round.EndPlayPhase();
+		OnPhaseChanged(_round.Current);
+		_endTurnButton.Disabled = true;
+		_clearRoomButton.Disabled = true;
+		_promptLabel.Text = "Run complete — you bested the Egg-Tyrant! (◀ Menu to leave)";
+		Refresh();
+	}
+
 	// A single hand card rendered as a clickable panel-button.
 	private Button MakeCardButton(Card card)
 	{
@@ -409,7 +591,8 @@ public partial class CardBattle : Node3D, ICardField
 			ClipText = false,
 			ToggleMode = true,
 			ButtonPressed = card == _pending,        // the pending card stays visibly selected
-			Disabled = !_energy.CanAfford(card),     // gate: dim cards your held ground can't pay for
+			// gate: dim cards your held ground can't pay for, and lock the whole hand while picking a reward
+			Disabled = _pendingReward != null || !_energy.CanAfford(card),
 		};
 		b.AddThemeFontSizeOverride("font_size", 15);
 		b.AddThemeColorOverride("font_color",
