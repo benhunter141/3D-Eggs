@@ -974,10 +974,22 @@ public partial class UnitTest : Node3D
 		bool cantReach = !cap.TryMount() && !cap.IsMounted;
 		GD.Print($"out of range: mount refused={cantReach}");
 
-		bool pass = mounted && faster && ridden && carriedUnder && restored && onGround && cantReach;
+		// Chunk 29 (M10): the chocobo is the fast mount — riding it must beat riding the donkey.
+		donkey.GlobalPosition = new Vector3(1.5f, 0f, 0f);   // back in range
+		var chocobo = GD.Load<PackedScene>("res://scenes/Chocobo.tscn").Instantiate<Mount>();
+		AddChild(chocobo);
+		chocobo.GlobalPosition = new Vector3(-1.5f, 0f, 0f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		cap.TryMount();   // nearest in range — either is fine; we compare the mount stats directly
+		cap.Dismount();
+		bool chocoboFaster = chocobo.MountSpeed > donkey.MountSpeed;
+		GD.Print($"chocobo vs donkey: MountSpeed {chocobo.MountSpeed:0.0} > {donkey.MountSpeed:0.0} = {chocoboFaster}");
+
+		bool pass = mounted && faster && ridden && carriedUnder && restored && onGround && cantReach && chocoboFaster;
 		GD.Print(pass
-			? "PASS: captain mounts a nearby donkey (faster, carried), dismounts (speed/height restored), can't mount one out of range"
-			: $"FAIL: mounted={mounted}, faster={faster}, ridden={ridden}, carried={carriedUnder}, restored={restored}, onGround={onGround}, cantReach={cantReach}");
+			? "PASS: captain mounts a nearby donkey (faster, carried), dismounts (speed/height restored), can't mount one out of range; chocobo outruns the donkey"
+			: $"FAIL: mounted={mounted}, faster={faster}, ridden={ridden}, carried={carriedUnder}, restored={restored}, onGround={onGround}, cantReach={cantReach}, chocoboFaster={chocoboFaster}");
 		return pass;
 	}
 }

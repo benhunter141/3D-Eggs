@@ -16,15 +16,28 @@ public partial class Mount : CharacterBody3D
 	[Export] public float MountRange = 3.0f;    // how close the player must be to climb on
 	[Export] public float RiderHeight = 1.6f;   // vertical gap from the mount's origin up to the seated rider's origin
 
+	// Optional bouncy gait (Chunk 29). When HopAmplitude > 0 and the mount is being ridden at speed,
+	// a child Node3D named "Visual" bobs up and down — a springy hop the donkey doesn't have but the
+	// chocobo does. Cosmetic only: it bobs the VISUAL, never the rider or the collision body, so it
+	// can't shove the captain or break the carried-silhouette mirroring.
+	[Export] public float HopAmplitude = 0.0f;  // peak vertical bob of the visual while moving (0 = no hop, e.g. donkey)
+	[Export] public float HopFrequency = 9.0f;  // bobs per second of travel
+
 	public Player Rider { get; private set; }
 	public bool IsRidden => Rider != null && IsInstanceValid(Rider);
 
 	private CollisionShape3D _collision;
+	private Node3D _visual;       // optional "Visual" child that hops; null on mounts without one
+	private float _visualBaseY;   // the visual's rest height, restored when not hopping
+	private float _hopPhase;      // advances with travel distance so the bob ties to motion, not wall-clock
 
 	public override void _Ready()
 	{
 		AddToGroup("mounts");
 		_collision = GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
+		_visual = GetNodeOrNull<Node3D>("Visual");
+		if (_visual != null)
+			_visualBaseY = _visual.Position.Y;
 	}
 
 	// Called by the Player when it climbs on: take the rider and stop being a separate obstacle
@@ -65,5 +78,20 @@ public partial class Mount : CharacterBody3D
 		Vector3 rot = Rotation;
 		rot.Y = Rider.Rotation.Y;
 		Rotation = rot;
+
+		// Springy gait: while we're actually travelling, bob the visual. Tying the phase to the
+		// horizontal speed makes the hop quicken with the gallop and settle when standing still.
+		if (_visual != null && HopAmplitude > 0f)
+		{
+			Vector3 vel = Rider.Velocity;
+			float groundSpeed = new Vector2(vel.X, vel.Z).Length();
+			if (groundSpeed > 0.5f)
+				_hopPhase += (float)delta * HopFrequency;
+			// abs(sin) so the body kicks UP off the ground and lands, never dipping below rest.
+			float bob = groundSpeed > 0.5f ? Mathf.Abs(Mathf.Sin(_hopPhase)) * HopAmplitude : 0f;
+			Vector3 vp = _visual.Position;
+			vp.Y = _visualBaseY + bob;
+			_visual.Position = vp;
+		}
 	}
 }

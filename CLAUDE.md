@@ -132,7 +132,10 @@ the player's top `Speed` becomes the mount's `MountSpeed`, the player is lifted 
 the mount's back, and the mount mirrors the rider's position/yaw each frame with its own collision
 DISABLED — captain + steed read as one silhouette, and the full move/aim/attack pipeline keeps
 working (mounted combat). Dismount restores foot `Speed` + ground height. Concrete mounts are just
-scenes with their own `MountSpeed`/look (Donkey now; Chocobo = faster, Chunk 29).
+scenes with their own `MountSpeed`/look (Donkey = 9 m/s; Chocobo = 13 m/s, Chunk 29). A mount may
+also carry a cosmetic **hop** (`HopAmplitude`/`HopFrequency`): while ridden at speed the `Mount`
+bobs a child `Node3D` named `Visual` up and down (abs-sin, off the ground), affecting only the
+visual — never the rider or collision. The donkey leaves it 0; the chocobo springs.
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
@@ -143,7 +146,7 @@ live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.ts
 `Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
 `Levels/Level5_PinballArena.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`, `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Bumper.tscn`,
-`Donkey.tscn`, `Tests/UnitTest.tscn`, `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
+`Donkey.tscn`, `Chocobo.tscn`, `Tests/UnitTest.tscn`, `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
 
@@ -193,12 +196,14 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       data-driven `WeaponType→WeaponProfile` table built from exports; `swap_weapon` now cycles
       ALL weapons; added Axe (heaviest hit, slowest) + Mace (hardest knockback) with new Captain
       meshes). Built; balance/feel-check the new archetypes when convenient.
-- [~] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
+- [x] **M10 — Mounts:** cute donkey + chocobo mounts (mount / dismount, mounted movement &
       combat; chocobo faster). (Chunks 28–29.) Chunk 28 done (`Mount` base + `Donkey.tscn`: walk up
       and press `mount` = E / gamepad B to climb on — riding raises the captain's top Speed to the
       mount's `MountSpeed`, carries the steed under the rider as one silhouette, and keeps the full
-      move/aim/attack pipeline; dismount drops you beside it at foot speed/height. One donkey added
-      to Level 1 to try). Chocobo (Chunk 29) next.
+      move/aim/attack pipeline; dismount drops you beside it at foot speed/height). Chunk 29 done
+      (`Chocobo.tscn`: bright-yellow bipedal bird with googly eyes/beak/tail, `MountSpeed` 13 vs the
+      donkey's 9, plus a cosmetic springy hop — `Mount.HopAmplitude/HopFrequency` bob a `Visual`
+      child while moving, never the rider/collision). Both mounts placed in Level 1 to try.
 - [ ] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
       period (15 s for now); HUD for scores / timer / contest. Feeds M12's energy. (Chunks 30–31.)
 - [ ] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
@@ -293,9 +298,10 @@ and weapons differ in reach / damage / knockback / look.
   mount/dismount (proximity + `mount` input), mounted state raises move speed & changes the
   player silhouette (rider on mount), mounted combat still works; dismount drops you beside the
   mount. Headless-test: mounting raises speed, dismount restores it.
-- [ ] **Chunk 29 — Chocobo mount.** `scenes/Chocobo.tscn` reusing `Mount.cs` — faster than the
-  donkey, distinct look (Chunk-24 eyes), maybe a small hop/dash trait. Headless-test: chocobo
-  top speed > donkey.
+- [x] **Chunk 29 — Chocobo mount.** `scenes/Chocobo.tscn` reusing `Mount.cs` — faster than the
+  donkey (`MountSpeed` 13 vs 9), distinct yellow bipedal-bird look with googly eyes/beak/tail,
+  plus a cosmetic springy hop (`Mount.HopAmplitude/HopFrequency` bob a `Visual` child while
+  moving). Headless-test: chocobo top speed > donkey.
 
 ---
 
