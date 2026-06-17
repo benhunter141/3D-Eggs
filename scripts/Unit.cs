@@ -8,7 +8,7 @@ using Godot;
 // chokepoint every hit flows through (sword, fists, stones, skeleton melee): each hit
 // pops a body-colour flash and fires a short impact sound. Subclasses only override
 // _PhysicsProcess, so the flash decay rides on _Process without conflict.
-public partial class Unit : CharacterBody3D
+public partial class Unit : CharacterBody3D, ICardUnit
 {
 	public enum TeamId { Player, Enemy }
 
@@ -55,6 +55,14 @@ public partial class Unit : CharacterBody3D
 	// unshaded materials + one sphere mesh across every unit to keep crowds cheap.
 	[Export] public bool ShowEyes = true;
 	[Export] public float EyeScale = 1.0f;   // per-archetype multiplier on eye size
+
+	// --- Card-mode actions (M12, Chunk 33) ---
+	// When an Action card is played onto this (friendly) unit it runs PerformAction below.
+	// Effects are deliberately simple/visible for now; Str/Int scaling lands in Chunk 34.
+	[Export] public float CardChargeImpulse = 12.0f; // Charge: forward lunge speed (via knockback)
+	[Export] public float CardStrikeDamage = 12.0f;  // Rally: weapon strike on the nearest foe
+	[Export] public float CardMagicDamage = 16.0f;   // Firebolt: magic hit on the nearest foe
+	[Export] public float CardActionRange = 14.0f;   // Rally/Firebolt: max reach to the nearest foe
 
 	public float Health { get; private set; }
 	public bool IsDead { get; private set; }
@@ -268,6 +276,51 @@ public partial class Unit : CharacterBody3D
 			Flash(0.85f);
 			PlaySound(1f);
 		}
+	}
+
+	// --- ICardUnit (M12, Chunk 33): the card battler treats a Unit as a targetable fighter ---
+
+	// An Action card may target this unit only while it's ours and still alive.
+	public bool IsFriendly => Team == TeamId.Player && !IsDead;
+
+	// Run an Action card's effect on this unit. Effects are simple and visible for now (Chunk 33);
+	// Str/Int scaling (Chunk 34) and energy gating (Chunk 35) layer on later. Virtual so archetypes
+	// can specialise. Foe-targeting actions reuse UnitRegistry — never a per-frame group scan.
+	public virtual void PerformAction(Card action)
+	{
+		if (IsDead || action == null)
+			return;
+
+		switch (action.Action)
+		{
+			case Card.ActionKind.Charge:
+				// Lunge along the way we're facing (-Z is forward); rides the pinball knockback path.
+				AddKnockback(-GlobalTransform.Basis.Z.Normalized() * CardChargeImpulse);
+				break;
+
+			case Card.ActionKind.Rally:
+				StrikeNearestFoe(CardStrikeDamage);
+				break;
+
+			case Card.ActionKind.Firebolt:
+				StrikeNearestFoe(CardMagicDamage);
+				break;
+
+			case Card.ActionKind.Brace:
+				// No combat effect yet — just a defiant pop so the play reads on screen.
+				break;
+		}
+
+		Flash(1f);          // every card action pops a flash so the targeted unit is obvious
+		GD.Print($"[Unit] {Name} performed card action {action.Action}");
+	}
+
+	// Deal `damage` to the nearest opposing unit within CardActionRange (no knockback). Used by
+	// the Rally / Firebolt actions; silently does nothing if no foe is in reach.
+	private void StrikeNearestFoe(float damage)
+	{
+		Unit foe = UnitRegistry.FindNearestOpponent(Team, GlobalPosition, CardActionRange);
+		foe?.TakeDamage(damage);
 	}
 
 	protected virtual void Die()

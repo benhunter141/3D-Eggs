@@ -19,107 +19,129 @@ grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.11, 0.12, 0.15, 1)
 
-[node name="VBox" type="VBoxContainer" parent="."]
+[node name="Margin" type="MarginContainer" parent="."]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -280.0
-offset_right = 200.0
-offset_bottom = 280.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 18
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
 
-[node name="Title" type="Label" parent="VBox"]
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+alignment = 1
+
+[node name="Title" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 text = "PHALANX"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
-theme_override_font_sizes/font_size = 72
+theme_override_font_sizes/font_size = 64
 
-[node name="Subtitle" type="Label" parent="VBox"]
+[node name="Subtitle" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 text = "Select a Battle"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)
 theme_override_font_sizes/font_size = 24
 
-[node name="Spacer" type="Control" parent="VBox"]
-custom_minimum_size = Vector2(0, 20)
+[node name="Spacer" type="Control" parent="Margin/VBox"]
+custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 
-[node name="Level1Button" type="Button" parent="VBox"]
-custom_minimum_size = Vector2(400, 60)
+[node name="LevelScroll" type="ScrollContainer" parent="Margin/VBox"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="LevelList" type="VBoxContainer" parent="Margin/VBox/LevelScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="Level1Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+custom_minimum_size = Vector2(440, 58)
+layout_mode = 2
+size_flags_horizontal = 4
 text = "1.  Hold the Line"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level1_HoldTheLine.tscn"
 
-[node name="Level2Button" type="Button" parent="VBox"]
-custom_minimum_size = Vector2(400, 60)
+[node name="Level2Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
+size_flags_horizontal = 4
 text = "2.  Pincer"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level2_Pincer.tscn"
 
-[node name="Level3Button" type="Button" parent="VBox"]
-custom_minimum_size = Vector2(400, 60)
+[node name="Level3Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
+size_flags_horizontal = 4
 text = "3.  Arrow Storm"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level3_ArrowStorm.tscn"
 
-[node name="Level4Button" type="Button" parent="VBox"]
-custom_minimum_size = Vector2(400, 60)
+[node name="Level4Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
+size_flags_horizontal = 4
 text = "4.  Onslaught"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level4_Onslaught.tscn"
 
-[node name="Level5Button" type="Button" parent="VBox"]
-custom_minimum_size = Vector2(400, 60)
+[node name="Level5Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
+size_flags_horizontal = 4
 text = "5.  Pinball Arena"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level5_PinballArena.tscn"
 
-[node name="KothButton" type="Button" parent="VBox"]
-custom_minimum_size = Vector2(400, 60)
+[node name="KothButton" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
+size_flags_horizontal = 4
 text = "6.  King of the Hill"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/KingOfTheHill.tscn"
 
-[node name="CardsButton" type="Button" parent="VBox"]
-custom_minimum_size = Vector2(400, 60)
+[node name="CardsButton" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
+size_flags_horizontal = 4
 text = "7.  Slay the Eggs  (WIP)"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Cards/CardBattle.tscn"
 
-[node name="ControlsSpacer" type="Control" parent="VBox"]
-custom_minimum_size = Vector2(0, 24)
+[node name="ControlsSpacer" type="Control" parent="Margin/VBox"]
+custom_minimum_size = Vector2(0, 12)
 layout_mode = 2
 
-[node name="ControlsTitle" type="Label" parent="VBox"]
+[node name="ControlsTitle" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 text = "CONTROLS"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
 theme_override_font_sizes/font_size = 22
 
-[node name="Controls" type="Label" parent="VBox"]
+[node name="Controls" type="Label" parent="Margin/VBox"]
 layout_mode = 2
 text = "WASD / Arrows — move captain      Mouse — aim
 Left-Click — attack      Right-Click / Space — brace wall
