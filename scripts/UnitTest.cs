@@ -43,8 +43,9 @@ public partial class UnitTest : Node3D
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
 		bool capturePoint = await TestCapturePoint();
+		bool cardDeck = TestCardDeck();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1086,6 +1087,53 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: holder at period end scores; contested scores nobody"
 			: $"FAIL: enemyScored={enemyScored}, playerZero={playerZero}, noNewEnemy={noNewEnemy}, noNewPlayer={noNewPlayer}, contested={contested}");
+		return pass;
+	}
+
+	// Chunk 32 (M12): the card deck's draw / hand / discard piles. Cards cycle DrawPile -> Hand ->
+	// DiscardPile and the discard reshuffles back in when the draw pile empties — and through all of
+	// it the TOTAL number of cards across the three piles is conserved (cards only move, never
+	// vanish). Pure model, so this is a synchronous check (no tree / physics). Seeded for repeatability.
+	private bool TestCardDeck()
+	{
+		GD.Print("=== UnitTest: card deck piles + reshuffle (Chunk 32) ===");
+
+		var deck = new Deck(seed: 1234);
+		var starter = CardLibrary.StarterDeck();
+		int total = starter.Count;
+		deck.LoadStarter(starter);
+
+		// Fresh load: every card sits in the draw pile, hand + discard empty.
+		bool loaded = deck.DrawPile.Count == total && deck.Hand.Count == 0
+			&& deck.DiscardPile.Count == 0 && deck.TotalCount == total;
+
+		// Draw a hand of 5 off the top.
+		int drawn = deck.Draw(5);
+		bool drewHand = drawn == 5 && deck.Hand.Count == 5
+			&& deck.DrawPile.Count == total - 5 && deck.TotalCount == total;
+
+		// Discard the whole hand.
+		deck.DiscardHand();
+		bool discarded = deck.Hand.Count == 0 && deck.DiscardPile.Count == 5 && deck.TotalCount == total;
+
+		// Draw the ENTIRE deck out: drains the draw pile, auto-reshuffles the discard back in, and
+		// ends with every card in hand — total conserved throughout, nothing duplicated or lost.
+		int more = deck.Draw(total);
+		bool drewAll = deck.Hand.Count == total && deck.DrawPile.Count == 0
+			&& deck.DiscardPile.Count == 0 && deck.TotalCount == total;
+
+		// Asking for more than exists returns only what's left (never invents cards).
+		deck.DiscardHand();
+		int got = deck.Draw(total + 10);
+		bool capped = got == total && deck.Hand.Count == total && deck.TotalCount == total;
+
+		GD.Print($"loaded={loaded}, drewHand={drewHand}(drew {drawn}), discarded={discarded}, " +
+			$"drewAll={drewAll}(drew {more}), capped={capped}(asked {total + 10}, got {got}); total stays {total}");
+
+		bool pass = loaded && drewHand && discarded && drewAll && capped;
+		GD.Print(pass
+			? "PASS: piles cycle draw->hand->discard and reshuffle conserves the deck"
+			: "FAIL: deck pile bookkeeping wrong");
 		return pass;
 	}
 }

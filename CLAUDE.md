@@ -151,17 +151,32 @@ reaching `WinScore`. Lose is checked first each frame (GameManager's rule). It d
 shared `victory`/`game_over` groups so the same `ResultMenu.tscn` works here. Listed as
 battle 6 on LevelSelect.
 
+**Cards: Deck = three piles (M12, Chunk 32).** `scripts/Cards/` is the card battler's PURE MODEL
+(plain C#, no Godot types, fully headless-testable). A `Card` is a `Kind` (Unit | Action) + title +
+`EnergyCost` + description (Unit cards spawn a unit at a location; Action cards make a friendly unit
+act — targeting lands in Chunk 33). A `Deck` owns three `List<Card>` piles — `DrawPile`, `Hand`,
+`DiscardPile` — and the only operations that move cards between them: `Draw(n)` (top of draw pile →
+hand, **auto-`Reshuffle()`-ing** the discard back under the draw pile when it empties mid-draw),
+`Discard(card)` / `DiscardHand()` (hand → discard), `LoadStarter(cards)` (clones a starter list into
+a shuffled draw pile). **Invariant:** `TotalCount` (sum across the three piles) never changes — cards
+only move, never appear/vanish; the headless test leans on it. Shuffles are seedable (`new Deck(seed)`)
+for deterministic tests; `CardLibrary.StarterDeck()` is the shared opening deck. `CardBattle` (a
+`CanvasLayer`, `CardBattle.tscn`) is a thin VIEW: draw-count panel (bottom-left), the live hand as
+clickable card-buttons (centre, Unit=blue / Action=amber), discard-count panel (bottom-right), plus
+Draw / End-Turn controls and an Energy readout. For now clicking a card just discards it (so the cycle
+reads); real play/targeting = Chunk 33, energy gating = Chunk 35.
+
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
 `CapturePoint.cs`, `KothManager.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`,
-`CrowdTest.cs`, `Hud.cs`.
+`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardBattle.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
 `Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
 live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
 `Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
 `Levels/Level5_PinballArena.tscn`, `Levels/KingOfTheHill.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`, `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Bumper.tscn`,
-`Donkey.tscn`, `Chocobo.tscn`, `CapturePoint.tscn`, `Tests/UnitTest.tscn`,
+`Donkey.tscn`, `Chocobo.tscn`, `CapturePoint.tscn`, `Cards/CardBattle.tscn`, `Tests/UnitTest.tscn`,
 `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
@@ -229,12 +244,15 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       central CapturePoint, live score/period-countdown/contest HUD, win at 3 held periods or an
       enemy wipeout, lose on death or enemy 3; battle 6 on LevelSelect). Balance/feel-check when
       convenient.
-- [ ] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
+- [~] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
       draw / hand / discard piles; Unit cards played on a location, Action cards played on a
       friendly unit who then performs the action; units have HP / Str / Int (Str → weapon &
       strength actions, Int → magic); beat a series of rooms collecting cards / relics /
       potions with events; **energy comes from holding KotH points (M11) at period end.**
-      (Chunks 32–37.)
+      (Chunks 32–37.) Chunk 32 done (`scripts/Cards/` — `Card`/`Deck` pure model with
+      draw/hand/discard piles + auto-reshuffle; `CardBattle.tscn` StS-style hand UI showing all
+      three piles; battle 7 "Slay the Eggs (WIP)" on LevelSelect). Headless-tested: the pile
+      cycle conserves the deck.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -363,7 +381,7 @@ rooms.
 - **Run = rooms.** PvE like StS: a series of rooms (combat / event), collecting **cards**,
   **relics**, and **potions** between them.
 
-- [ ] **Chunk 32 — Card model + piles + hand UI.** `scripts/Cards/` data model (Card, Deck) +
+- [x] **Chunk 32 — Card model + piles + hand UI.** `scripts/Cards/` data model (Card, Deck) +
   draw / hand / discard piles with reshuffle; on-screen UI showing all three piles (StS-style:
   draw count, hand, discard). Headless-test: draw/discard/reshuffle cycle conserves the deck.
 - [ ] **Chunk 33 — Unit & Action cards (play targeting).** Unit cards target a **location**

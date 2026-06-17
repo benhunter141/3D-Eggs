@@ -1,0 +1,169 @@
+[gd_scene load_steps=4 format=3 uid="uid://bcardbattle0egg1"]
+
+[ext_resource type="Script" path="res://scripts/Cards/CardBattle.cs" id="1_cb"]
+[ext_resource type="Script" path="res://scripts/SceneButton.cs" id="2_btn"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_pile"]
+bg_color = Color(0.08, 0.09, 0.12, 0.85)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.92, 0.88, 0.72, 0.45)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="CardBattle" type="CanvasLayer"]
+script = ExtResource("1_cb")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="ColorRect" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.1, 0.11, 0.14, 1)
+
+[node name="Title" type="Label" parent="Root"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 22.0
+offset_bottom = 70.0
+grow_horizontal = 2
+text = "SLAY THE EGGS"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
+theme_override_font_sizes/font_size = 44
+
+[node name="EnergyLabel" type="Label" parent="Root"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 84.0
+offset_bottom = 118.0
+grow_horizontal = 2
+text = "ENERGY   3 / 3"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.55, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 24
+
+[node name="DrawPanel" type="Panel" parent="Root"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -150.0
+offset_right = 150.0
+offset_bottom = -24.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBox_pile")
+
+[node name="DrawCount" type="Label" parent="Root/DrawPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "DRAW
+0"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 1)
+theme_override_font_sizes/font_size = 22
+
+[node name="DiscardPanel" type="Panel" parent="Root"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -150.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("StyleBox_pile")
+
+[node name="DiscardCount" type="Label" parent="Root/DiscardPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "DISCARD
+0"
+horizontal_alignment = 1
+vertical_alignment = 1
+theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 1)
+theme_override_font_sizes/font_size = 22
+
+[node name="HandBox" type="HBoxContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 180.0
+offset_top = -272.0
+offset_right = -180.0
+offset_bottom = -96.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="Buttons" type="HBoxContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -80.0
+offset_bottom = -32.0
+grow_horizontal = 2
+grow_vertical = 0
+alignment = 1
+theme_override_constants/separation = 24
+
+[node name="DrawButton" type="Button" parent="Root/Buttons"]
+custom_minimum_size = Vector2(180, 48)
+layout_mode = 2
+text = "Draw  (+1)"
+theme_override_font_sizes/font_size = 22
+
+[node name="EndTurnButton" type="Button" parent="Root/Buttons"]
+custom_minimum_size = Vector2(180, 48)
+layout_mode = 2
+text = "End Turn"
+theme_override_font_sizes/font_size = 22
+
+[node name="BackButton" type="Button" parent="Root"]
+custom_minimum_size = Vector2(160, 44)
+layout_mode = 1
+anchors_preset = 0
+offset_left = 24.0
+offset_top = 20.0
+offset_right = 184.0
+offset_bottom = 64.0
+text = "◀  Menu"
+theme_override_font_sizes/font_size = 20
+script = ExtResource("2_btn")
+ScenePath = "res://scenes/Menu/LevelSelect.tscn"
