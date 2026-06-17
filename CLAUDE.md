@@ -140,18 +140,26 @@ per team inside its collision cylinder each physics frame via `GetOverlappingBod
 absent); contested (both present) or neutral (empty) awards nobody. Exposes `PlayerScore`,
 `EnemyScore`, `State` (Neutral/PlayerHeld/EnemyHeld/Contested), `PeriodTimer`, `PeriodCount`
 plus `PeriodEnded` and `StateChanged` signals. A translucent ground disc recolours per state
-(gray → blue/red/yellow). Chunk 31 wires a HUD + KotH level on top; M12 ties `PeriodEnded` to
-card energy.
+(gray → blue/red/yellow). M12 ties `PeriodEnded` to card energy.
+
+**KotH mode (M11, Chunk 31).** `KingOfTheHill.tscn` puts the player's phalanx against
+swordmen + bowmen around one central `CapturePoint`. `KothManager` (a `CanvasLayer`, the
+mode's sole match authority — no `GameManager` in this scene) finds that lone CapturePoint,
+shows a live HUD (score, period countdown, contest state) and decides the match: **WIN** at
+`WinScore` (3) held periods *or* an enemy wipeout; **LOSE** on player death *or* the enemy
+reaching `WinScore`. Lose is checked first each frame (GameManager's rule). It drives the
+shared `victory`/`game_over` groups so the same `ResultMenu.tscn` works here. Listed as
+battle 6 on LevelSelect.
 
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
-`CapturePoint.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`,
-`Hud.cs`.
+`CapturePoint.cs`, `KothManager.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`,
+`CrowdTest.cs`, `Hud.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
 `Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
 live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
 `Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
-`Levels/Level5_PinballArena.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
+`Levels/Level5_PinballArena.tscn`, `Levels/KingOfTheHill.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`, `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Bumper.tscn`,
 `Donkey.tscn`, `Chocobo.tscn`, `CapturePoint.tscn`, `Tests/UnitTest.tscn`,
 `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
@@ -212,11 +220,15 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       (`Chocobo.tscn` reuses `Mount.cs` — faster steed, `MountSpeed` 13 vs the donkey's 9, with a
       distinct tall yellow look: beak, crest + tail feathers, googly eyes). A donkey and a chocobo
       flank the spawn in Level 1 to compare. Balance/feel-check the chocobo speed when convenient.
-- [~] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
+- [x] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
       period (15 s for now); HUD for scores / timer / contest. Feeds M12's energy. (Chunks 30–31.)
       Chunk 30 done (`CapturePoint` Area3D zone: counts living units per team via
       `GetOverlappingBodies`, awards a point to the sole holder at period end, contested = no
-      award; colour-coded disc + PeriodEnded/StateChanged signals for HUD/energy hooks).
+      award; colour-coded disc + PeriodEnded/StateChanged signals for HUD/energy hooks). Chunk 31
+      done (`KingOfTheHill.tscn` + `KothManager` CanvasLayer: phalanx vs swordmen/bowmen around one
+      central CapturePoint, live score/period-countdown/contest HUD, win at 3 held periods or an
+      enemy wipeout, lose on death or enemy 3; battle 6 on LevelSelect). Balance/feel-check when
+      convenient.
 - [ ] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
       draw / hand / discard piles; Unit cards played on a location, Action cards played on a
       friendly unit who then performs the action; units have HP / Str / Int (Str → weapon &
@@ -326,10 +338,11 @@ draws energy from.
   **period (15 s for now)** it awards a point to the team holding it at period end (contested =
   no award). Emits a signal / exposes state for HUD + energy hooks. Headless-test: holder at
   period end scores; contested scores nobody.
-- [ ] **Chunk 31 — KotH mode level + HUD.** `scenes/Levels/KingOfTheHill.tscn` (arena + one or
-  more `CapturePoint`s + squads) + a `CanvasLayer` HUD showing per-team score, period countdown,
-  and contest state; win at a score threshold. Add the LevelSelect button. Headless smoke:
-  loads clean, points tick at period boundaries.
+- [x] **Chunk 31 — KotH mode level + HUD.** `scenes/Levels/KingOfTheHill.tscn` (one central
+  `CapturePoint` + player phalanx vs swordmen/bowmen) + `scripts/KothManager.cs` — a `CanvasLayer`
+  HUD showing per-team score, period countdown, and contest state, and the mode's match authority:
+  win at `WinScore` (3) held periods or an enemy wipeout, lose on player death or enemy 3. Added as
+  battle 6 on LevelSelect.
 
 ---
 
