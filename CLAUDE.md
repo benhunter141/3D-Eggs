@@ -218,7 +218,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions.
-      (Chunks 32–39.) Chunks 32–34 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop). Next: Chunk 35 dev panel.
+      (Chunks 32–39.) Chunks 32–35 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel). Next: Chunk 36 HP/Str/Int stats.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -370,9 +370,10 @@ rooms.
   disabled during PLAY. Headless-tested: starts paused; End Turn begins a round; timeout advances the
   round counter + repauses; cards playable in both phases (`_ExitTree` lifts the global pause on the
   way out so the menu/next scene isn't frozen).
-- [ ] **Chunk 35 — Dev panel: live round-length control.** A toggleable in-mode dev panel to adjust
-  `RoundSeconds` live while testing (numeric readout + +/- buttons or a slider, default 15) plus a
-  manual pause/resume toggle for debugging. Pure dev tool; user feel-check.
+- [x] **Chunk 35 — Dev panel: live round-length control.** A toggleable in-mode dev panel (DEV button
+  or F3) to adjust `RoundSeconds` live while testing (−/+ in 5 s steps, clamped 5–60) plus a manual
+  pause/resume toggle for debugging. `RoundLoop.RetuneRoundSeconds` caps the live clock to the new
+  length; `RoundLoop.Resume` continues the SAME round (no redeal/bump, unlike End Turn). Pure dev tool.
 - [ ] **Chunk 36 — HP / Str / Int stats wired in.** Add Str/Int to units; Str scales weapon
   damage + strength actions, Int scales magic actions. Headless-test: higher Str → more weapon
   damage; higher Int → stronger magic action.
