@@ -93,7 +93,8 @@ public partial class Player : Unit
 
 	// Read-only views (used by the headless weapon tests).
 	public WeaponType CurrentWeapon => _weapon;
-	public float CurrentDamage => _damage;
+	public float CurrentDamage => _damage;                               // weapon BASE damage (pre-stat)
+	public float CurrentAttackDamage => ScaledWeaponDamage(_damage);     // what a hit actually deals (Strength-scaled)
 	public float CurrentWeaponKnockback => _knockback;   // NOTE: Unit.CurrentKnockback is the live shove Vector3
 	public float CurrentReach => _reach;
 	public float CurrentSwingCooldown => _swingCooldown;                // higher = slower (the axe's tax)
@@ -368,8 +369,9 @@ public partial class Player : Unit
 			if (body is Unit unit && unit.Team != Team)
 			{
 				Vector3 hitDir = unit.GlobalPosition - GlobalPosition;
-				unit.TakeDamage(_damage, hitDir, _knockback);  // sword shoves; spear deals no knockback
-				GD.Print($"[{_weapon}] {Name} thrust {unit.Name} for {_damage} (knockback {_knockback})");
+				float dmg = ScaledWeaponDamage(_damage);       // Strength scales weapon attack power (Chunk 36)
+				unit.TakeDamage(dmg, hitDir, _knockback);      // sword shoves; spear deals no knockback
+				GD.Print($"[{_weapon}] {Name} thrust {unit.Name} for {dmg:0.0} (knockback {_knockback})");
 			}
 		}
 

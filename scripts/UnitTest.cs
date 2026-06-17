@@ -46,8 +46,9 @@ public partial class UnitTest : Node3D
 		bool cardDeck = TestCardDeck();
 		bool cardPlay = TestCardPlay();
 		bool roundLoop = TestRoundLoop();
+		bool unitStats = await TestUnitStats();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1281,6 +1282,85 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: starts paused; End Turn begins a round; timeout advances the round + repauses; dev pause/resume/retune hold"
 			: "FAIL: round loop state machine wrong");
+		return pass;
+	}
+
+	// Deal one card action and report how much HP the foe lost. Sets up a clean scene with a single
+	// caster (given Str/Int) and a lone foe in reach, runs PerformAction, then measures the damage.
+	// Isolated per call so the caster's FindNearestOpponent can only pick this foe.
+	private async Task<float> MeasureCardActionDamage(Card card, int strength, int intelligence)
+	{
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var caster = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f, Strength = strength, Intelligence = intelligence };
+		AddChild(caster);
+		caster.GlobalPosition = Vector3.Zero;
+
+		var foe = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 1000f };   // big pool so it survives the hit
+		AddChild(foe);
+		foe.GlobalPosition = new Vector3(2f, 0f, 0f);                          // well inside CardActionRange
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);          // register both in UnitRegistry
+
+		caster.PerformAction(card);
+		return foe.MaxHealth - foe.Health;
+	}
+
+	// Chunk 36 (M12): HP / Str / Int stats. STRENGTH scales weapon attack power (the captain's swing)
+	// AND strength-based card actions (Rally); INTELLIGENCE scales magic actions (Firebolt). The two
+	// stats route to different effects, so a Strength buff must NOT inflate magic and an Intelligence
+	// buff must NOT inflate a weapon strike. Stat 0 resolves to the base numbers (multiplier 1.0).
+	private async Task<bool> TestUnitStats()
+	{
+		GD.Print("=== UnitTest: unit stats HP/Str/Int (Chunk 36) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// (a) Strength scales the captain's actual weapon attack power.
+		var weakCap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		weakCap.Strength = 0;
+		AddChild(weakCap);
+		var strongCap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		strongCap.Strength = 5;                                  // +50% at StrengthScale 0.10
+		AddChild(strongCap);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool baseIsUnscaled = Mathf.IsEqualApprox(weakCap.CurrentAttackDamage, weakCap.CurrentDamage, 0.01f);
+		bool weaponScalesWithStr = strongCap.CurrentAttackDamage > weakCap.CurrentAttackDamage + 0.01f;
+		GD.Print($"weapon: Str0 hit={weakCap.CurrentAttackDamage:0.0} (base {weakCap.CurrentDamage:0.0}, unscaled={baseIsUnscaled}), " +
+			$"Str5 hit={strongCap.CurrentAttackDamage:0.0} (scales={weaponScalesWithStr})");
+
+		var rally = new Card("Rally", Card.CardKind.Action, 1, "", action: Card.ActionKind.Rally);
+		var firebolt = new Card("Firebolt", Card.CardKind.Action, 1, "", action: Card.ActionKind.Firebolt);
+
+		// (b) Strength scales a strength action (Rally), and does NOT touch a magic action.
+		float rallyWeak = await MeasureCardActionDamage(rally, strength: 0, intelligence: 0);
+		float rallyStrong = await MeasureCardActionDamage(rally, strength: 6, intelligence: 0);
+		bool strScalesAction = rallyStrong > rallyWeak + 0.01f;
+
+		// (c) Intelligence scales a magic action (Firebolt), and does NOT touch a weapon strike.
+		float boltDumb = await MeasureCardActionDamage(firebolt, strength: 0, intelligence: 0);
+		float boltSmart = await MeasureCardActionDamage(firebolt, strength: 0, intelligence: 6);
+		bool intScalesMagic = boltSmart > boltDumb + 0.01f;
+
+		// Cross-checks: Strength must not feed magic; Intelligence must not feed the weapon strike.
+		float boltStrong = await MeasureCardActionDamage(firebolt, strength: 6, intelligence: 0);
+		bool strNotMagic = Mathf.IsEqualApprox(boltStrong, boltDumb, 0.01f);
+		float rallySmart = await MeasureCardActionDamage(rally, strength: 0, intelligence: 6);
+		bool intNotWeapon = Mathf.IsEqualApprox(rallySmart, rallyWeak, 0.01f);
+
+		GD.Print($"action: rally Str0={rallyWeak:0.0} Str6={rallyStrong:0.0} (strScales={strScalesAction}); " +
+			$"firebolt Int0={boltDumb:0.0} Int6={boltSmart:0.0} (intScales={intScalesMagic})");
+		GD.Print($"cross: firebolt Str6={boltStrong:0.0} (str!=magic {strNotMagic}), rally Int6={rallySmart:0.0} (int!=weapon {intNotWeapon})");
+
+		bool pass = baseIsUnscaled && weaponScalesWithStr && strScalesAction && intScalesMagic && strNotMagic && intNotWeapon;
+		GD.Print(pass
+			? "PASS: Str scales weapon power + strength actions, Int scales magic, and the two stats stay in their lanes"
+			: $"FAIL: baseUnscaled={baseIsUnscaled}, weaponStr={weaponScalesWithStr}, rallyStr={strScalesAction}, " +
+			  $"boltInt={intScalesMagic}, strNotMagic={strNotMagic}, intNotWeapon={intNotWeapon}");
 		return pass;
 	}
 }

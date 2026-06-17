@@ -183,6 +183,17 @@ clickable card-buttons (centre, Unit=blue / Action=amber), discard-count panel (
 Draw / End-Turn controls and an Energy readout. Clicking a card then a target plays it (Chunk 33);
 the round/pause loop = Chunk 34, energy gating = Chunk 37.
 
+**Unit stats: HP / Str / Int (M12, Chunk 36).** `Unit` carries `Strength` + `Intelligence` (ints,
+default 0) beside its HP (`MaxHealth`/`Health`). **STRENGTH** scales weapon attack power and
+strength-based card actions (the Charge lunge, the Rally strike); **INTELLIGENCE** scales magic
+actions (Firebolt). Each point adds a flat fraction of the BASE value (`StrengthScale` /
+`IntelligenceScale`, default +10% each), exposed as `StrengthMultiplier` / `IntelligenceMultiplier`
+(both 1.0 at stat 0, so a stat of 0 resolves to exactly the numbers earlier chunks were tuned around —
+buffs only add on top). **All damage funnels through `Unit.ScaledWeaponDamage(base)` (Str) or
+`ScaledMagicDamage(base)` (Int)** so a buff lands uniformly: the player's swing, ally fist/pike
+strikes, and `PerformAction`'s Rally/Firebolt all route through them. The two stats stay in their
+lanes (Str never touches magic, Int never touches a weapon strike). Energy gating = Chunk 37.
+
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
 `CapturePoint.cs`, `KothManager.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`,
@@ -218,7 +229,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions.
-      (Chunks 32–39.) Chunks 32–35 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel). Next: Chunk 36 HP/Str/Int stats.
+      (Chunks 32–39.) Chunks 32–36 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel; HP/Str/Int stats). Next: Chunk 37 energy from KotH points.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -374,7 +385,7 @@ rooms.
   or F3) to adjust `RoundSeconds` live while testing (−/+ in 5 s steps, clamped 5–60) plus a manual
   pause/resume toggle for debugging. `RoundLoop.RetuneRoundSeconds` caps the live clock to the new
   length; `RoundLoop.Resume` continues the SAME round (no redeal/bump, unlike End Turn). Pure dev tool.
-- [ ] **Chunk 36 — HP / Str / Int stats wired in.** Add Str/Int to units; Str scales weapon
+- [x] **Chunk 36 — HP / Str / Int stats wired in.** Add Str/Int to units; Str scales weapon
   damage + strength actions, Int scales magic actions. Headless-test: higher Str → more weapon
   damage; higher Int → stronger magic action.
 - [ ] **Chunk 37 — Energy from KotH points.** Tie M11 capture-point holdings to per-round card

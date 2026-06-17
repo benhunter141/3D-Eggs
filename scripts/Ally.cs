@@ -129,9 +129,10 @@ public partial class Ally : Unit
 						desiredVel = toTarget.Normalized() * MoveSpeed;
 					else if (_attackTimer <= 0f)
 					{
-						target.TakeDamage(dmg);   // unbraced strike: damage only, no shove
+						float hit = ScaledWeaponDamage(dmg);   // Strength scales weapon attack power (Chunk 36)
+						target.TakeDamage(hit);                // unbraced strike: damage only, no shove
 						_attackTimer = cd;
-						GD.Print($"[Ally] {Name} struck {target.Name} for {dmg}");
+						GD.Print($"[Ally] {Name} struck {target.Name} for {hit:0.0}");
 					}
 				}
 			}
@@ -197,7 +198,7 @@ public partial class Ally : Unit
 				continue;                       // out of reach
 			if (fwd.Dot(to.Normalized()) < BraceFrontDot)
 				continue;                       // not in the pike-front cone
-			u.TakeDamage(PikeDamage, to, BraceRepel);   // braced pike: damage + small repel
+			u.TakeDamage(ScaledWeaponDamage(PikeDamage), to, BraceRepel);   // braced pike: Str-scaled damage + small repel
 			struck = true;
 		}
 

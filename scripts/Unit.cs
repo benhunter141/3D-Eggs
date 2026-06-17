@@ -58,11 +58,32 @@ public partial class Unit : CharacterBody3D, ICardUnit
 
 	// --- Card-mode actions (M12, Chunk 33) ---
 	// When an Action card is played onto this (friendly) unit it runs PerformAction below.
-	// Effects are deliberately simple/visible for now; Str/Int scaling lands in Chunk 34.
+	// Effects are deliberately simple/visible; Str/Int scaling wired in Chunk 36 (see below).
 	[Export] public float CardChargeImpulse = 12.0f; // Charge: forward lunge speed (via knockback)
 	[Export] public float CardStrikeDamage = 12.0f;  // Rally: weapon strike on the nearest foe
 	[Export] public float CardMagicDamage = 16.0f;   // Firebolt: magic hit on the nearest foe
 	[Export] public float CardActionRange = 14.0f;   // Rally/Firebolt: max reach to the nearest foe
+
+	// --- Unit stats: HP / Str / Int (M12, Chunk 36) ---
+	// HP is MaxHealth/Health above. STRENGTH scales weapon attack power + strength-based card
+	// actions (the Charge lunge, the Rally strike); INTELLIGENCE scales magic-based card actions
+	// (Firebolt). Each point adds a flat fraction of the BASE value (StrengthScale / Intelligence-
+	// Scale), so a stat of 0 resolves to exactly the base numbers every earlier chunk was tuned
+	// around — a buff only ever adds on top, never re-tunes the floor.
+	[Export] public int Strength = 0;
+	[Export] public int Intelligence = 0;
+	[Export] public float StrengthScale = 0.10f;       // +10% weapon/strength damage per Strength point
+	[Export] public float IntelligenceScale = 0.10f;   // +10% magic damage per Intelligence point
+
+	// Stat multipliers (1.0 at stat 0). Public so weapon code and headless tests can read them.
+	public float StrengthMultiplier => 1f + Strength * StrengthScale;
+	public float IntelligenceMultiplier => 1f + Intelligence * IntelligenceScale;
+
+	// Scale a base hit by the relevant stat: weapon / strength hits use STR, magic uses INT. Every
+	// damage source funnels through these (player swing, ally strike, card actions) so a stat buff
+	// lands uniformly everywhere a unit deals damage.
+	public float ScaledWeaponDamage(float baseDamage) => baseDamage * StrengthMultiplier;
+	public float ScaledMagicDamage(float baseDamage) => baseDamage * IntelligenceMultiplier;
 
 	public float Health { get; private set; }
 	public bool IsDead { get; private set; }
@@ -283,9 +304,10 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	// An Action card may target this unit only while it's ours and still alive.
 	public bool IsFriendly => Team == TeamId.Player && !IsDead;
 
-	// Run an Action card's effect on this unit. Effects are simple and visible for now (Chunk 33);
-	// Str/Int scaling (Chunk 34) and energy gating (Chunk 35) layer on later. Virtual so archetypes
-	// can specialise. Foe-targeting actions reuse UnitRegistry — never a per-frame group scan.
+	// Run an Action card's effect on this unit. Stats route the power (Chunk 36): the Charge lunge
+	// and Rally strike are STRENGTH actions (scaled by Str), Firebolt is a MAGIC action (scaled by
+	// Int). Energy gating (Chunk 37) layers on later. Virtual so archetypes can specialise.
+	// Foe-targeting actions reuse UnitRegistry — never a per-frame group scan.
 	public virtual void PerformAction(Card action)
 	{
 		if (IsDead || action == null)
@@ -294,16 +316,16 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		switch (action.Action)
 		{
 			case Card.ActionKind.Charge:
-				// Lunge along the way we're facing (-Z is forward); rides the pinball knockback path.
-				AddKnockback(-GlobalTransform.Basis.Z.Normalized() * CardChargeImpulse);
+				// Strength lunge along the way we're facing (-Z is forward); rides the pinball path.
+				AddKnockback(-GlobalTransform.Basis.Z.Normalized() * CardChargeImpulse * StrengthMultiplier);
 				break;
 
 			case Card.ActionKind.Rally:
-				StrikeNearestFoe(CardStrikeDamage);
+				StrikeNearestFoe(ScaledWeaponDamage(CardStrikeDamage));   // strength-scaled weapon strike
 				break;
 
 			case Card.ActionKind.Firebolt:
-				StrikeNearestFoe(CardMagicDamage);
+				StrikeNearestFoe(ScaledMagicDamage(CardMagicDamage));     // intelligence-scaled magic hit
 				break;
 
 			case Card.ActionKind.Brace:
