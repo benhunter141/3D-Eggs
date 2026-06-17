@@ -52,7 +52,15 @@ dropped. Use medieval/neutral names (`Player`, `Ally`, `Enemy` / `Skeleton`).
 - **Headless test:** run a scene with `--headless`; `GD.Print(...)` goes to stdout.
   `scenes/Tests/UnitTest.tscn` is the logic test harness (damage/death, knockback,
   ally follow + slot rotation, loose-leash fists, ranged stones).
-- **Build C# before running** with `dotnet build` (or let the editor build).
+- **Always leave the project ready-to-run for the user — never mention the build step.**
+  The user does not know or care what `dotnet build` is. After ANY change (and as part of
+  "pull"), silently compile the C# so the editor opens clean, and only surface the result
+  ("ready to test" / the error). NEVER ask the user to build, NEVER ask whether to build,
+  and NEVER use the words "dotnet build" in a reply to them. If it fails, fix it and retry —
+  don't hand them a broken project.
+- **"pull" means: pull the changes AND get everything ready to test** — fetch/fast-forward,
+  then silently compile, then tell the user it's ready to open (and what landed). One word,
+  zero follow-up questions.
 - Keep iterations small: build one thing → user runs it → adjust.
 - **Git — always land work on `master` directly (user-locked).** Never leave a change
   stranded on a feature branch. After any change: `git add -A && git commit`, then get it
