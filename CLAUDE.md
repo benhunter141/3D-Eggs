@@ -202,10 +202,21 @@ the `capture_points` group whose `State == PlayerHeld` (read while frozen, so it
 holding). Plays are **GATED**: `ResolvePlay` refuses a card unless `EnergyPool.CanAfford` (then `Spend`s
 its cost), and unaffordable hand cards render disabled. Two `CapturePoint`s sit on `CardBattle.tscn`.
 
+**Run = rooms (M12, Chunk 38).** `RunMap` (pure C# in `scripts/Cards/`) is the run's spine: a seeded
+sequence of `Room`s — an opening `Combat`, a final `Boss`, and a shuffled middle of combats, a couple of
+`Event`s, and the odd `Elite`. The player sits on `Current` and walks the run with `CompleteRoom()`, which
+marks the room cleared, returns a non-null `RoomReward`, and advances `CurrentIndex` (→ `IsComplete` past the
+boss; safe to call past the end). **Fight rooms (Combat/Elite/Boss) drop a card reward** — `_rewardChoices`
+(default 3) distinct cards cloned from `CardLibrary.RewardPool()`; **event rooms drop none** (`IsCardReward`
+false). `ChooseCard(reward, card)` adds a genuinely-offered choice to the run's `Deck` (via new
+`Deck.AddCard`, which lands it in the discard pile — deliberately bumping `TotalCount`, outside the draw/
+discard conservation invariant) and rejects any card not in the offer. Everything is seedable + headless-
+tested; the on-screen map view + wiring battles to rooms is the next visual step. Relics/potions = Chunk 39.
+
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
 `CapturePoint.cs`, `KothManager.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`,
-`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardBattle.cs`, `Cards/EnergyPool.cs`.
+`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardBattle.cs`, `Cards/EnergyPool.cs`, `Cards/RunMap.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
 `Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
 live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
@@ -237,7 +248,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions.
-      (Chunks 32–39.) Chunks 32–37 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel; HP/Str/Int stats; KotH-fed energy + play gating). Next: Chunk 38 run structure (rooms + rewards).
+      (Chunks 32–39.) Chunks 32–38 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel; HP/Str/Int stats; KotH-fed energy + play gating; run map of rooms + post-room card rewards). Next: Chunk 39 relics & potions.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -401,7 +412,7 @@ rooms.
   `CardBattle` refills it from the live count of player-held `capture_points` at every pause and GATES
   plays (unaffordable cards are disabled / refused). Two `CapturePoint`s added to `CardBattle.tscn`.
   Headless-tested: holding more points grants more energy; energy gates plays.
-- [ ] **Chunk 38 — Run structure (rooms + rewards + events).** A room map you traverse (combat /
+- [x] **Chunk 38 — Run structure (rooms + rewards + events).** A room map you traverse (combat /
   event rooms), with post-room rewards (pick a card; find relics / potions) and a few event
   rooms. Headless-test: completing a room advances the map and offers a reward.
 - [ ] **Chunk 39 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable

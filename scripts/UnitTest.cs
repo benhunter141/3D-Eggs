@@ -48,8 +48,9 @@ public partial class UnitTest : Node3D
 		bool roundLoop = TestRoundLoop();
 		bool unitStats = await TestUnitStats();
 		bool cardEnergy = TestCardEnergy();
+		bool runMap = TestRunMap();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1411,6 +1412,70 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: holding more points grants more energy, and energy gates plays (can't afford -> can't play)"
 			: "FAIL: card energy economy / gating wrong");
+		return pass;
+	}
+
+	// Chunk 38 (M12): run structure. A RunMap lays out a seeded sequence of rooms (an opening Combat ...
+	// a final Boss, with events/elites between). Completing a room ADVANCES the map and OFFERS a reward:
+	// fight rooms offer card choices (pick one -> it joins the run deck), event rooms offer none. The run
+	// ends after the boss, and completing past the end is safe. Deterministic under a seed. Pure model —
+	// synchronous, no tree.
+	private bool TestRunMap()
+	{
+		GD.Print("=== UnitTest: run structure (rooms + rewards) (Chunk 38) ===");
+
+		var map = new RunMap(seed: 1234, length: 8);
+
+		// Layout: 8 rooms, opens on a Combat, ends on the Boss, with at least one Event between, and the
+		// player starts on the first room with the run not yet complete.
+		bool sized = map.Rooms.Count == 8;
+		bool opensCombat = map.Rooms[0].Kind == RoomKind.Combat;
+		bool endsBoss = map.Rooms[^1].Kind == RoomKind.Boss;
+		bool hasEvent = map.Rooms.Exists(r => r.Kind == RoomKind.Event);
+		bool startsAtFirst = map.CurrentIndex == 0 && map.Current == map.Rooms[0] && !map.IsComplete;
+
+		// Completing the opening (combat) room offers a CARD reward and advances the map by exactly one.
+		int deckBefore = map.Deck.TotalCount;
+		RoomReward reward = map.CompleteRoom();
+		bool advanced = map.CurrentIndex == 1 && map.Rooms[0].Completed && map.Current == map.Rooms[1];
+		bool offeredCards = reward.IsCardReward && reward.CardChoices.Count > 0;
+
+		// Picking one offered choice adds exactly that card to the run deck; a card never offered is rejected.
+		Card pick = reward.CardChoices[0];
+		bool chose = map.ChooseCard(reward, pick) && map.Deck.TotalCount == deckBefore + 1;
+		bool rejectsForeign = !map.ChooseCard(reward, new Card("Bogus", Card.CardKind.Action, 0))
+			&& map.Deck.TotalCount == deckBefore + 1;
+
+		// Walk the rest of the run to the end: every CompleteRoom advances; an event room offers no card.
+		bool eventGivesNoCard = true;
+		while (!map.IsComplete)
+		{
+			RoomKind kind = map.Current.Kind;
+			RoomReward r = map.CompleteRoom();
+			if (kind == RoomKind.Event && r.IsCardReward) eventGivesNoCard = false;
+		}
+		bool runEnds = map.IsComplete && map.CurrentIndex == map.Rooms.Count && map.Current == null;
+
+		// Past the end CompleteRoom is safe — an empty reward, no crash, still complete.
+		RoomReward past = map.CompleteRoom();
+		bool safeAtEnd = past != null && !past.IsCardReward && map.IsComplete;
+
+		// Determinism: the same seed lays out the same sequence of room kinds.
+		var map2 = new RunMap(seed: 1234, length: 8);
+		bool deterministic = map.Rooms.Count == map2.Rooms.Count;
+		for (int i = 0; deterministic && i < map.Rooms.Count; i++)
+			if (map.Rooms[i].Kind != map2.Rooms[i].Kind) deterministic = false;
+
+		GD.Print($"sized={sized}, opensCombat={opensCombat}, endsBoss={endsBoss}, hasEvent={hasEvent}, " +
+			$"startsAtFirst={startsAtFirst}, advanced={advanced}, offeredCards={offeredCards}, chose={chose}, " +
+			$"rejectsForeign={rejectsForeign}, eventGivesNoCard={eventGivesNoCard}, runEnds={runEnds}, " +
+			$"safeAtEnd={safeAtEnd}, deterministic={deterministic}");
+
+		bool pass = sized && opensCombat && endsBoss && hasEvent && startsAtFirst && advanced && offeredCards
+			&& chose && rejectsForeign && eventGivesNoCard && runEnds && safeAtEnd && deterministic;
+		GD.Print(pass
+			? "PASS: run lays out seeded rooms; completing one advances the map + offers a reward; events give no card; run ends after the boss"
+			: "FAIL: run structure wrong");
 		return pass;
 	}
 }

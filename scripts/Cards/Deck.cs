@@ -76,6 +76,16 @@ public class Deck
 		Hand.Clear();
 	}
 
+	// Permanently add a card to the deck (deck-building — the Chunk 38 post-room rewards). It lands in
+	// the discard pile so it shuffles into the draw pile on the next Reshuffle. NOTE: unlike
+	// Draw/Discard/Reshuffle this DELIBERATELY changes TotalCount — a brand-new card enters the deck.
+	// The conservation invariant governs the pile-to-pile moves, not deck-building.
+	public void AddCard(Card card)
+	{
+		if (card != null)
+			DiscardPile.Add(card);
+	}
+
 	// Shuffle the discard pile back into the draw pile. Called automatically by Draw when the draw
 	// pile empties, but exposed for explicit refills too.
 	public void Reshuffle()
