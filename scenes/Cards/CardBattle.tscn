@@ -1,9 +1,10 @@
-[gd_scene load_steps=11 format=3 uid="uid://bcardbattle0egg1"]
+[gd_scene load_steps=12 format=3 uid="uid://bcardbattle0egg1"]
 
 [ext_resource type="Script" path="res://scripts/Cards/CardBattle.cs" id="1_cb"]
 [ext_resource type="Script" path="res://scripts/SceneButton.cs" id="2_btn"]
 [ext_resource type="PackedScene" path="res://scenes/Swordman.tscn" id="3_sword"]
 [ext_resource type="PackedScene" path="res://scenes/Bowman.tscn" id="4_bow"]
+[ext_resource type="PackedScene" path="res://scenes/CapturePoint.tscn" id="5_cap"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat_1"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -83,6 +84,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1, -17)
 
 [node name="Bowman2" parent="Units" instance=ExtResource("4_bow")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1, -17)
+
+[node name="CapturePointLeft" parent="Units" groups=["capture_points"] instance=ExtResource("5_cap")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 0, -7)
+PeriodSeconds = 15.0
+
+[node name="CapturePointRight" parent="Units" groups=["capture_points"] instance=ExtResource("5_cap")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 0, -7)
+PeriodSeconds = 15.0
 
 [node name="Ui" type="CanvasLayer" parent="."]
 

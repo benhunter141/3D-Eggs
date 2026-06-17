@@ -194,10 +194,18 @@ buffs only add on top). **All damage funnels through `Unit.ScaledWeaponDamage(ba
 strikes, and `PerformAction`'s Rally/Firebolt all route through them. The two stats stay in their
 lanes (Str never touches magic, Int never touches a weapon strike). Energy gating = Chunk 37.
 
+**Energy from KotH (M12, Chunk 37).** `EnergyPool` (pure C# in `scripts/Cards/`) is the card economy:
+each round's energy = `BaseEnergy` (default 3, keeps the opening hand playable with no ground) + a bonus
+per capture point your team HOLDS at the pause (`PerPoint`, default 1) — **territory is your economy.**
+`CardBattle` refills it at every pause (and at open) from `CountPlayerHeldPoints()` — capture points in
+the `capture_points` group whose `State == PlayerHeld` (read while frozen, so it reflects the end-of-round
+holding). Plays are **GATED**: `ResolvePlay` refuses a card unless `EnergyPool.CanAfford` (then `Spend`s
+its cost), and unaffordable hand cards render disabled. Two `CapturePoint`s sit on `CardBattle.tscn`.
+
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
 `CapturePoint.cs`, `KothManager.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`,
-`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardBattle.cs`.
+`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardBattle.cs`, `Cards/EnergyPool.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
 `Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
 live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
@@ -229,7 +237,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions.
-      (Chunks 32–39.) Chunks 32–36 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel; HP/Str/Int stats). Next: Chunk 37 energy from KotH points.
+      (Chunks 32–39.) Chunks 32–37 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel; HP/Str/Int stats; KotH-fed energy + play gating). Next: Chunk 38 run structure (rooms + rewards).
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -388,9 +396,11 @@ rooms.
 - [x] **Chunk 36 — HP / Str / Int stats wired in.** Add Str/Int to units; Str scales weapon
   damage + strength actions, Int scales magic actions. Headless-test: higher Str → more weapon
   damage; higher Int → stronger magic action.
-- [ ] **Chunk 37 — Energy from KotH points.** Tie M11 capture-point holdings to per-round card
-  **energy** (awarded at the pause); you can only play cards your held points afford. Headless-test:
-  holding more points grants more energy; energy gates plays.
+- [x] **Chunk 37 — Energy from KotH points.** `scripts/Cards/EnergyPool.cs` (pure model): each round's
+  energy = a base allowance + a bonus per capture point your team holds at the pause (territory = economy).
+  `CardBattle` refills it from the live count of player-held `capture_points` at every pause and GATES
+  plays (unaffordable cards are disabled / refused). Two `CapturePoint`s added to `CardBattle.tscn`.
+  Headless-tested: holding more points grants more energy; energy gates plays.
 - [ ] **Chunk 38 — Run structure (rooms + rewards + events).** A room map you traverse (combat /
   event rooms), with post-room rewards (pick a card; find relics / potions) and a few event
   rooms. Headless-test: completing a room advances the map and offers a reward.

@@ -47,8 +47,9 @@ public partial class UnitTest : Node3D
 		bool cardPlay = TestCardPlay();
 		bool roundLoop = TestRoundLoop();
 		bool unitStats = await TestUnitStats();
+		bool cardEnergy = TestCardEnergy();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1361,6 +1362,55 @@ public partial class UnitTest : Node3D
 			? "PASS: Str scales weapon power + strength actions, Int scales magic, and the two stats stay in their lanes"
 			: $"FAIL: baseUnscaled={baseIsUnscaled}, weaponStr={weaponScalesWithStr}, rallyStr={strScalesAction}, " +
 			  $"boltInt={intScalesMagic}, strNotMagic={strNotMagic}, intNotWeapon={intNotWeapon}");
+		return pass;
+	}
+
+	// Chunk 37 (M12): energy from KotH points. The card economy is fed by the ground you hold —
+	// EnergyPool grants a base allowance plus a bonus per capture point held at the pause, so HOLDING
+	// MORE POINTS GRANTS MORE ENERGY. Energy then GATES plays: a card you can't afford can't be
+	// spent (Spend rejects and the pool is unchanged). Pure model — synchronous, no tree.
+	private bool TestCardEnergy()
+	{
+		GD.Print("=== UnitTest: card energy from KotH points + gating (Chunk 37) ===");
+
+		var pool = new EnergyPool(baseEnergy: 3, perPoint: 2);
+
+		// Fresh pool sits at the base allowance (opening hand playable with no ground held).
+		bool baseOk = pool.Energy == 3 && pool.Granted == 3 && pool.EnergyFor(0) == 3;
+
+		// More held points grant strictly more energy: 3 -> 5 -> 7 for 0/1/2 points.
+		bool moreGrantsMore = pool.EnergyFor(1) > pool.EnergyFor(0)
+			&& pool.EnergyFor(2) > pool.EnergyFor(1)
+			&& pool.EnergyFor(1) == 5 && pool.EnergyFor(2) == 7;
+
+		// Refill at the pause from points held: holding 2 points funds 7 energy this round.
+		pool.Refill(2);
+		bool refilled = pool.Energy == 7 && pool.Granted == 7;
+
+		// Gating: build a cheap (cost 1) and a pricey (cost 6) card.
+		var cheap = new Card("Cheap", Card.CardKind.Action, 1, action: Card.ActionKind.Brace);
+		var pricey = new Card("Pricey", Card.CardKind.Unit, 6, spawnPath: "res://scenes/Ally.tscn");
+
+		// With 7 energy both are affordable; spending the cheap one deducts its cost.
+		bool affordsBoth = pool.CanAfford(cheap) && pool.CanAfford(pricey);
+		bool spentCheap = pool.Spend(cheap) && pool.Energy == 6;
+
+		// Now drop the pool to 1 (hold no ground): the pricey card is gated out, the cheap one still plays.
+		pool.Refill(0);                                    // -> base 3
+		pool.Spend(cheap); pool.Spend(cheap);              // 3 -> 2 -> 1
+		bool atOne = pool.Energy == 1;
+		bool priceyGated = !pool.CanAfford(pricey) && !pool.Spend(pricey) && pool.Energy == 1; // refused, unchanged
+		bool cheapStillPlays = pool.CanAfford(cheap) && pool.Spend(cheap) && pool.Energy == 0;
+
+		GD.Print($"baseOk={baseOk}, moreGrantsMore={moreGrantsMore}(0->{pool.EnergyFor(0)} 1->{pool.EnergyFor(1)} 2->{pool.EnergyFor(2)}), " +
+			$"refilled={refilled}, affordsBoth={affordsBoth}, spentCheap={spentCheap}, " +
+			$"atOne={atOne}, priceyGated={priceyGated}, cheapStillPlays={cheapStillPlays}");
+
+		bool pass = baseOk && moreGrantsMore && refilled && affordsBoth && spentCheap
+			&& atOne && priceyGated && cheapStillPlays;
+		GD.Print(pass
+			? "PASS: holding more points grants more energy, and energy gates plays (can't afford -> can't play)"
+			: "FAIL: card energy economy / gating wrong");
 		return pass;
 	}
 }

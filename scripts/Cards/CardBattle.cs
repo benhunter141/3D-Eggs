@@ -14,15 +14,20 @@ using Godot;
 // the battlefield runs in real time for RoundSeconds while you keep playing cards live. When the
 // clock runs out it auto-pauses AND redeals (discard the hand, refill energy, draw a fresh 5); you
 // set up again and hit End Turn to play the next round.
+//
+// Energy from KotH (Chunk 37): each pause refills energy from the capture points your team HOLDS
+// (EnergyPool: a base allowance + a bonus per held point) — territory is your economy. Plays are
+// GATED: a card can only be played if you can afford its cost (unaffordable cards are disabled).
 public partial class CardBattle : Node3D, ICardField
 {
 	[Export] public int HandSize = 5;
-	[Export] public int StartingEnergy = 3;
+	[Export] public int BaseEnergy = 3;         // energy granted each round before counting held ground
+	[Export] public int EnergyPerPoint = 1;     // extra energy per capture point held at the pause
 	[Export] public float RoundSeconds = 15f;   // length of a PLAY phase before it auto-pauses (Chunk 34)
 
 	private readonly Deck _deck = new();
 	private RoundLoop _round;        // PLAY/PAUSE state machine (Chunk 34)
-	private int _energy;
+	private EnergyPool _energy;      // KotH-fed energy economy + play gate (Chunk 37)
 	private Card _pending;          // card awaiting a target click (null = nothing selected)
 
 	private Label _energyLabel;
@@ -63,7 +68,8 @@ public partial class CardBattle : Node3D, ICardField
 		BuildDevPanel();
 
 		_deck.LoadStarter(CardLibrary.StarterDeck());
-		_energy = StartingEnergy;
+		_energy = new EnergyPool(BaseEnergy, EnergyPerPoint);
+		_energy.Refill(CountPlayerHeldPoints());   // opening allowance (no ground held yet -> base)
 		_deck.Draw(HandSize);
 		OnPhaseChanged(_round.Current);   // sync the opening PAUSED state (freeze + button + HUD)
 		Refresh();
@@ -84,17 +90,29 @@ public partial class CardBattle : Node3D, ICardField
 		UpdatePhaseHud();
 	}
 
-	// The PLAY clock ran out: discard the spent hand, refill energy, and deal a fresh 5 for the new
-	// round. The phase already flipped to PAUSE (OnPhaseChanged froze the battlefield); the player now
-	// sets up the new hand and hits End Turn to play on.
+	// The PLAY clock ran out: discard the spent hand, refill energy from the ground we now hold, and
+	// deal a fresh 5 for the new round. The phase already flipped to PAUSE (OnPhaseChanged froze the
+	// battlefield); the player now sets up the new hand and hits End Turn to play on.
 	private void OnRoundTimeout()
 	{
 		_pending = null;
 		_deck.DiscardHand();
-		_energy = StartingEnergy;
+		_energy.Refill(CountPlayerHeldPoints());   // KotH points held at the pause -> this round's energy
 		_deck.Draw(HandSize);
 		UpdatePrompt();
 		Refresh();
+	}
+
+	// Count the capture points the player's team HOLDS right now (sole occupant). Read at the pause,
+	// this is the territory that funds the next round (Chunk 37). Capture points are tagged into the
+	// "capture_points" group in the scene; their State reflects the last PLAY frame while frozen.
+	private int CountPlayerHeldPoints()
+	{
+		int held = 0;
+		foreach (Node n in GetTree().GetNodesInGroup("capture_points"))
+			if (n is CapturePoint cp && cp.State == CapturePoint.ZoneState.PlayerHeld)
+				held++;
+		return held;
 	}
 
 	// Freeze the battlefield while paused, run it while playing. The Units node is ProcessMode =
@@ -169,10 +187,15 @@ public partial class CardBattle : Node3D, ICardField
 		Card card = _pending;
 		if (card == null)
 			return;
+		if (!_energy.CanAfford(card))               // gate: can't play what your held ground can't pay for
+		{
+			_promptLabel.Text = $"Not enough energy for {card.Title}  ({card.EnergyCost} needed, {_energy.Energy} left)";
+			return;                                 // card stays pending so the player can pick another target/card
+		}
 		if (CardPlay.Play(card, this, location, unitTarget))
 		{
 			_deck.Discard(card);
-			_energy -= card.EnergyCost;             // spent (not gated until Chunk 35)
+			_energy.Spend(card);                    // deduct the cost (gated above)
 			CancelPending();
 		}
 		// On a miss (e.g. clicked an enemy with an Action card) the card stays pending to retry.
@@ -251,7 +274,11 @@ public partial class CardBattle : Node3D, ICardField
 
 		_drawCount.Text = $"DRAW\n{_deck.DrawPile.Count}";
 		_discardCount.Text = $"DISCARD\n{_deck.DiscardPile.Count}";
-		_energyLabel.Text = $"ENERGY   {_energy} / {StartingEnergy}";
+		// Show the held ground that funded this round next to the spend tally (territory = economy).
+		int held = CountPlayerHeldPoints();
+		_energyLabel.Text = held > 0
+			? $"ENERGY   {_energy.Energy} / {_energy.Granted}   (holding {held})"
+			: $"ENERGY   {_energy.Energy} / {_energy.Granted}";
 	}
 
 	// The aim hint under the energy readout: what the currently selected card wants targeted.
@@ -382,6 +409,7 @@ public partial class CardBattle : Node3D, ICardField
 			ClipText = false,
 			ToggleMode = true,
 			ButtonPressed = card == _pending,        // the pending card stays visibly selected
+			Disabled = !_energy.CanAfford(card),     // gate: dim cards your held ground can't pay for
 		};
 		b.AddThemeFontSizeOverride("font_size", 15);
 		b.AddThemeColorOverride("font_color",
