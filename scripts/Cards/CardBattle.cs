@@ -8,8 +8,12 @@ using Godot;
 //   • Click a UNIT card  → it becomes "pending"; the next click on the GROUND spawns that unit there.
 //   • Click an ACTION card → it becomes "pending"; the next click on a FRIENDLY UNIT makes it act.
 // A right-click (or clicking nothing valid) cancels the pending card. On a successful play the card
-// goes to discard and its energy is spent (shown, not yet GATED — that's Chunk 35). End Turn dumps
-// the hand, refills energy, and deals a fresh hand; Draw pulls one more so the pile cycle still reads.
+// goes to discard and its energy is spent (shown, not yet GATED — that's Chunk 35).
+//
+// Round loop (Chunk 34): the battle STARTS PAUSED with an opening hand. End Turn begins the round —
+// the battlefield runs in real time for RoundSeconds while you keep playing cards live. When the
+// clock runs out it auto-pauses AND redeals (discard the hand, refill energy, draw a fresh 5); you
+// set up again and hit End Turn to play the next round.
 public partial class CardBattle : Node3D, ICardField
 {
 	[Export] public int HandSize = 5;
@@ -32,6 +36,13 @@ public partial class CardBattle : Node3D, ICardField
 	private Camera3D _camera;
 	private Node3D _units;           // parent for every spawned/seed unit
 
+	// Chunk 35 dev panel — built in code so it never ships in the scene. Tune RoundSeconds live and
+	// pause/resume the battlefield for debugging. Toggle with the DEV button or F3.
+	private const float DevMinRound = 5f, DevMaxRound = 60f, DevRoundStep = 5f;
+	private Control _devPanel;
+	private Label _devRoundLabel;
+	private Button _devPauseButton;
+
 	public override void _Ready()
 	{
 		_energyLabel = GetNode<Label>("Ui/Root/EnergyLabel");
@@ -49,29 +60,53 @@ public partial class CardBattle : Node3D, ICardField
 
 		_round = new RoundLoop(RoundSeconds);
 		_round.PhaseChanged += OnPhaseChanged;
+		BuildDevPanel();
 
 		_deck.LoadStarter(CardLibrary.StarterDeck());
 		_energy = StartingEnergy;
 		_deck.Draw(HandSize);
-		UpdatePhaseHud();
+		OnPhaseChanged(_round.Current);   // sync the opening PAUSED state (freeze + button + HUD)
 		Refresh();
 	}
 
-	// PLAY runs the clock down in real time; the loop flips itself to PAUSE on expiry. This node is
-	// ProcessMode = Always (scene) so _Process keeps running while the rest of the tree is frozen.
+	// GetTree().Paused is global and survives scene changes, so always lift it on the way out (the
+	// Menu button can be hit mid-pause) — otherwise the menu / next level would load frozen.
+	public override void _ExitTree() => GetTree().Paused = false;
+
+	// PLAY runs the clock down in real time; the loop flips itself to PAUSE when the round times out.
+	// This node is ProcessMode = Always (scene) so _Process keeps running while the tree is frozen.
 	public override void _Process(double delta)
 	{
+		RoundLoop.Phase before = _round.Current;
 		_round.Tick((float)delta);   // counts down only during PLAY (no-op while paused)
+		if (before == RoundLoop.Phase.Play && _round.Current == RoundLoop.Phase.Pause)
+			OnRoundTimeout();        // the round just ran out -> redeal a fresh hand
 		UpdatePhaseHud();
+	}
+
+	// The PLAY clock ran out: discard the spent hand, refill energy, and deal a fresh 5 for the new
+	// round. The phase already flipped to PAUSE (OnPhaseChanged froze the battlefield); the player now
+	// sets up the new hand and hits End Turn to play on.
+	private void OnRoundTimeout()
+	{
+		_pending = null;
+		_deck.DiscardHand();
+		_energy = StartingEnergy;
+		_deck.Draw(HandSize);
+		UpdatePrompt();
+		Refresh();
 	}
 
 	// Freeze the battlefield while paused, run it while playing. The Units node is ProcessMode =
 	// Pausable (scene) so it stops on GetTree().Paused; this node + the UI stay Always, so cards
-	// remain playable in both phases.
+	// remain playable in both phases. End Turn is only live while paused (it BEGINS the round).
 	private void OnPhaseChanged(RoundLoop.Phase phase)
 	{
-		GetTree().Paused = phase == RoundLoop.Phase.Pause;
-		_endTurnButton.Text = phase == RoundLoop.Phase.Play ? "End Round  ⏸" : "End Turn  ▶";
+		bool paused = phase == RoundLoop.Phase.Pause;
+		GetTree().Paused = paused;
+		_endTurnButton.Disabled = !paused;
+		_endTurnButton.Text = paused ? "End Turn  ▶" : "Round in play…";
+		UpdateDevPauseLabel();
 		UpdatePhaseHud();
 	}
 
@@ -79,6 +114,12 @@ public partial class CardBattle : Node3D, ICardField
 	// themselves (they consume the input), so a left-click that reaches here is a battlefield aim.
 	public override void _UnhandledInput(InputEvent @event)
 	{
+		if (@event is InputEventKey key && key.Pressed && !key.Echo && key.Keycode == Key.F3)
+		{
+			ToggleDevPanel();
+			return;
+		}
+
 		if (@event is not InputEventMouseButton mb || !mb.Pressed)
 			return;
 
@@ -170,23 +211,16 @@ public partial class CardBattle : Node3D, ICardField
 		Refresh();
 	}
 
-	// The End Turn / End Round button is context-sensitive (Chunk 34):
-	//   • During PLAY  → end the live round early and pause to play cards unhurried (hand kept).
-	//   • During PAUSE → resume the next round: dump the hand, refill energy, deal a fresh hand.
+	// End Turn BEGINS the round (Chunk 34): unfreeze the battlefield and start the clock. Only live
+	// while paused; the hand carries into play (cards stay playable live), and the timeout redeal
+	// (OnRoundTimeout) is what cycles the hand. The button is disabled during play, so this only
+	// fires from PAUSE — the guard is belt-and-braces.
 	private void OnEndTurn()
 	{
+		if (_round.Current != RoundLoop.Phase.Pause)
+			return;
 		_pending = null;
-		if (_round.Current == RoundLoop.Phase.Play)
-		{
-			_round.EndPlayPhase();              // -> PAUSE (OnPhaseChanged freezes the battlefield)
-		}
-		else
-		{
-			_deck.DiscardHand();
-			_energy = StartingEnergy;
-			_deck.Draw(HandSize);
-			_round.EndTurn();                   // -> PLAY (OnPhaseChanged unfreezes + resets the clock)
-		}
+		_round.EndTurn();                       // -> PLAY (OnPhaseChanged unfreezes + starts the clock)
 		UpdatePrompt();
 		Refresh();
 	}
@@ -231,6 +265,110 @@ public partial class CardBattle : Node3D, ICardField
 		_promptLabel.Text = _pending.Target == Card.TargetKind.Location
 			? $"{_pending.Title} — click the GROUND to place  (right-click cancels)"
 			: $"{_pending.Title} — click a FRIENDLY unit  (right-click cancels)";
+	}
+
+	// ── Chunk 35 dev panel ───────────────────────────────────────────────────────────────────────
+	// A small in-code overlay (top-right, hidden by default) to retune round length live and to
+	// pause/resume the battlefield for debugging. ProcessMode is inherited from this node (Always),
+	// so its buttons keep working while the battlefield is frozen.
+	private void BuildDevPanel()
+	{
+		Control root = GetNode<Control>("Ui/Root");
+
+		var toggle = new Button
+		{
+			Text = "DEV",
+			CustomMinimumSize = new Vector2(72, 32),
+			ToggleMode = true,
+		};
+		toggle.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+		toggle.OffsetLeft = -96; toggle.OffsetRight = -24;
+		toggle.OffsetTop = 20; toggle.OffsetBottom = 52;
+		toggle.AddThemeFontSizeOverride("font_size", 16);
+		toggle.Pressed += ToggleDevPanel;
+		root.AddChild(toggle);
+
+		var panel = new PanelContainer { Visible = false };
+		panel.SetAnchorsPreset(Control.LayoutPreset.TopRight);
+		panel.OffsetLeft = -256; panel.OffsetRight = -24;
+		panel.OffsetTop = 60; panel.OffsetBottom = 196;
+		root.AddChild(panel);
+		_devPanel = panel;
+
+		var box = new VBoxContainer();
+		box.AddThemeConstantOverride("separation", 8);
+		panel.AddChild(box);
+
+		var header = new Label { Text = "DEV PANEL  (F3)", HorizontalAlignment = HorizontalAlignment.Center };
+		header.AddThemeColorOverride("font_color", new Color(0.92f, 0.88f, 0.72f));
+		box.AddChild(header);
+
+		// Round-length row: [ − ]  Round 15s  [ + ]
+		var roundRow = new HBoxContainer();
+		roundRow.AddThemeConstantOverride("separation", 8);
+		roundRow.Alignment = BoxContainer.AlignmentMode.Center;
+		box.AddChild(roundRow);
+
+		var minus = new Button { Text = "−", CustomMinimumSize = new Vector2(40, 36) };
+		minus.Pressed += () => StepRoundSeconds(-DevRoundStep);
+		roundRow.AddChild(minus);
+
+		_devRoundLabel = new Label
+		{
+			CustomMinimumSize = new Vector2(120, 0),
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+		};
+		_devRoundLabel.AddThemeFontSizeOverride("font_size", 18);
+		roundRow.AddChild(_devRoundLabel);
+
+		var plus = new Button { Text = "+", CustomMinimumSize = new Vector2(40, 36) };
+		plus.Pressed += () => StepRoundSeconds(DevRoundStep);
+		roundRow.AddChild(plus);
+
+		// Manual pause / resume toggle — freezes the battlefield without the turn bookkeeping.
+		_devPauseButton = new Button { CustomMinimumSize = new Vector2(0, 36) };
+		_devPauseButton.Pressed += OnDevPauseToggle;
+		box.AddChild(_devPauseButton);
+
+		UpdateDevRoundLabel();
+		UpdateDevPauseLabel();
+	}
+
+	private void ToggleDevPanel()
+	{
+		if (_devPanel != null)
+			_devPanel.Visible = !_devPanel.Visible;
+	}
+
+	private void StepRoundSeconds(float delta)
+	{
+		float seconds = Mathf.Clamp(_round.RoundSeconds + delta, DevMinRound, DevMaxRound);
+		_round.RetuneRoundSeconds(seconds);
+		UpdateDevRoundLabel();
+		UpdatePhaseHud();
+	}
+
+	// Pause/resume for debugging: flip the round phase without redealing or refilling. Resume continues
+	// the SAME round (RoundLoop.Resume), unlike End Turn which starts a fresh one.
+	private void OnDevPauseToggle()
+	{
+		if (_round.Current == RoundLoop.Phase.Play)
+			_round.EndPlayPhase();
+		else
+			_round.Resume();
+	}
+
+	private void UpdateDevRoundLabel()
+	{
+		if (_devRoundLabel != null)
+			_devRoundLabel.Text = $"Round {_round.RoundSeconds:0}s";
+	}
+
+	private void UpdateDevPauseLabel()
+	{
+		if (_devPauseButton != null)
+			_devPauseButton.Text = _round.Current == RoundLoop.Phase.Play ? "⏸  Pause" : "▶  Resume";
 	}
 
 	// A single hand card rendered as a clickable panel-button.

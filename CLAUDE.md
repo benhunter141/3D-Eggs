@@ -340,10 +340,12 @@ rooms.
 - **Cards = Units or Actions.** A **Unit card** is played onto a **location** (a battlefield
   zone / `CapturePoint`-style slot) to spawn that unit for your team. An **Action card** is
   played onto a **friendly unit**, which then performs the action (move / attack / buff / spell).
-- **Round = timed real-time play + tactical pause.** Play runs in real time for `RoundSeconds`
-  (default 15, dev-tunable) — units move/fight and the player may play cards live — then the mode
-  **pauses** (battlefield frozen) so the player can play more cards; pressing **End Turn** resumes
-  the next round and restarts the timer. The pause is also where per-period energy is awarded (Chunk 37).
+- **Round = timed real-time play + tactical pause.** The mode **starts PAUSED** with an opening hand;
+  **End Turn begins a round** — play runs in real time for `RoundSeconds` (default 15, dev-tunable),
+  units move/fight and the player may play cards live — then at **timeout** the mode **pauses**
+  (battlefield frozen) **and redeals** a fresh hand (discard + refill energy + draw 5); the player
+  sets up again and hits **End Turn** to play on. The pause is also where per-period energy is
+  awarded (Chunk 37).
 - **Unit stats: HP / Str / Int.** **Str** scales weapon attack power + strength-based actions;
   **Int** scales magic-based actions. Stats live on `Unit` (or a card-mode component).
 - **Energy from holding ground.** Card energy each round = KotH points your team holds at the
@@ -358,14 +360,16 @@ rooms.
   (spawn there); Action cards target a **friendly unit** (it performs the action). Play resolves
   to a real spawn / a real unit behavior on the battlefield. Headless-test: a unit card spawns at
   a location; an action card makes its target unit act.
-- [x] **Chunk 34 — Round loop: timed real-time play + tactical pause.** The card battle alternates a
-  **PLAY phase** (real time for `RoundSeconds`, default 15; units move/fight and cards are playable
-  live) → a **PAUSE phase** (battlefield simulation frozen — e.g. `GetTree().Paused = true` with
-  `CardBattle`'s `ProcessMode = Always` so its UI keeps running; cards still playable) → the existing
-  **End Turn** control resumes the next PLAY phase and resets the timer. A phase state machine
-  (`RoundManager` or on `CardBattle`) drives it; HUD shows the current phase + countdown to the next
-  pause. Headless-test the state machine: timer expiry flips PLAY→PAUSE; End Turn flips PAUSE→PLAY and
-  resets the timer; cards remain playable in both phases.
+- [x] **Chunk 34 — Round loop: timed real-time play + tactical pause.** The card battle **starts
+  PAUSED** with an opening hand; **End Turn BEGINS a round** → a **PLAY phase** (real time for
+  `RoundSeconds`, default 15; units move/fight and cards are playable live) → at **timeout** it
+  auto-flips to a **PAUSE phase** (battlefield frozen via `GetTree().Paused = true`, with `CardBattle`
+  at `ProcessMode = Always` and the `Units` node `Pausable` so the UI/cards keep running while units
+  freeze) **and redeals** (discard hand, refill energy, draw a fresh 5); End Turn plays the next round.
+  Pure `RoundLoop` state machine drives it; HUD banner shows round/phase + countdown. End Turn is
+  disabled during PLAY. Headless-tested: starts paused; End Turn begins a round; timeout advances the
+  round counter + repauses; cards playable in both phases (`_ExitTree` lifts the global pause on the
+  way out so the menu/next scene isn't frozen).
 - [ ] **Chunk 35 — Dev panel: live round-length control.** A toggleable in-mode dev panel to adjust
   `RoundSeconds` live while testing (numeric readout + +/- buttons or a slider, default 15) plus a
   manual pause/resume toggle for debugging. Pure dev tool; user feel-check.

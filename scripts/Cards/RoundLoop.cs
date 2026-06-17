@@ -14,7 +14,8 @@ public class RoundLoop
 {
 	public enum Phase { Play, Pause }
 
-	public Phase Current { get; private set; } = Phase.Play;
+	// Games START PAUSED: the player sets up with their opening hand, then End Turn begins round 1.
+	public Phase Current { get; private set; } = Phase.Pause;
 	// Length of a PLAY phase. Mutable so the Chunk-35 dev panel can retune it live (applies next round).
 	public float RoundSeconds { get; set; }
 	// Seconds left in the current PLAY phase (clamped at 0; frozen while paused).
@@ -34,8 +35,9 @@ public class RoundLoop
 	// Cards may be played in either phase — live during PLAY, unhurried during PAUSE.
 	public bool CardsPlayable => true;
 
-	// Advance the play clock by dt seconds. Only PLAY consumes time; when it runs out the loop flips
-	// to PAUSE. A no-op while paused (the battlefield is frozen, so no time passes).
+	// Advance the play clock by dt seconds. Only PLAY consumes time; when it runs out the round ends:
+	// the counter advances and the loop flips to PAUSE (the view redeals the hand on this edge). A
+	// no-op while paused (the battlefield is frozen, so no time passes).
 	public void Tick(float dt)
 	{
 		if (Current != Phase.Play)
@@ -44,27 +46,50 @@ public class RoundLoop
 		if (TimeLeft <= 0f)
 		{
 			TimeLeft = 0f;
+			RoundNumber++;
 			SetPhase(Phase.Pause);
 		}
 	}
 
-	// End the current PLAY phase early ("pause now to play cards"), flipping straight to PAUSE.
-	// No-op if already paused.
+	// Dev only (Chunk 35): end the current PLAY phase early -> PAUSE WITHOUT ending the round (no
+	// counter bump, no redeal — Resume continues the same round). No-op if already paused.
 	public void EndPlayPhase()
 	{
 		if (Current == Phase.Play)
 			SetPhase(Phase.Pause);
 	}
 
-	// End Turn: resume real-time play and reset the clock to a full round. No-op unless paused —
-	// this is the PAUSE -> PLAY control only.
+	// End Turn: BEGIN the round — resume real-time play and reset the clock to a full round. No-op
+	// unless paused; this is the PAUSE -> PLAY control. The round counter advances at the timeout
+	// that ENDS a round (Tick), not here, so the round you start playing keeps its number.
 	public void EndTurn()
 	{
 		if (Current != Phase.Pause)
 			return;
-		RoundNumber++;
 		TimeLeft = RoundSeconds;
 		SetPhase(Phase.Play);
+	}
+
+	// Dev panel resume (Chunk 35): unfreeze and continue the CURRENT round — no redeal/refill and no
+	// round-number bump (unlike EndTurn). Keeps the remaining clock; if the round had already timed out
+	// it gets a fresh full clock so there's something to watch. No-op unless paused.
+	public void Resume()
+	{
+		if (Current != Phase.Pause)
+			return;
+		if (TimeLeft <= 0f)
+			TimeLeft = RoundSeconds;
+		SetPhase(Phase.Play);
+	}
+
+	// Dev panel live retune (Chunk 35): change the round length and apply it to the CURRENT play clock
+	// at once — cap any remaining time at the new length — so shortening a round is visible immediately
+	// instead of only taking effect next round.
+	public void RetuneRoundSeconds(float seconds)
+	{
+		RoundSeconds = seconds;
+		if (TimeLeft > seconds)
+			TimeLeft = seconds;
 	}
 
 	private void SetPhase(Phase p)
