@@ -45,8 +45,9 @@ public partial class UnitTest : Node3D
 		bool capturePoint = await TestCapturePoint();
 		bool cardDeck = TestCardDeck();
 		bool cardPlay = TestCardPlay();
+		bool roundLoop = TestRoundLoop();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1202,6 +1203,61 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: unit cards spawn at a location, action cards act on a friendly unit, guards hold"
 			: "FAIL: card play targeting wrong");
+		return pass;
+	}
+
+	// Chunk 34 (M12): the round-loop state machine. PLAY counts the clock down; expiry flips
+	// PLAY -> PAUSE; End Turn flips PAUSE -> PLAY and resets the clock; cards stay playable in both
+	// phases. Pure model, so this is a synchronous check (no tree / physics).
+	private bool TestRoundLoop()
+	{
+		GD.Print("=== UnitTest: round loop state machine (Chunk 34) ===");
+
+		var loop = new RoundLoop(roundSeconds: 15f);
+
+		int playEdges = 0, pauseEdges = 0;
+		loop.PhaseChanged += p => { if (p == RoundLoop.Phase.Play) playEdges++; else pauseEdges++; };
+
+		bool startsPlaying = loop.Current == RoundLoop.Phase.Play
+			&& Mathf.IsEqualApprox(loop.TimeLeft, 15f) && loop.CardsPlayable && loop.RoundNumber == 1;
+
+		// Tick a few seconds — still PLAY, clock falling, cards still playable.
+		loop.Tick(5f);
+		bool ticking = loop.Current == RoundLoop.Phase.Play
+			&& Mathf.IsEqualApprox(loop.TimeLeft, 10f) && loop.CardsPlayable;
+
+		// Run the clock out — flips PLAY -> PAUSE exactly once, clamps at 0, cards still playable.
+		loop.Tick(20f);
+		bool expired = loop.Current == RoundLoop.Phase.Pause
+			&& Mathf.IsZeroApprox(loop.TimeLeft) && pauseEdges == 1 && loop.CardsPlayable;
+
+		// Ticking while paused does nothing (battlefield frozen, no time passes).
+		loop.Tick(5f);
+		bool frozen = loop.Current == RoundLoop.Phase.Pause && Mathf.IsZeroApprox(loop.TimeLeft);
+
+		// End Turn resumes PLAY, resets the clock to a full round, and bumps the round counter.
+		loop.EndTurn();
+		bool resumed = loop.Current == RoundLoop.Phase.Play && Mathf.IsEqualApprox(loop.TimeLeft, 15f)
+			&& playEdges == 1 && loop.RoundNumber == 2 && loop.CardsPlayable;
+
+		// End Turn during PLAY is a no-op (it's the PAUSE -> PLAY control only).
+		loop.EndTurn();
+		bool endTurnNoop = loop.Current == RoundLoop.Phase.Play && playEdges == 1 && loop.RoundNumber == 2;
+
+		// End-round-early pauses immediately; a second call while already paused does nothing.
+		loop.EndPlayPhase();
+		bool earlyPause = loop.Current == RoundLoop.Phase.Pause && pauseEdges == 2;
+		loop.EndPlayPhase();
+		bool earlyNoop = loop.Current == RoundLoop.Phase.Pause && pauseEdges == 2;
+
+		GD.Print($"start={startsPlaying}, tick={ticking}, expired={expired}(pauseEdges={pauseEdges}), " +
+			$"frozen={frozen}, resumed={resumed}(playEdges={playEdges}, round={loop.RoundNumber}), " +
+			$"endTurnNoop={endTurnNoop}, earlyPause={earlyPause}, earlyNoop={earlyNoop}");
+
+		bool pass = startsPlaying && ticking && expired && frozen && resumed && endTurnNoop && earlyPause && earlyNoop;
+		GD.Print(pass
+			? "PASS: timer expiry flips PLAY->PAUSE; End Turn flips PAUSE->PLAY + resets; cards playable in both"
+			: "FAIL: round loop state machine wrong");
 		return pass;
 	}
 }

@@ -218,7 +218,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
       units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions.
-      (Chunks 32–39.) Chunks 32–33 done (model + piles + hand UI; play targeting). Next: Chunk 34 round/pause loop.
+      (Chunks 32–39.) Chunks 32–34 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop). Next: Chunk 35 dev panel.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -358,7 +358,7 @@ rooms.
   (spawn there); Action cards target a **friendly unit** (it performs the action). Play resolves
   to a real spawn / a real unit behavior on the battlefield. Headless-test: a unit card spawns at
   a location; an action card makes its target unit act.
-- [ ] **Chunk 34 — Round loop: timed real-time play + tactical pause.** The card battle alternates a
+- [x] **Chunk 34 — Round loop: timed real-time play + tactical pause.** The card battle alternates a
   **PLAY phase** (real time for `RoundSeconds`, default 15; units move/fight and cards are playable
   live) → a **PAUSE phase** (battlefield simulation frozen — e.g. `GetTree().Paused = true` with
   `CardBattle`'s `ProcessMode = Always` so its UI keeps running; cards still playable) → the existing

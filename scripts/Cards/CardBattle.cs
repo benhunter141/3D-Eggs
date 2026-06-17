@@ -14,16 +14,20 @@ public partial class CardBattle : Node3D, ICardField
 {
 	[Export] public int HandSize = 5;
 	[Export] public int StartingEnergy = 3;
+	[Export] public float RoundSeconds = 15f;   // length of a PLAY phase before it auto-pauses (Chunk 34)
 
 	private readonly Deck _deck = new();
+	private RoundLoop _round;        // PLAY/PAUSE state machine (Chunk 34)
 	private int _energy;
 	private Card _pending;          // card awaiting a target click (null = nothing selected)
 
 	private Label _energyLabel;
+	private Label _phaseLabel;
 	private Label _promptLabel;
 	private Label _drawCount;
 	private Label _discardCount;
 	private HBoxContainer _handBox;
+	private Button _endTurnButton;
 
 	private Camera3D _camera;
 	private Node3D _units;           // parent for every spawned/seed unit
@@ -31,20 +35,44 @@ public partial class CardBattle : Node3D, ICardField
 	public override void _Ready()
 	{
 		_energyLabel = GetNode<Label>("Ui/Root/EnergyLabel");
+		_phaseLabel = GetNode<Label>("Ui/Root/PhaseLabel");
 		_promptLabel = GetNode<Label>("Ui/Root/PromptLabel");
 		_handBox = GetNode<HBoxContainer>("Ui/Root/HandBox");
 		_drawCount = GetNode<Label>("Ui/Root/DrawPanel/DrawCount");
 		_discardCount = GetNode<Label>("Ui/Root/DiscardPanel/DiscardCount");
 		GetNode<Button>("Ui/Root/Buttons/DrawButton").Pressed += OnDrawOne;
-		GetNode<Button>("Ui/Root/Buttons/EndTurnButton").Pressed += OnEndTurn;
+		_endTurnButton = GetNode<Button>("Ui/Root/Buttons/EndTurnButton");
+		_endTurnButton.Pressed += OnEndTurn;
 
 		_camera = GetNode<Camera3D>("Camera3D");
 		_units = GetNode<Node3D>("Units");
 
+		_round = new RoundLoop(RoundSeconds);
+		_round.PhaseChanged += OnPhaseChanged;
+
 		_deck.LoadStarter(CardLibrary.StarterDeck());
 		_energy = StartingEnergy;
 		_deck.Draw(HandSize);
+		UpdatePhaseHud();
 		Refresh();
+	}
+
+	// PLAY runs the clock down in real time; the loop flips itself to PAUSE on expiry. This node is
+	// ProcessMode = Always (scene) so _Process keeps running while the rest of the tree is frozen.
+	public override void _Process(double delta)
+	{
+		_round.Tick((float)delta);   // counts down only during PLAY (no-op while paused)
+		UpdatePhaseHud();
+	}
+
+	// Freeze the battlefield while paused, run it while playing. The Units node is ProcessMode =
+	// Pausable (scene) so it stops on GetTree().Paused; this node + the UI stay Always, so cards
+	// remain playable in both phases.
+	private void OnPhaseChanged(RoundLoop.Phase phase)
+	{
+		GetTree().Paused = phase == RoundLoop.Phase.Pause;
+		_endTurnButton.Text = phase == RoundLoop.Phase.Play ? "End Round  ⏸" : "End Turn  ▶";
+		UpdatePhaseHud();
 	}
 
 	// World clicks resolve a pending card. Card-button clicks are handled by the buttons
@@ -142,15 +170,40 @@ public partial class CardBattle : Node3D, ICardField
 		Refresh();
 	}
 
-	// End of turn: dump the hand to discard, refill energy, and deal a fresh hand.
+	// The End Turn / End Round button is context-sensitive (Chunk 34):
+	//   • During PLAY  → end the live round early and pause to play cards unhurried (hand kept).
+	//   • During PAUSE → resume the next round: dump the hand, refill energy, deal a fresh hand.
 	private void OnEndTurn()
 	{
 		_pending = null;
-		_deck.DiscardHand();
-		_energy = StartingEnergy;
-		_deck.Draw(HandSize);
+		if (_round.Current == RoundLoop.Phase.Play)
+		{
+			_round.EndPlayPhase();              // -> PAUSE (OnPhaseChanged freezes the battlefield)
+		}
+		else
+		{
+			_deck.DiscardHand();
+			_energy = StartingEnergy;
+			_deck.Draw(HandSize);
+			_round.EndTurn();                   // -> PLAY (OnPhaseChanged unfreezes + resets the clock)
+		}
 		UpdatePrompt();
 		Refresh();
+	}
+
+	// Top banner: which round we're in, the phase, and (during PLAY) the countdown to the next pause.
+	private void UpdatePhaseHud()
+	{
+		if (_round.Current == RoundLoop.Phase.Play)
+		{
+			_phaseLabel.Text = $"ROUND {_round.RoundNumber}   •   PLAY   {_round.TimeLeft:0.0}s";
+			_phaseLabel.AddThemeColorOverride("font_color", new Color(0.6f, 0.95f, 0.6f));
+		}
+		else
+		{
+			_phaseLabel.Text = $"ROUND {_round.RoundNumber}   •   PAUSED — play cards, then End Turn";
+			_phaseLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.55f));
+		}
 	}
 
 	// Rebuild the hand row and refresh the counters/energy from the deck's current piles.
