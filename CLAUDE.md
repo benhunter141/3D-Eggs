@@ -134,16 +134,27 @@ DISABLED — captain + steed read as one silhouette, and the full move/aim/attac
 working (mounted combat). Dismount restores foot `Speed` + ground height. Concrete mounts are just
 scenes with their own `MountSpeed`/look (Donkey now; Chocobo = faster, Chunk 29).
 
+**Capture zones (M11, Chunk 30).** A `CapturePoint` (`Area3D`, NOT a `Unit`) counts living units
+per team inside its collision cylinder each physics frame via `GetOverlappingBodies()`. Every
+`PeriodSeconds` (default 15) it awards a point to the sole holder (one team present, the other
+absent); contested (both present) or neutral (empty) awards nobody. Exposes `PlayerScore`,
+`EnemyScore`, `State` (Neutral/PlayerHeld/EnemyHeld/Contested), `PeriodTimer`, `PeriodCount`
+plus `PeriodEnded` and `StateChanged` signals. A translucent ground disc recolours per state
+(gray → blue/red/yellow). Chunk 31 wires a HUD + KotH level on top; M12 ties `PeriodEnded` to
+card energy.
+
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
-`FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`, `Hud.cs`.
+`CapturePoint.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`, `CrowdTest.cs`,
+`Hud.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
 `Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
 live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
 `Levels/Level3_ArrowStorm.tscn`, `Levels/Level4_Onslaught.tscn`,
 `Levels/Level5_PinballArena.tscn`, `Captain.tscn`, `Pikeman.tscn`, `Swordman.tscn`,
 `Bowman.tscn`, `Arrow.tscn`, `Skeleton.tscn`, `Ally.tscn`, `Stone.tscn`, `Bumper.tscn`,
-`Donkey.tscn`, `Chocobo.tscn`, `Tests/UnitTest.tscn`, `Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
+`Donkey.tscn`, `Chocobo.tscn`, `CapturePoint.tscn`, `Tests/UnitTest.tscn`,
+`Tests/Crowd.tscn`. (Legacy `Main.tscn` retired — git history keeps it.)
 
 ## 6. Roadmap (single-player fun first, multiplayer LAST)
 
@@ -201,8 +212,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       (`Chocobo.tscn` reuses `Mount.cs` — faster steed, `MountSpeed` 13 vs the donkey's 9, with a
       distinct tall yellow look: beak, crest + tail feathers, googly eyes). A donkey and a chocobo
       flank the spawn in Level 1 to compare. Balance/feel-check the chocobo speed when convenient.
-- [ ] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
+- [~] **M11 — King of the Hill mode:** capture zones score their holder at the end of each
       period (15 s for now); HUD for scores / timer / contest. Feeds M12's energy. (Chunks 30–31.)
+      Chunk 30 done (`CapturePoint` Area3D zone: counts living units per team via
+      `GetOverlappingBodies`, awards a point to the sole holder at period end, contested = no
+      award; colour-coded disc + PeriodEnded/StateChanged signals for HUD/energy hooks).
 - [ ] **M12 — Slay the Eggs (card battler mode):** Slay-the-Spire-style PvE — visible
       draw / hand / discard piles; Unit cards played on a location, Action cards played on a
       friendly unit who then performs the action; units have HP / Str / Int (Str → weapon &
@@ -307,7 +321,7 @@ and weapons differ in reach / damage / knockback / look.
 **Goal:** a scoring mode where holding ground matters — and the foundation Slay the Eggs (M12)
 draws energy from.
 
-- [ ] **Chunk 30 — Capture zone + period scoring.** `scripts/CapturePoint.cs` +
+- [x] **Chunk 30 — Capture zone + period scoring.** `scripts/CapturePoint.cs` +
   `scenes/CapturePoint.tscn`: an `Area3D` zone tracking which team has units inside; every
   **period (15 s for now)** it awards a point to the team holding it at period end (contested =
   no award). Emits a signal / exposes state for HUD + energy hooks. Headless-test: holder at
