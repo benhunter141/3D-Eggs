@@ -256,7 +256,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
       smaller fully on-screen field with two endzones; deploy units in your endzone and they
       march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43).
-      Pitch + endzones + camera reframe done (Chunk 40); placement/march/tuning pending.
+      Pitch + endzones + camera reframe (Chunk 40) + endzone-gated placement (Chunk 41) done; march/tuning pending.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -450,7 +450,7 @@ opts in.
   near edge by the camera (today it clips off-screen). Move the seed swordmen/bowmen into the
   far enemy endzone. Store the player-endzone bounds on `CardBattle` for Chunks 41–42. Pure
   visual + layout; **user feel-check** that the field is fully on-screen and uncramped.
-- [ ] **Chunk 41 — Endzone-gated unit placement.** Unit cards may only be placed inside the
+- [x] **Chunk 41 — Endzone-gated unit placement.** Unit cards may only be placed inside the
   PLAYER endzone. `TryPlayAtLocation` validates the ground-ray point against the endzone
   bounds and rejects an out-of-zone click with a prompt ("Place units in your endzone") —
   the card stays pending so the player can re-aim. Action-card targeting is unchanged. Pull

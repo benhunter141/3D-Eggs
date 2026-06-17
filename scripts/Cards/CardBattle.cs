@@ -196,7 +196,12 @@ public partial class CardBattle : Node3D, ICardField
 			TryPlayOnUnit(mb.Position);
 	}
 
-	// Unit card: drop the unit where the mouse ray meets the ground plane (y = 0).
+	// The player endzone rectangle (Chunk 41) — the only place Unit cards may be deployed.
+	private Endzone PlayerEndzone => new(FieldHalfWidth, PlayerEndzoneFarZ, PlayerEndzoneNearZ);
+
+	// Unit card: drop the unit where the mouse ray meets the ground plane (y = 0), but only inside the
+	// player endzone (Chunk 41). An out-of-zone click is rejected with a prompt and the card stays
+	// pending so the player can re-aim.
 	private void TryPlayAtLocation(Vector2 mousePos)
 	{
 		Vector3 from = _camera.ProjectRayOrigin(mousePos);
@@ -207,6 +212,11 @@ public partial class CardBattle : Node3D, ICardField
 		if (t <= 0f)
 			return;                                  // ground is behind the camera
 		Vector3 point = from + dir * t;
+		if (!PlayerEndzone.Contains(point))
+		{
+			_promptLabel.Text = "Place units in your endzone (the near strip).";
+			return;                                  // card stays pending — re-aim inside the zone
+		}
 		ResolvePlay(_camera, point, null);
 	}
 

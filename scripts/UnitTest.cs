@@ -50,8 +50,9 @@ public partial class UnitTest : Node3D
 		bool cardEnergy = TestCardEnergy();
 		bool runMap = TestRunMap();
 		bool relicsPotions = TestRelicsPotions();
+		bool endzone = TestEndzone();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1560,6 +1561,41 @@ public partial class UnitTest : Node3D
 			? "PASS: relic modifiers apply + aggregate; potions consume one-shot effects; the run grants both"
 			: $"FAIL: relicApplies={relicApplies}, aggregates={aggregates}, energyPop={firstPop}, energyOneShot={oneShot}, " +
 			  $"drawPop={drawPops}, drawOneShot={drawOneShot}, bossRelic={bossRelicGranted}, eventPotion={eventPotionGranted}, collected={collected}");
+		return pass;
+	}
+
+	// Chunk 41 (M12.5): endzone-gated unit placement. Unit cards may only drop inside the player's
+	// endzone rectangle. The Endzone struct is the pure bounds test CardBattle validates each placement
+	// click against. Mirrors CardBattle's default field bounds: half-width 14, z ∈ [14, 22].
+	private bool TestEndzone()
+	{
+		GD.Print("=== UnitTest: endzone-gated placement (Chunk 41) ===");
+
+		var zone = new Endzone(halfWidth: 14f, farZ: 14f, nearZ: 22f);
+
+		// Inside: centre and a point near (but within) each edge are accepted.
+		bool centreIn = zone.Contains(new Vector3(0f, 0f, 18f));
+		bool edgesIn = zone.Contains(new Vector3(13.9f, 0f, 14.1f)) && zone.Contains(new Vector3(-13.9f, 0f, 21.9f));
+
+		// Outside: past the far edge (enemy side), past the near edge, and beyond the side line are rejected.
+		bool farOut = !zone.Contains(new Vector3(0f, 0f, 10f));      // −Z of the inner edge (mid-pitch)
+		bool nearOut = !zone.Contains(new Vector3(0f, 0f, 26f));     // +Z behind the back line
+		bool wideOut = !zone.Contains(new Vector3(20f, 0f, 18f));    // outside the side line
+
+		// Y is ignored — only the ground footprint matters.
+		bool ignoresY = zone.Contains(new Vector3(0f, 99f, 18f));
+
+		// Bounds passed in either order resolve the same rectangle.
+		var flipped = new Endzone(halfWidth: 14f, farZ: 22f, nearZ: 14f);
+		bool orderAgnostic = flipped.Contains(new Vector3(0f, 0f, 18f)) && !flipped.Contains(new Vector3(0f, 0f, 10f));
+
+		GD.Print($"centreIn={centreIn}, edgesIn={edgesIn}, farOut={farOut}, nearOut={nearOut}, " +
+			$"wideOut={wideOut}, ignoresY={ignoresY}, orderAgnostic={orderAgnostic}");
+
+		bool pass = centreIn && edgesIn && farOut && nearOut && wideOut && ignoresY && orderAgnostic;
+		GD.Print(pass
+			? "PASS: points inside the endzone are accepted, points outside are rejected"
+			: "FAIL: endzone bounds test wrong");
 		return pass;
 	}
 }
