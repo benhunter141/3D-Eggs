@@ -15,6 +15,10 @@ public class EnergyPool
 	// Extra energy per capture point held at the pause — territory pays.
 	public int PerPoint { get; }
 
+	// Flat run-long bonus from relics (M12, Chunk 39): added to every round's grant on top of the
+	// base allowance and the territory bonus. Set by CardBattle from the run inventory before Refill.
+	public int BonusEnergy { get; set; }
+
 	// Energy available to spend this round, and the amount granted this round (the "/ max" denominator).
 	public int Energy { get; private set; }
 	public int Granted { get; private set; }
@@ -26,11 +30,20 @@ public class EnergyPool
 		Energy = Granted = BaseEnergy;
 	}
 
-	// Energy a round grants for holding `pointsHeld` capture points: base + a bonus per point.
-	public int EnergyFor(int pointsHeld) => BaseEnergy + Math.Max(0, pointsHeld) * PerPoint;
+	// Energy a round grants for holding `pointsHeld` capture points: base + relic bonus + per-point.
+	public int EnergyFor(int pointsHeld) =>
+		BaseEnergy + Math.Max(0, BonusEnergy) + Math.Max(0, pointsHeld) * PerPoint;
 
 	// Refill at the pause: set this round's energy from the capture points held (territory = economy).
 	public void Refill(int pointsHeld) => Energy = Granted = EnergyFor(pointsHeld);
+
+	// Add energy mid-round on top of the round's grant (a one-shot energy Potion, Chunk 39). Only ever
+	// raises the spendable pool — never the denominator — so the readout can show e.g. 5 / 3.
+	public void Add(int amount)
+	{
+		if (amount > 0)
+			Energy += amount;
+	}
 
 	// Can this card be played right now? (A null card, or one costing more than we hold, cannot.)
 	public bool CanAfford(Card card) => card != null && Energy >= card.EnergyCost;

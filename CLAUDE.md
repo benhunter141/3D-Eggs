@@ -202,10 +202,25 @@ the `capture_points` group whose `State == PlayerHeld` (read while frozen, so it
 holding). Plays are **GATED**: `ResolvePlay` refuses a card unless `EnergyPool.CanAfford` (then `Spend`s
 its cost), and unaffordable hand cards render disabled. Two `CapturePoint`s sit on `CardBattle.tscn`.
 
+**Relics & potions (M12, Chunk 39).** The run accumulates two kinds of item, both pure C# in
+`scripts/Cards/`. A **`Relic`** is a PERMANENT run-long passive (`RelicKind`: `BonusEnergy` /
+`BonusHandSize` / `SpawnStrength` + a `Magnitude`); a **`Potion`** is a ONE-SHOT consumable
+(`PotionKind`: `Energy` / `Draw`) that `Apply(EnergyPool, Deck)`s its effect once, then refuses
+(`Consumed`). `RunMap.Inventory` (a **`RunInventory`**) carries both; rooms grant them as a guaranteed
+bonus on the room reward — **boss rooms hand a relic, event rooms hand a potion** (`RoomReward.BonusRelic`
+/ `BonusPotion`, added to the inventory in `TakeReward`). Relics never apply themselves: `RunInventory`
+SUMS them by kind into `BonusEnergy` / `BonusHandSize` / `SpawnStrengthBonus`, and `CardBattle` folds
+those in each round — `RefillEnergy()` sets `EnergyPool.BonusEnergy` before refilling, `EffectiveHandSize()`
+adds to the draw, and `SpawnUnit` bumps each spawned unit's `Strength`. Potions are popped from a left-edge
+inventory panel (built in code) → `Potion.Apply` → `Refresh`. `CardLibrary.RelicPool()` / `PotionPool()`
+are the grant pools. All headless-testable (`TestRelicsPotions`): a relic's modifier applies, a potion
+consumes its effect once, and the run grants both.
+
 **Key files:** `scripts/` — `Player.cs`, `Unit.cs`, `UnitRegistry.cs`, `Ally.cs`,
 `Enemy.cs`, `Swordman.cs`, `Bowman.cs`, `Stone.cs`, `Arrow.cs`, `Bumper.cs`, `Mount.cs`,
 `CapturePoint.cs`, `KothManager.cs`, `FollowCamera.cs`, `GameManager.cs`, `SceneButton.cs`,
-`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardBattle.cs`, `Cards/EnergyPool.cs`.
+`CrowdTest.cs`, `Hud.cs`, `Cards/Card.cs`, `Cards/Deck.cs`, `Cards/CardLibrary.cs`, `Cards/CardBattle.cs`,
+`Cards/EnergyPool.cs`, `Cards/RoundLoop.cs`, `Cards/CardPlay.cs`, `Cards/RunMap.cs`, `Cards/RunInventory.cs`, `Cards/Relic.cs`, `Cards/Potion.cs`.
 `scenes/` — `Menu/LevelSelect.tscn` (entry/`main_scene`, carries the full CONTROLS list),
 `Menu/ResultMenu.tscn` (reusable win/lose UI), `Hud.tscn` (reusable in-game controls panel +
 live weapon readout — instanced in every level), `Levels/Level1_HoldTheLine.tscn`, `Levels/Level2_Pincer.tscn`,
@@ -233,11 +248,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **M9 — Weapons & loadouts:** data-driven `WeaponType→WeaponProfile`; `swap_weapon` (Q) cycles spear/sword/axe/mace with distinct reach/damage/knockback/mesh (Chunks 26–27). Archetype balance feel-check pending.
 - [x] **M10 — Mounts:** rideable Donkey + faster Chocobo (mount/dismount via `mount`, mounted combat); both flank the Level 1 spawn (Chunks 28–29). Chocobo-speed feel-check pending.
 - [x] **M11 — King of the Hill mode:** central `CapturePoint` scores its holder each period; `KothManager` HUD + match authority; battle 6 on LevelSelect (Chunks 30–31). Feeds M12 energy. Balance feel-check pending.
-- [~] **M12 — Slay the Eggs (card battler mode):** StS-style PvE on the battlefield — draw/hand/discard
+- [x] **M12 — Slay the Eggs (card battler mode):** StS-style PvE on the battlefield — draw/hand/discard
       piles; Unit cards spawn at a location, Action cards make a friendly unit act; a **round loop**
       runs real-time play for N sec (default 15) then **pauses** to play cards (End Turn resumes);
-      units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions.
-      (Chunks 32–39.) Chunks 32–38 done (model + piles + hand UI; play targeting; PLAY/PAUSE round loop; dev panel; HP/Str/Int stats; KotH-fed energy + play gating; run structure — rooms/rewards). Next: Chunk 39 relics & potions.
+      units gain HP/Str/Int; energy from holding KotH points; a run of rooms with cards/relics/potions
+      (Chunks 32–39, all done). Balance/feel-check pending. Next milestone: M13 multiplayer.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -408,7 +423,7 @@ rooms.
   deck) or skips. `CardLibrary.RewardPool()` is the reward card pool. `CardBattle` is a thin view:
   room-track HUD, a paused-only "Clear Room" control that pops a reward picker, each new room reloads
   the battle deck from `Collection`, plus a run-complete banner. Headless-tested.
-- [ ] **Chunk 39 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable
+- [x] **Chunk 39 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable
   **potions** (one-shot effects), collected through the run. Headless-test: a relic's modifier
   applies; a potion consumes and triggers its effect.
 

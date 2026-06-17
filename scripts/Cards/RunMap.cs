@@ -40,6 +40,11 @@ public class RunMap
 		public bool Resolved;
 		public Card Chosen;       // null once Resolved = the reward was skipped
 
+		// Chunk 39: a guaranteed bonus item the room hands over regardless of the card pick — a Relic
+		// (boss rooms) or a Potion (event rooms). Granted to the run inventory when the reward resolves.
+		public Relic BonusRelic;
+		public Potion BonusPotion;
+
 		public RoomReward(string prompt, List<Card> choices)
 		{
 			Prompt = prompt;
@@ -50,6 +55,8 @@ public class RunMap
 	public List<Room> Rooms { get; } = new();
 	// The run's growing deck — every battle this run is built from it; rewards add to it.
 	public List<Card> Collection { get; } = new();
+	// The run's collected relics + potions (Chunk 39) — permanent passives + one-shot items.
+	public RunInventory Inventory { get; } = new();
 
 	public int CurrentIndex { get; private set; }
 	public Room Current => IsComplete ? null : Rooms[CurrentIndex];
@@ -128,6 +135,11 @@ public class RunMap
 		reward.Chosen = chosen;
 		if (chosen != null)
 			Collection.Add(chosen.Clone());
+		// Chunk 39: any guaranteed bonus item is granted to the run inventory at the same time.
+		if (reward.BonusRelic != null)
+			Inventory.AddRelic(reward.BonusRelic);
+		if (reward.BonusPotion != null)
+			Inventory.AddPotion(reward.BonusPotion);
 	}
 
 	private RoomReward BuildReward(Room room)
@@ -135,12 +147,39 @@ public class RunMap
 		switch (room.Type)
 		{
 			case RoomType.Event:
-				return new RoomReward(Pick(EventPrompts), SampleRewards(EventChoices));
+			{
+				// Event rooms also hand over a one-shot Potion (Chunk 39).
+				Potion potion = PickPotion();
+				var reward = new RoomReward(Pick(EventPrompts) + $"  (Bonus: {potion.Title} — {potion.Description})",
+					SampleRewards(EventChoices));
+				reward.BonusPotion = potion;
+				return reward;
+			}
 			case RoomType.Boss:
-				return new RoomReward("The Egg-Tyrant falls! Claim a powerful card.", SampleRewards(CombatChoices));
+			{
+				// The boss room hands over a permanent Relic (Chunk 39) on top of a powerful card.
+				Relic relic = PickRelic();
+				var reward = new RoomReward($"The Egg-Tyrant falls! Claim a powerful card.  (Relic: {relic.Title} — {relic.Description})",
+					SampleRewards(CombatChoices));
+				reward.BonusRelic = relic;
+				return reward;
+			}
 			default:
 				return new RoomReward("Victory! Choose a card to add to your deck.", SampleRewards(CombatChoices));
 		}
+	}
+
+	// Pick one relic / potion at random from the library pool (a clone, so the pool isn't aliased).
+	private Relic PickRelic()
+	{
+		List<Relic> pool = CardLibrary.RelicPool();
+		return pool[_rng.Next(pool.Count)].Clone();
+	}
+
+	private Potion PickPotion()
+	{
+		List<Potion> pool = CardLibrary.PotionPool();
+		return pool[_rng.Next(pool.Count)].Clone();
 	}
 
 	// Draw `count` distinct cards from the reward pool without replacement (clones, so picks are

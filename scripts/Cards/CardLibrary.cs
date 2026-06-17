@@ -52,4 +52,22 @@ public static class CardLibrary
 		new Card("Brace", Card.CardKind.Action, 0, "A friendly unit braces (a brief defiant pop).",
 			action: Card.ActionKind.Brace),
 	};
+
+	// Relic pool (M12, Chunk 39) — permanent, run-long passives. A boss room grants one of these at
+	// random; RunInventory sums their kinds into the modifiers each battle reads. Kept distinct so a
+	// single grant never picks the same relic twice.
+	public static System.Collections.Generic.List<Relic> RelicPool() => new()
+	{
+		new Relic("Egg of Plenty", Relic.RelicKind.BonusEnergy, 1, "+1 card energy every round."),
+		new Relic("Captain's Banner", Relic.RelicKind.BonusHandSize, 1, "Draw +1 card every round."),
+		new Relic("Warlord's Crest", Relic.RelicKind.SpawnStrength, 2, "Spawned units gain +2 Strength."),
+	};
+
+	// Potion pool (M12, Chunk 39) — one-shot consumables. An event room grants one of these; the
+	// player pops it for an immediate effect (extra energy now, or extra cards now).
+	public static System.Collections.Generic.List<Potion> PotionPool() => new()
+	{
+		new Potion("Energy Draught", Potion.PotionKind.Energy, 2, "Gain +2 energy now."),
+		new Potion("Scroll of Insight", Potion.PotionKind.Draw, 2, "Draw 2 cards now."),
+	};
 }

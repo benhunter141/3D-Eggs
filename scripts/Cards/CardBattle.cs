@@ -57,6 +57,10 @@ public partial class CardBattle : Node3D, ICardField
 	private Label _rewardPrompt;
 	private VBoxContainer _rewardChoices;
 
+	// Chunk 39 inventory UI — built in code (left edge): a relics readout + a button per held potion.
+	private Label _relicLabel;
+	private VBoxContainer _potionBox;
+
 	public override void _Ready()
 	{
 		_energyLabel = GetNode<Label>("Ui/Root/EnergyLabel");
@@ -76,12 +80,13 @@ public partial class CardBattle : Node3D, ICardField
 		_round.PhaseChanged += OnPhaseChanged;
 		BuildDevPanel();
 		BuildRunUi();
+		BuildInventoryUi();
 
 		_run = new RunMap();                       // the run: rooms + the deck we carry between them
 		_deck.LoadStarter(_run.Collection);        // first battle's deck = the run's starting collection
 		_energy = new EnergyPool(BaseEnergy, EnergyPerPoint);
-		_energy.Refill(CountPlayerHeldPoints());   // opening allowance (no ground held yet -> base)
-		_deck.Draw(HandSize);
+		RefillEnergy();                            // opening allowance (no ground held yet -> base + relics)
+		_deck.Draw(EffectiveHandSize());
 		OnPhaseChanged(_round.Current);   // sync the opening PAUSED state (freeze + button + HUD)
 		UpdateRunHud();
 		Refresh();
@@ -109,11 +114,22 @@ public partial class CardBattle : Node3D, ICardField
 	{
 		_pending = null;
 		_deck.DiscardHand();
-		_energy.Refill(CountPlayerHeldPoints());   // KotH points held at the pause -> this round's energy
-		_deck.Draw(HandSize);
+		RefillEnergy();                            // KotH points held + relic bonus -> this round's energy
+		_deck.Draw(EffectiveHandSize());
 		UpdatePrompt();
 		Refresh();
 	}
+
+	// Refill energy at a pause folding in the run's relic energy bonus (Chunk 39) on top of held ground.
+	private void RefillEnergy()
+	{
+		if (_run != null)
+			_energy.BonusEnergy = _run.Inventory.BonusEnergy;
+		_energy.Refill(CountPlayerHeldPoints());
+	}
+
+	// Cards drawn each round = base hand size + the run's relic hand-size bonus (Chunk 39).
+	private int EffectiveHandSize() => HandSize + (_run != null ? _run.Inventory.BonusHandSize : 0);
 
 	// Count the capture points the player's team HOLDS right now (sole occupant). Read at the pause,
 	// this is the territory that funds the next round (Chunk 37). Capture points are tagged into the
@@ -228,6 +244,9 @@ public partial class CardBattle : Node3D, ICardField
 			return null;
 		_units.AddChild(node);
 		node.GlobalPosition = location + Vector3.Up;   // lift onto the ground like the level scenes
+		// Chunk 39: SpawnStrength relics make every deployed unit hit harder.
+		if (_run != null && node is Unit unit)
+			unit.Strength += _run.Inventory.SpawnStrengthBonus;
 		return node as ICardUnit;
 	}
 
@@ -300,6 +319,7 @@ public partial class CardBattle : Node3D, ICardField
 		_energyLabel.Text = held > 0
 			? $"ENERGY   {_energy.Energy} / {_energy.Granted}   (holding {held})"
 			: $"ENERGY   {_energy.Energy} / {_energy.Granted}";
+		UpdateInventoryUi();
 	}
 
 	// The aim hint under the energy readout: what the currently selected card wants targeted.
@@ -561,8 +581,8 @@ public partial class CardBattle : Node3D, ICardField
 		if (_round.Current == RoundLoop.Phase.Play)
 			_round.EndPlayPhase();              // back to PAUSE (no round bump) for setup
 		_deck.LoadStarter(_run.Collection);
-		_energy.Refill(CountPlayerHeldPoints());
-		_deck.Draw(HandSize);
+		RefillEnergy();
+		_deck.Draw(EffectiveHandSize());
 		OnPhaseChanged(_round.Current);         // re-sync button/freeze state now the reward is closed
 		UpdatePrompt();
 		Refresh();
@@ -601,5 +621,92 @@ public partial class CardBattle : Node3D, ICardField
 				: new Color(1.0f, 0.85f, 0.55f));    // Action cards read amber
 		b.Pressed += () => OnCardSelected(card);
 		return b;
+	}
+
+	// ── Chunk 39 relics & potions ────────────────────────────────────────────────────────────────
+	// Built in code (like the run/dev panels): a relics readout + a column of potion buttons down the
+	// left edge. Relics are passive (their modifiers fold into RefillEnergy / EffectiveHandSize /
+	// SpawnUnit); potions are popped here for a one-shot effect.
+	private void BuildInventoryUi()
+	{
+		Control root = GetNode<Control>("Ui/Root");
+
+		var panel = new PanelContainer();
+		panel.SetAnchorsPreset(Control.LayoutPreset.CenterLeft);
+		panel.OffsetLeft = 24; panel.OffsetRight = 268;
+		panel.OffsetTop = -150; panel.OffsetBottom = 150;
+		root.AddChild(panel);
+
+		var box = new VBoxContainer();
+		box.AddThemeConstantOverride("separation", 8);
+		panel.AddChild(box);
+
+		var header = new Label { Text = "RELICS & POTIONS" };
+		header.AddThemeFontSizeOverride("font_size", 16);
+		header.AddThemeColorOverride("font_color", new Color(0.92f, 0.88f, 0.72f));
+		box.AddChild(header);
+
+		_relicLabel = new Label
+		{
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			CustomMinimumSize = new Vector2(230, 0),
+		};
+		_relicLabel.AddThemeFontSizeOverride("font_size", 14);
+		_relicLabel.AddThemeColorOverride("font_color", new Color(0.75f, 0.85f, 1.0f));
+		box.AddChild(_relicLabel);
+
+		_potionBox = new VBoxContainer();
+		_potionBox.AddThemeConstantOverride("separation", 6);
+		box.AddChild(_potionBox);
+	}
+
+	// Refresh the relics line and rebuild the potion buttons from the run inventory. Consumed potions
+	// stay listed but disabled (clear feedback that they're spent); all lock while a reward is open.
+	private void UpdateInventoryUi()
+	{
+		if (_relicLabel == null || _run == null)
+			return;
+
+		var relics = _run.Inventory.Relics;
+		if (relics.Count == 0)
+		{
+			_relicLabel.Text = "Relics: none yet\n(beat the boss to earn one)";
+		}
+		else
+		{
+			string text = "Relics:";
+			foreach (Relic r in relics)
+				text += $"\n• {r.Title} — {r.Description}";
+			_relicLabel.Text = text;
+		}
+
+		foreach (Node c in _potionBox.GetChildren())
+			c.QueueFree();
+
+		foreach (Potion potion in _run.Inventory.Potions)
+		{
+			Potion p = potion;   // capture per-iteration for the closure
+			var b = new Button
+			{
+				CustomMinimumSize = new Vector2(230, 40),
+				Text = p.Consumed ? $"{p.Title}  (used)" : $"Pop: {p.Title}",
+				AutowrapMode = TextServer.AutowrapMode.WordSmart,
+				Disabled = p.Consumed || _pendingReward != null,
+			};
+			b.AddThemeFontSizeOverride("font_size", 14);
+			b.AddThemeColorOverride("font_color", new Color(0.7f, 1.0f, 0.8f));
+			b.Pressed += () => UsePotion(p);
+			_potionBox.AddChild(b);
+		}
+	}
+
+	// Pop a potion: fire its one-shot effect against the live energy pool / deck, then refresh. The
+	// potion marks itself consumed (Apply refuses a second use), so the button disables on the rebuild.
+	private void UsePotion(Potion potion)
+	{
+		if (_pendingReward != null)
+			return;
+		if (potion.Apply(_energy, _deck))
+			Refresh();   // rebuilds hand (a Draw potion may have added cards) + inventory + energy
 	}
 }

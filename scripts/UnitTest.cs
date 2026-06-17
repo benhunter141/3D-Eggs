@@ -49,8 +49,9 @@ public partial class UnitTest : Node3D
 		bool unitStats = await TestUnitStats();
 		bool cardEnergy = TestCardEnergy();
 		bool runMap = TestRunMap();
+		bool relicsPotions = TestRelicsPotions();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1488,6 +1489,77 @@ public partial class UnitTest : Node3D
 			: $"FAIL: startsAtFirst={startsAtFirst}, seededDeck={seededDeck}, hasEvent={hasEvent}, hasBoss={hasBoss}, " +
 			  $"advanced={advanced}, tookCard={tookCard}, idempotent={takeIdempotent}, skipped={skipped}, " +
 			  $"finished={finished}, noRewardDone={noRewardWhenDone}, everyRoomReward={everyRoomOfferedReward}, deterministic={deterministic}");
+		return pass;
+	}
+
+	// Chunk 39 (M12): relics & potions. A RELIC is a permanent run-long passive whose modifier APPLIES
+	// (here: a BonusEnergy relic raises the EnergyPool's per-round grant). A POTION is a one-shot that
+	// CONSUMES and triggers its effect (energy/draw), refusing a second use. Plus the run grants them:
+	// event rooms hand a potion, the boss hands a relic, both landing in the run Inventory on take.
+	// Pure model — synchronous, deterministic under a seed.
+	private bool TestRelicsPotions()
+	{
+		GD.Print("=== UnitTest: relics & potions (Chunk 39) ===");
+
+		// (a) A relic's modifier APPLIES: a +1 BonusEnergy relic raises the pool's per-round grant.
+		var inv = new RunInventory();
+		var pool = new EnergyPool(baseEnergy: 3, perPoint: 1);
+		int beforeRelic = pool.EnergyFor(0);                       // 3 with no relics
+		inv.AddRelic(new Relic("Egg of Plenty", Relic.RelicKind.BonusEnergy, 1));
+		pool.BonusEnergy = inv.BonusEnergy;                        // the battle folds the aggregate in
+		int afterRelic = pool.EnergyFor(0);                       // 4 now
+		bool relicApplies = inv.BonusEnergy == 1 && afterRelic == beforeRelic + 1;
+
+		// Relic aggregates sum by kind and stay in their lanes (hand-size + spawn-strength).
+		inv.AddRelic(new Relic("Captain's Banner", Relic.RelicKind.BonusHandSize, 1));
+		inv.AddRelic(new Relic("Warlord's Crest", Relic.RelicKind.SpawnStrength, 2));
+		inv.AddRelic(new Relic("Egg of Plenty II", Relic.RelicKind.BonusEnergy, 1));   // stacks
+		bool aggregates = inv.BonusEnergy == 2 && inv.BonusHandSize == 1 && inv.SpawnStrengthBonus == 2;
+		GD.Print($"relic: grant {beforeRelic}->{afterRelic} (applies={relicApplies}); " +
+			$"aggregates energy={inv.BonusEnergy} hand={inv.BonusHandSize} str={inv.SpawnStrengthBonus} (ok={aggregates})");
+
+		// (b) A potion CONSUMES + triggers: an energy potion adds to the pool exactly once.
+		var energyPotion = new Potion("Energy Draught", Potion.PotionKind.Energy, 2);
+		pool.Refill(0);                                            // grant = base(3) + synced relic bonus(1) = 4
+		int beforePop = pool.Energy;
+		bool firstPop = energyPotion.Apply(pool, null) && energyPotion.Consumed && pool.Energy == beforePop + 2;
+		bool oneShot = !energyPotion.Apply(pool, null) && pool.Energy == beforePop + 2;   // refused, unchanged
+		GD.Print($"energy potion: {beforePop}->{pool.Energy} (popped={firstPop}), second use refused={oneShot}");
+
+		// A draw potion pulls extra cards into the hand, once.
+		var deck = new Deck(seed: 1);
+		deck.LoadStarter(CardLibrary.StarterDeck());
+		deck.Draw(2);
+		int handBefore = deck.Hand.Count;
+		var drawPotion = new Potion("Scroll of Insight", Potion.PotionKind.Draw, 2);
+		bool drawPops = drawPotion.Apply(null, deck) && deck.Hand.Count == handBefore + 2;
+		bool drawOneShot = !drawPotion.Apply(null, deck) && deck.Hand.Count == handBefore + 2;
+		GD.Print($"draw potion: hand {handBefore}->{deck.Hand.Count} (popped={drawPops}), second use refused={drawOneShot}");
+
+		// (c) The run GRANTS them: clear rooms until both an event (potion) and the boss (relic) land
+		// in the inventory. Take each reward (card null = just the bonus) and watch the inventory grow.
+		var run = new RunMap(seed: 7);
+		bool bossRelicGranted = false, eventPotionGranted = false;
+		while (!run.IsComplete)
+		{
+			RunMap.Room room = run.Current;
+			RunMap.RoomReward reward = run.CompleteCurrentRoom();
+			if (room.Type == RunMap.RoomType.Boss)
+				bossRelicGranted = reward.BonusRelic != null;
+			if (room.Type == RunMap.RoomType.Event)
+				eventPotionGranted = reward.BonusPotion != null;
+			run.TakeReward(reward, null);             // skip the card; still collect the bonus item
+		}
+		bool collected = run.Inventory.Relics.Count >= 1 && run.Inventory.Potions.Count >= 1;
+		GD.Print($"run grants: boss relic offered={bossRelicGranted}, event potion offered={eventPotionGranted}; " +
+			$"collected relics={run.Inventory.Relics.Count}, potions={run.Inventory.Potions.Count} (ok={collected})");
+
+		bool pass = relicApplies && aggregates && firstPop && oneShot && drawPops && drawOneShot
+			&& bossRelicGranted && eventPotionGranted && collected;
+		GD.Print(pass
+			? "PASS: relic modifiers apply + aggregate; potions consume one-shot effects; the run grants both"
+			: $"FAIL: relicApplies={relicApplies}, aggregates={aggregates}, energyPop={firstPop}, energyOneShot={oneShot}, " +
+			  $"drawPop={drawPops}, drawOneShot={drawOneShot}, bossRelic={bossRelicGranted}, eventPotion={eventPotionGranted}, collected={collected}");
 		return pass;
 	}
 }
