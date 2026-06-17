@@ -268,8 +268,13 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       potions with events; **energy comes from holding KotH points (M11) at period end.**
       (Chunks 32–37.) Chunk 32 done (`scripts/Cards/` — `Card`/`Deck` pure model with
       draw/hand/discard piles + auto-reshuffle; `CardBattle.tscn` StS-style hand UI showing all
-      three piles; battle 7 "Slay the Eggs (WIP)" on LevelSelect). Headless-tested: the pile
-      cycle conserves the deck.
+      three piles; battle 7 "Slay the Eggs (WIP)" on LevelSelect). Chunk 33 done (`Cards/CardPlay.cs`
+      — `ICardField`/`ICardUnit` + `CardPlay.Play` resolver routes a card to its target by Kind: Unit
+      cards SPAWN at a clicked ground location, Action cards make a clicked FRIENDLY unit act;
+      `CardBattle` is now a real 3D battlefield — click a card then click the ground/a unit, energy is
+      spent (not yet gated), `Unit` implements `ICardUnit` with Charge/Rally/Firebolt/Brace effects).
+      Headless-tested: the pile cycle conserves the deck; unit/action cards reach the right target and
+      the guards (no field / no unit / enemy target) reject.
 - [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -401,7 +406,7 @@ rooms.
 - [x] **Chunk 32 — Card model + piles + hand UI.** `scripts/Cards/` data model (Card, Deck) +
   draw / hand / discard piles with reshuffle; on-screen UI showing all three piles (StS-style:
   draw count, hand, discard). Headless-test: draw/discard/reshuffle cycle conserves the deck.
-- [ ] **Chunk 33 — Unit & Action cards (play targeting).** Unit cards target a **location**
+- [x] **Chunk 33 — Unit & Action cards (play targeting).** Unit cards target a **location**
   (spawn there); Action cards target a **friendly unit** (it performs the action). Play resolves
   to a real spawn / a real unit behavior on the battlefield. Headless-test: a unit card spawns at
   a location; an action card makes its target unit act.

@@ -44,8 +44,9 @@ public partial class UnitTest : Node3D
 		bool chocobo = await TestChocobo();
 		bool capturePoint = await TestCapturePoint();
 		bool cardDeck = TestCardDeck();
+		bool cardPlay = TestCardPlay();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1134,6 +1135,73 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: piles cycle draw->hand->discard and reshuffle conserves the deck"
 			: "FAIL: deck pile bookkeeping wrong");
+		return pass;
+	}
+
+	// Fake battlefield: records every Unit-card spawn so the test can assert where/what landed.
+	private class FakeField : ICardField
+	{
+		public readonly System.Collections.Generic.List<(Card card, Vector3 at)> Spawns = new();
+		public ICardUnit SpawnUnit(Card card, Vector3 location)
+		{
+			var u = new FakeUnit { IsFriendly = true };
+			Spawns.Add((card, location));
+			return u;
+		}
+	}
+
+	// Fake friendly/enemy unit: records the Action cards it was made to perform.
+	private class FakeUnit : ICardUnit
+	{
+		public bool IsFriendly { get; set; }
+		public readonly System.Collections.Generic.List<Card> Performed = new();
+		public void PerformAction(Card action) => Performed.Add(action);
+	}
+
+	// Chunk 33 (M12): card PLAY targeting routes through CardPlay — a UNIT card spawns at a LOCATION,
+	// an ACTION card makes a FRIENDLY unit act. Verifies each kind reaches the right target and that
+	// the guard rails hold (no field, no unit, or an enemy target all reject without side effects).
+	// Pure model (fakes stand in for the real battlefield/units), so this is a synchronous check.
+	private bool TestCardPlay()
+	{
+		GD.Print("=== UnitTest: card play targeting (Chunk 33) ===");
+
+		var field = new FakeField();
+		var friendly = new FakeUnit { IsFriendly = true };
+		var enemy = new FakeUnit { IsFriendly = false };
+
+		var unitCard = new Card("Recruit", Card.CardKind.Unit, 1, "", spawnPath: "res://scenes/Ally.tscn");
+		var actionCard = new Card("Charge", Card.CardKind.Action, 1, "", action: Card.ActionKind.Charge);
+
+		// Target kind follows from kind: Unit → location, Action → friendly unit.
+		bool targets = unitCard.Target == Card.TargetKind.Location
+			&& actionCard.Target == Card.TargetKind.FriendlyUnit;
+
+		// Unit card spawns at the clicked location.
+		var loc = new Vector3(3, 0, -5);
+		bool unitPlayed = CardPlay.Play(unitCard, field, loc, null);
+		bool spawned = unitPlayed && field.Spawns.Count == 1
+			&& field.Spawns[0].card == unitCard && field.Spawns[0].at == loc;
+
+		// Action card makes the friendly unit perform exactly that card.
+		bool actionPlayed = CardPlay.Play(actionCard, field, Vector3.Zero, friendly);
+		bool acted = actionPlayed && friendly.Performed.Count == 1 && friendly.Performed[0] == actionCard;
+
+		// Guard rails — each rejects (false) and changes nothing:
+		//  • Action card on an ENEMY unit,
+		//  • Action card with NO target,
+		//  • Unit card with NO field.
+		bool enemyRejected = !CardPlay.Play(actionCard, field, Vector3.Zero, enemy) && enemy.Performed.Count == 0;
+		bool noTargetRejected = !CardPlay.Play(actionCard, field, Vector3.Zero, null);
+		bool noFieldRejected = !CardPlay.Play(unitCard, null, loc, null) && field.Spawns.Count == 1;
+
+		GD.Print($"targets={targets}, spawned={spawned}(at {(field.Spawns.Count > 0 ? field.Spawns[0].at : Vector3.Zero)}), " +
+			$"acted={acted}, enemyRejected={enemyRejected}, noTargetRejected={noTargetRejected}, noFieldRejected={noFieldRejected}");
+
+		bool pass = targets && spawned && acted && enemyRejected && noTargetRejected && noFieldRejected;
+		GD.Print(pass
+			? "PASS: unit cards spawn at a location, action cards act on a friendly unit, guards hold"
+			: "FAIL: card play targeting wrong");
 		return pass;
 	}
 }
