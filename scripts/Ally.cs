@@ -45,6 +45,12 @@ public partial class Ally : Unit
 	// Set per-ally in the scene; rotated by the player's yaw each frame to get the world slot.
 	[Export] public Vector3 FormationOffset = Vector3.Zero;
 
+	// Squad ownership (M12.7, Chunk 45). When set, this ally anchors its formation slot AND
+	// facing to THAT captain instead of `GetFirstNodeInGroup("player")` — so two captains can
+	// each lead their own squad on one screen. Unset (the default) = today's first-player-in-group
+	// behaviour, so every single-player level is untouched.
+	[Export] public NodePath CaptainPath;
+
 	private Node3D _player;
 	private float _attackTimer; // counts down; > 0 blocks the next fist hit
 
@@ -52,8 +58,12 @@ public partial class Ally : Unit
 	{
 		Team = TeamId.Player;   // allies fight on the player's side
 		base._Ready();
-		// The player tags itself into the "player" group on ready; grab it once.
-		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
+		// Pick our captain once: an explicit CaptainPath binds us to ONE captain (co-op squads,
+		// Chunk 45); otherwise fall back to the first node in the "player" group (single-player).
+		if (CaptainPath != null && !CaptainPath.IsEmpty())
+			_player = GetNodeOrNull<Node3D>(CaptainPath);
+		if (_player == null)
+			_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
 
 		// Stone-throwers need a projectile scene; auto-load one if none was wired in.
 		if (Weapon == WeaponType.Stones && StoneScene == null)

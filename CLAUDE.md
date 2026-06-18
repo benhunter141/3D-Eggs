@@ -259,7 +259,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M12.7 — Two-player couch co-op ⭐:** a local same-screen 2-player level — P1 on keyboard+mouse,
       P2 on gamepad — each captain leads 6 pikemen + 2 bowmen, fighting a shared AI enemy force; one
       shared camera frames both captains; lose only when BOTH captains fall. Per-captain control schemes +
-      controller aim landed (Chunk 44); squad ownership / shared camera / scene next (Chunks 45–47). Removes
+      controller aim + squad ownership landed (Chunks 44–45); shared camera / scene next (Chunks 46–47). Removes
       the first four levels from the menu. *Local* couch co-op — NOT the networked M13.
 - [ ] **M13 — Multiplayer:** 2 players over the network, server-authoritative. Hardest, last.
 
@@ -512,7 +512,7 @@ captain, single-target camera, lose-on-player-death) must behave EXACTLY as they
   aim), and that pad's buttons; `KeyboardMouse` uses keyboard + mouse only. Pull the stick-aim
   math (stick vector → desired yaw) into a tiny pure helper. **Headless-test:** right-stick vector
   resolves to the correct facing yaw; `Any` still reads the blended path.
-- [ ] **Chunk 45 — Squad ownership (allies bound to a specific captain).** Add `Ally.CaptainPath`
+- [x] **Chunk 45 — Squad ownership (allies bound to a specific captain).** Add `Ally.CaptainPath`
   (NodePath export); when set, the ally resolves its captain from it and anchors slot + facing to
   that captain; unset = today's first-`player`-group behavior. **Headless-test:** an ally with an
   explicit captain follows that captain's slot, not another captain's.

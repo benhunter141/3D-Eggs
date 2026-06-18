@@ -54,8 +54,9 @@ public partial class UnitTest : Node3D
 		bool march = await TestMarch();
 		bool deckTuning = TestDeckTuning();
 		bool stickAim = TestStickAim();
+		bool squadOwnership = await TestSquadOwnership();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1731,6 +1732,61 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: stick aim resolves to the right yaw; Any reads the blended path, Gamepad stays device-scoped"
 			: "FAIL: control-scheme/stick-aim wrong");
+		return pass;
+	}
+
+	// Chunk 45 (M12.7): squad ownership. An ally with an explicit CaptainPath anchors its
+	// formation slot to THAT captain, not whichever node happens to be first in the "player"
+	// group — so two captains can each lead their own squad. We park two captains apart, bind
+	// the ally to the SECOND one, and confirm its slot (and the spot it marches to) tracks that
+	// captain. A plain Node3D in the "player" group stands in for each captain.
+	private async Task<bool> TestSquadOwnership()
+	{
+		GD.Print("=== UnitTest: squad ownership (ally bound to a captain) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Two captains far apart. The FIRST in the group is the one the legacy lookup would grab;
+		// our ally must instead follow the SECOND, which CaptainPath points at.
+		var captainA = new Node3D { Name = "CaptainA" };
+		AddChild(captainA);
+		captainA.AddToGroup("player");
+		captainA.GlobalPosition = Vector3.Zero;
+
+		var captainB = new Node3D { Name = "CaptainB" };
+		AddChild(captainB);
+		captainB.AddToGroup("player");
+		captainB.GlobalPosition = new Vector3(20f, 0f, 0f);
+
+		var ally = GD.Load<PackedScene>("res://scenes/Ally.tscn").Instantiate<Ally>();
+		ally.FormationOffset = new Vector3(1.5f, 0f, 1.5f);
+		ally.CaptainPath = captainB.GetPath();           // bind to the SECOND captain before _Ready
+		AddChild(ally);                                  // _Ready resolves the captain from the path
+		ally.GlobalPosition = new Vector3(20f, 0f, 6f);  // start near captain B
+
+		// The ally's slot must be captain B's position + offset, NOT captain A's (the group head).
+		Vector3 slot = ally.SlotWorldPosition();
+		Vector3 wantB = captainB.GlobalPosition + ally.FormationOffset;   // both yaw 0 -> basis is identity
+		Vector3 wantA = captainA.GlobalPosition + ally.FormationOffset;
+		bool slotOnB = slot.DistanceTo(wantB) < 0.01f;
+		bool notOnA = slot.DistanceTo(wantA) > 1f;
+		GD.Print($"slot={slot}; wantB={wantB} (onB={slotOnB}), wantA={wantA} (notOnA={notOnA})");
+
+		// And it actually FORMS on captain B: let it march in and settle on that slot.
+		for (int i = 0; i < 150; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float restDist = ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition());
+		bool formedOnB = restDist < 0.3f && ally.GlobalPosition.DistanceTo(captainB.GlobalPosition) < 5f;
+		GD.Print($"after follow: {restDist:0.00} m from B's slot, " +
+			$"{ally.GlobalPosition.DistanceTo(captainB.GlobalPosition):0.00} m from captain B (formedOnB={formedOnB})");
+
+		bool pass = slotOnB && notOnA && formedOnB;
+		GD.Print(pass
+			? "PASS: an ally with CaptainPath follows that captain's slot, not the group head"
+			: $"FAIL: slotOnB={slotOnB}, notOnA={notOnA}, formedOnB={formedOnB}");
 		return pass;
 	}
 }
