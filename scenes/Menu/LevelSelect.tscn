@@ -27,47 +27,40 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/margin_left = 24
-theme_override_constants/margin_top = 24
+theme_override_constants/margin_top = 20
 theme_override_constants/margin_right = 24
-theme_override_constants/margin_bottom = 24
+theme_override_constants/margin_bottom = 20
 
 [node name="VBox" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
-theme_override_constants/separation = 10
-alignment = 1
+theme_override_constants/separation = 8
 
 [node name="Title" type="Label" parent="Margin/VBox"]
 layout_mode = 2
-text = "PHALANX"
+text = "SELECT A BATTLE"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
-theme_override_font_sizes/font_size = 64
+theme_override_font_sizes/font_size = 40
 
-[node name="Subtitle" type="Label" parent="Margin/VBox"]
-layout_mode = 2
-text = "Select a Battle"
-horizontal_alignment = 1
-theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)
-theme_override_font_sizes/font_size = 24
-
-[node name="Spacer" type="Control" parent="Margin/VBox"]
-custom_minimum_size = Vector2(0, 8)
-layout_mode = 2
-
-[node name="LevelScroll" type="ScrollContainer" parent="Margin/VBox"]
+[node name="PageScroll" type="ScrollContainer" parent="Margin/VBox"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
-[node name="LevelList" type="VBoxContainer" parent="Margin/VBox/LevelScroll"]
+[node name="Page" type="VBoxContainer" parent="Margin/VBox/PageScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/separation = 12
+
+[node name="LevelList" type="VBoxContainer" parent="Margin/VBox/PageScroll/Page"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
 alignment = 1
 
-[node name="Level5Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+[node name="Level5Button" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -76,7 +69,7 @@ theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level5_PinballArena.tscn"
 
-[node name="KothButton" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+[node name="KothButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -85,7 +78,7 @@ theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/KingOfTheHill.tscn"
 
-[node name="CardsButton" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+[node name="CardsButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -94,7 +87,7 @@ theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Cards/CardBattle.tscn"
 
-[node name="CoopButton" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+[node name="CoopButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
 size_flags_horizontal = 4
@@ -103,18 +96,18 @@ theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/CoopStand.tscn"
 
-[node name="ControlsSpacer" type="Control" parent="Margin/VBox"]
-custom_minimum_size = Vector2(0, 12)
+[node name="ControlsSpacer" type="Control" parent="Margin/VBox/PageScroll/Page"]
+custom_minimum_size = Vector2(0, 8)
 layout_mode = 2
 
-[node name="ControlsTitle" type="Label" parent="Margin/VBox"]
+[node name="ControlsTitle" type="Label" parent="Margin/VBox/PageScroll/Page"]
 layout_mode = 2
 text = "CONTROLS"
 horizontal_alignment = 1
-theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
-theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(0.6, 0.62, 0.68, 1)
+theme_override_font_sizes/font_size = 18
 
-[node name="Controls" type="Label" parent="Margin/VBox"]
+[node name="Controls" type="Label" parent="Margin/VBox/PageScroll/Page"]
 layout_mode = 2
 text = "WASD / Arrows — move captain      Mouse — aim
 Left-Click — attack      Right-Click / Space — brace wall
@@ -123,5 +116,5 @@ F / H / G — squad: follow / hold / attack-move
 Mouse Wheel  or  + / −  — zoom      R — restart battle      Esc — pause / quit to menu
 Couch Co-op:  P1 = keyboard + mouse      P2 = gamepad (left stick move, right stick aim)"
 horizontal_alignment = 1
-theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)
-theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.62, 0.64, 0.7, 1)
+theme_override_font_sizes/font_size = 15
