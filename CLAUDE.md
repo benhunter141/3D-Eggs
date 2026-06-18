@@ -256,7 +256,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
       smaller fully on-screen field with two endzones; deploy units in your endzone and they
       march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43, all done).
-- [ ] **M13 — Multiplayer:** 2 players, server-authoritative. Hardest, last.
+- [ ] **M12.7 — Two-player couch co-op ⭐:** a local same-screen 2-player level — P1 on keyboard+mouse,
+      P2 on gamepad — each captain leads 6 pikemen + 2 bowmen, fighting a shared AI enemy force; one
+      shared camera frames both captains; lose only when BOTH captains fall (Chunks 44–47). Removes the
+      first four levels from the menu. *Local* couch co-op — NOT the networked M13.
+- [ ] **M13 — Multiplayer:** 2 players over the network, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -471,6 +475,59 @@ opts in.
   to be **mostly Unit cards** (units the clear majority, a few actions) so the opening deck
   is about deploying a force. **Headless-test:** the starter deck is majority Unit; default
   round length is 5 s.
+
+---
+
+### ▶ PLANNED — M12.7 Two-Player Couch Co-op (Chunks 44–47)
+
+**Goal:** one new *local same-screen* co-op level. **Player 1** drives a captain with
+**keyboard + mouse**; **Player 2** drives a second captain with a **gamepad**. Each captain
+leads **6 pikemen + 2 bowmen** in formation, and both squads fight a **shared AI enemy force**.
+A single shared camera frames both captains; the match is lost only when **both** captains fall.
+The first four levels are removed from the menu. This is NOT the networked M13 — no netcode,
+just two input devices on one machine.
+
+**Invariant — don't disturb the other levels.** Every behavior below is **off by default**
+(`Any` control scheme, no `CaptainPath`, single camera target, single-captain lose rule); only
+the new co-op scene opts in. Existing levels (real formations, blended keyboard+gamepad on one
+captain, single-target camera, lose-on-player-death) must behave EXACTLY as they do today.
+
+**New durable rules (promote into §5 as chunks land):**
+- **Control schemes.** `Player.ControlScheme` ∈ {`Any`, `KeyboardMouse`, `Gamepad`}. `Any`
+  (default) = today's blended read (keyboard+gamepad move, mouse aim) so single-player levels
+  are untouched. `KeyboardMouse` reads only the keyboard for move + mouse for aim. `Gamepad`
+  reads a specific pad (`DeviceId`) — **left stick = move, right stick = aim** (directional, no
+  mouse), face buttons = attack/brace/swap/mount/zoom.
+- **Squad ownership.** An `Ally` with `CaptainPath` set anchors its formation slot + facing to
+  THAT captain (not `GetFirstNodeInGroup("player")`), so two squads follow two captains.
+- **Co-op match state.** `GameManager` gains `RequireAllPlayersDead` (default false). When true
+  (co-op scene), LOSE fires only once EVERY `player`-group captain is dead/gone; WIN is unchanged
+  (all enemies cleared).
+
+- [ ] **Chunk 44 — Per-captain control schemes + controller aim.** Add `Player.ControlScheme`
+  (`Any`|`KeyboardMouse`|`Gamepad`) + `DeviceId`, default `Any` = current behavior. Route move /
+  aim / attack / brace / swap / mount / zoom through scheme-aware reads: `Gamepad` uses left stick
+  to move, **right stick to aim** (turn toward the stick direction, rate-limited like the mouse
+  aim), and that pad's buttons; `KeyboardMouse` uses keyboard + mouse only. Pull the stick-aim
+  math (stick vector → desired yaw) into a tiny pure helper. **Headless-test:** right-stick vector
+  resolves to the correct facing yaw; `Any` still reads the blended path.
+- [ ] **Chunk 45 — Squad ownership (allies bound to a specific captain).** Add `Ally.CaptainPath`
+  (NodePath export); when set, the ally resolves its captain from it and anchors slot + facing to
+  that captain; unset = today's first-`player`-group behavior. **Headless-test:** an ally with an
+  explicit captain follows that captain's slot, not another captain's.
+- [ ] **Chunk 46 — Shared two-player camera.** Give `FollowCamera` an optional second target
+  (`Target2`); when set, center on the **midpoint** of both captains and size the distance to keep
+  both (plus crowd spread) framed, reusing the dynamic-zoom fit. Single-target path unchanged.
+  **Headless-test:** with two targets the focus point is their midpoint and the distance grows as
+  they separate.
+- [ ] **Chunk 47 — Co-op level scene + co-op lose rule + menu.** Build
+  `scenes/Levels/CoopStand.tscn`: two captains (P1 `KeyboardMouse`, P2 `Gamepad` device 0), each
+  leading **6 Pikemen + 2 bowmen** (friendly archers — re-team a Bowman to the player side or use
+  a bow-skinned ranged `Ally`, whichever keeps squad cohesion) wired to their captain via
+  `CaptainPath`, vs a shared AI enemy force (swordmen + bowmen); the shared two-captain camera;
+  `GameManager` with `RequireAllPlayersDead = true`. **Remove Level 1–4** from `LevelSelect.tscn`
+  and delete their scene files (git keeps history); renumber the menu and add the co-op level +
+  a P1/P2 controls note. **User feel-check** (needs a gamepad to test P2).
 
 ---
 
