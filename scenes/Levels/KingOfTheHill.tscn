@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://b3degg0levelkoth"]
+[gd_scene load_steps=14 format=3 uid="uid://b3degg0levelkoth"]
 
 [ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="1_camera"]
 [ext_resource type="PackedScene" path="res://scenes/Captain.tscn" id="2_captain"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://scenes/Menu/ResultMenu.tscn" id="6_result"]
 [ext_resource type="PackedScene" path="res://scenes/Hud.tscn" id="7_hud"]
 [ext_resource type="PackedScene" path="res://scenes/CapturePoint.tscn" id="8_capture"]
+[ext_resource type="PackedScene" path="res://scenes/PauseMenu.tscn" id="9_pause"]
 [ext_resource type="Script" path="res://scripts/KothManager.cs" id="9_koth"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat_1"]
@@ -116,6 +117,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, -15)
 [node name="ResultMenu" parent="." instance=ExtResource("6_result")]
 
 [node name="Hud" parent="." instance=ExtResource("7_hud")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("9_pause")]
 
 [node name="KothManager" type="CanvasLayer" parent="."]
 script = ExtResource("9_koth")

@@ -73,6 +73,7 @@ Swap weapon — Q
 Mount / dismount — E
 Squad — F follow / H hold / G attack-move
 Zoom — Mouse Wheel / + −
-Restart — R"
+Restart — R
+Pause / quit — Esc"
 theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 1)
 theme_override_font_sizes/font_size = 16

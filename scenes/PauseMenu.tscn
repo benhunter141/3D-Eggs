@@ -1,0 +1,92 @@
+[gd_scene load_steps=3 format=3 uid="uid://b3degg0pausemenu"]
+
+[ext_resource type="Script" path="res://scripts/PauseMenu.cs" id="1_pause"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_pausepanel"]
+bg_color = Color(0.08, 0.09, 0.12, 0.92)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.92, 0.88, 0.72, 0.5)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="PauseMenu" type="CanvasLayer"]
+process_mode = 3
+layer = 10
+script = ExtResource("1_pause")
+
+[node name="Overlay" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Dim" type="ColorRect" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 0.55)
+
+[node name="Panel" type="Panel" parent="Overlay"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -160.0
+offset_right = 200.0
+offset_bottom = 160.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBox_pausepanel")
+
+[node name="VBox" type="VBoxContainer" parent="Overlay/Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = 28.0
+offset_right = -28.0
+offset_bottom = -28.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="Title" type="Label" parent="Overlay/Panel/VBox"]
+layout_mode = 2
+text = "PAUSED"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
+theme_override_font_sizes/font_size = 48
+
+[node name="ResumeButton" type="Button" parent="Overlay/Panel/VBox"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+text = "Resume"
+theme_override_font_sizes/font_size = 28
+
+[node name="MenuButton" type="Button" parent="Overlay/Panel/VBox"]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+text = "Level Select"
+theme_override_font_sizes/font_size = 28
+
+[node name="Hint" type="Label" parent="Overlay/Panel/VBox"]
+layout_mode = 2
+text = "Esc to resume"
+horizontal_alignment = 1
+theme_override_colors/font_color = Color(0.6, 0.62, 0.68, 1)
+theme_override_font_sizes/font_size = 16
