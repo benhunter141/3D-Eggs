@@ -71,6 +71,7 @@ Attack — Left-Click
 Brace wall — Right-Click / Space
 Swap weapon — Q
 Mount / dismount — E
+Squad — F follow / H hold / G attack-move
 Zoom — Mouse Wheel / + −
 Restart — R"
 theme_override_colors/font_color = Color(0.82, 0.84, 0.88, 1)

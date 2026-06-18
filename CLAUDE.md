@@ -148,7 +148,11 @@ re-settles on it. **AttackMove** advances to a world point, engaging foes within
 route (the same aggro scan MarchMode uses), then holds. The engagement scan anchors on
 `CommandAnchor()` and all re-settle/return motion on a shared `ArriveVelocity(point)`. **Off by
 default** (everyone spawns `Follow`) and resolved AFTER the `MarchMode` branch, so existing levels and
-the football auto-battler are byte-identical. The captain dispatches commands to its squad in Chunk 49.
+the football auto-battler are byte-identical. **The captain dispatches them (M7, Chunk 49):**
+`Player.IssueSquadCommand(mode)` walks the `units` group for allies whose `Captain == this` and sets
+Hold (plant where they stand) / Attack-move (a point `AttackMoveDistance` ahead of the captain's
+facing) / Follow. Reads are scheme-aware (`command_follow`/`command_hold`/`command_attack` actions;
+keys F/H/G or gamepad left-shoulder/d-pad) so co-op captains command their squads independently.
 
 **Mounts (M10, Chunk 28).** A `Mount` (`CharacterBody3D`, NOT a `Unit` — mounts don't fight/take
 damage) joins the `mounts` group. The **Player** owns the `mount` input (read once, so it never
@@ -252,8 +256,9 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; pikeman captain leads a braceable pike wall vs swordmen + bowmen across hand-designed levels (Chunks 11–16).
 - [x] **M5 — Crowds:** `UnitRegistry` + staggered re-scan kill the O(n²) group scans; 50/100 units within the 60 FPS budget (Chunks 17–19). Onslaught balance feel-check pending.
 - [~] **M6 — Deeper pinball physics:** bouncy/transferring knockback + `Bumper` posts + Pinball Arena (Chunks 20–22). Balance feel-check pending.
-- [~] **M7 — Ally commands:** player directs allies (hold / follow / attack-move). Command model on
-  `Ally` (Follow/Hold/AttackMove, off by default) landed (Chunk 48); captain input dispatch next (Chunk 49).
+- [x] **M7 — Ally commands:** player directs allies (hold / follow / attack-move). Command model on
+  `Ally` (Follow/Hold/AttackMove, off by default, Chunk 48) + per-captain input dispatch (Chunk 49).
+  Optional polish (per-ally command HUD marker, attack-move ground reticle) deferred — revisit if asked.
 - [x] **M8 — Camera & visual identity polish:** live zoom bias, googly eyes on every unit, recognizable weapon meshes (Chunks 23–25). Eyes/weapon feel-check pending.
 - [x] **M9 — Weapons & loadouts:** data-driven `WeaponType→WeaponProfile`; `swap_weapon` (Q) cycles spear/sword/axe/mace with distinct reach/damage/knockback/mesh (Chunks 26–27). Archetype balance feel-check pending.
 - [x] **M10 — Mounts:** rideable Donkey + faster Chocobo (mount/dismount via `mount`, mounted combat); both flank the Level 1 spawn (Chunks 28–29). Chocobo-speed feel-check pending.
@@ -559,13 +564,14 @@ so the football auto-battler is untouched too.
   then holds. The leash scan now anchors on `CommandAnchor()` and the arrive logic on a shared
   `ArriveVelocity(point)`. Headless-tested: default is Follow; Hold plants; Attack-move advances; a
   held ally engages a near foe.
-- [ ] **Chunk 49 — Captain issues squad commands.** Player reads scheme-aware command edges
-  (Follow / Hold / Attack-move) and dispatches them to the allies bound to it (its `CaptainPath`
-  squad, or the whole player squad in single-player): **Hold** plants each ally where it stands,
-  **Attack-move** sends them to a point ahead of the captain's facing, **Follow** recalls them to
-  formation. Per-captain (co-op: P1 keys, P2 gamepad) so squads take orders independently. New
-  `command_follow` / `command_hold` / `command_attack` input actions + a small on-screen hint.
-  Headless-test: a captain's command sets each owned ally's mode/target.
+- [x] **Chunk 49 — Captain issues squad commands.** `Player` reads scheme-aware command edges
+  (Follow / Hold / Attack-move) and `IssueSquadCommand` dispatches them to the allies bound to it
+  (`a.Captain == this` — its `CaptainPath` squad, or the whole player squad in single-player):
+  **Hold** plants each ally where it stands, **Attack-move** sends them to a point
+  `AttackMoveDistance` ahead of the captain's facing, **Follow** recalls them to formation.
+  Per-captain (co-op: P1 keys F/H/G, P2 gamepad left-shoulder/d-pad) so squads take orders
+  independently. New `command_follow` / `command_hold` / `command_attack` input actions + a HUD hint
+  line. Headless-tested: a captain's order reaches only its own squad, with the right mode + target.
 
 **(Later — M7 polish, unnumbered for now: a command-state HUD marker over each ally, and an
 attack-move ground-target reticle.)**

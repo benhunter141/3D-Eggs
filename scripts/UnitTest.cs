@@ -58,8 +58,9 @@ public partial class UnitTest : Node3D
 		bool coopCamera = TestCoopCamera();
 		bool coopLose = await TestCoopLose();
 		bool allyCommands = await TestAllyCommands();
+		bool squadCommands = await TestSquadCommands();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1982,6 +1983,76 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: Follow default; Hold plants; Attack-move advances; Hold engages a near foe"
 			: $"FAIL: defaultFollow={defaultFollow}, held={held}, advanced={advanced}, engaged={engaged}");
+		return pass;
+	}
+
+	// Chunk 49 (M7): a captain dispatches commands to ITS OWN squad only. Hold plants each owned ally
+	// where it stands; Attack-move targets a point AttackMoveDistance ahead of the captain's facing;
+	// Follow recalls. An ally bound to a DIFFERENT captain is left untouched (per-captain in co-op).
+	private async Task<bool> TestSquadCommands()
+	{
+		GD.Print("=== UnitTest: captain issues squad commands (Chunk 49) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var capScene = GD.Load<PackedScene>("res://scenes/Captain.tscn");
+		var allyScene = GD.Load<PackedScene>("res://scenes/Ally.tscn");
+
+		var cap = capScene.Instantiate<Player>();
+		cap.AttackMoveDistance = 12f;
+		AddChild(cap);
+		cap.GlobalPosition = Vector3.Zero;        // yaw 0 -> faces -Z
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var mine1 = allyScene.Instantiate<Ally>();
+		mine1.CaptainPath = cap.GetPath();
+		AddChild(mine1);
+		mine1.GlobalPosition = new Vector3(-2f, 0f, 2f);
+		var mine2 = allyScene.Instantiate<Ally>();
+		mine2.CaptainPath = cap.GetPath();
+		AddChild(mine2);
+		mine2.GlobalPosition = new Vector3(2f, 0f, 2f);
+
+		// A second captain + its ally — cap's orders must NOT reach this squad.
+		var other = capScene.Instantiate<Player>();
+		AddChild(other);
+		other.GlobalPosition = new Vector3(40f, 0f, 0f);
+		var theirs = allyScene.Instantiate<Ally>();
+		theirs.CaptainPath = other.GetPath();
+		AddChild(theirs);
+		theirs.GlobalPosition = new Vector3(40f, 0f, 2f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// HOLD: my allies plant where they stand; the other squad is untouched.
+		cap.IssueSquadCommand(Ally.CommandMode.Hold);
+		bool holdMine = mine1.Command == Ally.CommandMode.Hold && mine2.Command == Ally.CommandMode.Hold
+			&& mine1.CommandPoint.DistanceTo(mine1.GlobalPosition) < 0.01f;
+		bool otherUntouched = theirs.Command == Ally.CommandMode.Follow;
+
+		// ATTACK-MOVE: target a point AttackMoveDistance ahead of the captain (-Z at yaw 0).
+		cap.IssueSquadCommand(Ally.CommandMode.AttackMove);
+		Vector3 expect = new Vector3(0f, 0f, -12f);
+		bool attackMine = mine1.Command == Ally.CommandMode.AttackMove
+			&& mine1.CommandPoint.DistanceTo(expect) < 0.5f;
+
+		// FOLLOW: recall to formation.
+		cap.IssueSquadCommand(Ally.CommandMode.Follow);
+		bool followMine = mine1.Command == Ally.CommandMode.Follow && mine2.Command == Ally.CommandMode.Follow;
+
+		GD.Print($"hold: mine={holdMine}, otherUntouched={otherUntouched}; attack pt={mine1.CommandPoint} (ok={attackMine}); follow={followMine}");
+
+		cap.QueueFree();
+		other.QueueFree();
+		mine1.QueueFree();
+		mine2.QueueFree();
+		theirs.QueueFree();
+
+		bool pass = holdMine && otherUntouched && attackMine && followMine;
+		GD.Print(pass
+			? "PASS: a captain's order reaches only its own squad, with the right mode + target"
+			: $"FAIL: holdMine={holdMine}, otherUntouched={otherUntouched}, attackMine={attackMine}, followMine={followMine}");
 		return pass;
 	}
 }

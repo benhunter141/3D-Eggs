@@ -119,6 +119,7 @@ layout_mode = 2
 text = "WASD / Arrows — move captain      Mouse — aim
 Left-Click — attack      Right-Click / Space — brace wall
 Q — swap weapon (spear / sword / axe / mace)      E — mount / dismount
+F / H / G — squad: follow / hold / attack-move
 Mouse Wheel  or  + / −  — zoom      R — restart battle
 Couch Co-op:  P1 = keyboard + mouse      P2 = gamepad (left stick move, right stick aim)"
 horizontal_alignment = 1

@@ -48,9 +48,16 @@ public partial class Player : Unit
 	private const JoyButton MountButton  = JoyButton.B;    // 1
 	private const JoyButton BraceButton  = JoyButton.Back; // 4
 
+	// Squad-command buttons (M7, Chunk 49) — mirror the command_* actions in project.godot so the
+	// explicit schemes match what a single pad already does in Any mode.
+	private const JoyButton CmdFollowButton = JoyButton.LeftShoulder; // 9
+	private const JoyButton CmdHoldButton   = JoyButton.DpadLeft;     // 13
+	private const JoyButton CmdAttackButton = JoyButton.DpadRight;    // 14
+
 	// Prev-frame pressed state for the device-scoped schemes, so a raw "is pressed" bool becomes
 	// a one-frame "just pressed" (the action system gives this for free, but only un-scoped).
 	private bool _attackHeldPrev, _swapHeldPrev, _mountHeldPrev;
+	private bool _cmdFollowPrev, _cmdHoldPrev, _cmdAttackPrev;
 
 	// One weapon's resolved numbers. The Inspector exports below feed these in _Ready so each
 	// weapon stays tunable while the swing code reads a single uniform set.
@@ -154,6 +161,9 @@ public partial class Player : Unit
 	// The captain can climb onto a nearby Mount (Donkey, later Chocobo) to ride faster. While
 	// mounted the player keeps its full move/aim/attack pipeline — only the top Speed changes and
 	// the body is lifted onto the mount's back; the Mount mirrors us underneath as one silhouette.
+	// --- Squad commands (M7, Chunk 49) ---
+	[Export] public float AttackMoveDistance = 12.0f;  // how far ahead of the captain an attack-move order targets
+
 	[Export] public float MountRange = 3.0f;   // how close a mount must be to climb on (the mount's own range can extend this)
 	private Mount _mount;                        // current mount, or null on foot
 	private float _footSpeed;                    // top Speed on foot, restored on dismount
@@ -278,6 +288,41 @@ public partial class Player : Unit
 		GD.Print($"[Player] dismounted {m.Name} (speed -> {Speed:0.0})");
 	}
 
+	// --- Squad commands (Chunk 49) ---
+
+	// Push a command to every Ally that answers to THIS captain (its CaptainPath squad, or the
+	// whole player squad in single-player). Hold plants each ally where it stands; Attack-move sends
+	// them to a point ahead of our facing; Follow recalls them to formation. Public so a headless
+	// test can drive it without faking input.
+	public void IssueSquadCommand(Ally.CommandMode mode)
+	{
+		Vector3 attackTarget = AttackMoveTarget();
+		int n = 0;
+		foreach (Node node in GetTree().GetNodesInGroup("units"))
+		{
+			if (node is not Ally a || a.Captain != this)
+				continue;
+			switch (mode)
+			{
+				case Ally.CommandMode.Hold:       a.HoldAt(a.GlobalPosition); break;   // plant where it stands
+				case Ally.CommandMode.AttackMove: a.AttackMoveTo(attackTarget); break; // push ahead of the captain
+				default:                          a.FollowCaptain(); break;
+			}
+			n++;
+		}
+		GD.Print($"[Player] {Name} commanded squad ({n}): {mode}");
+	}
+
+	// A point AttackMoveDistance metres ahead of the captain's facing (forward is -Z), on the flat
+	// plane — the rally point an attack-move order pushes the squad toward.
+	private Vector3 AttackMoveTarget()
+	{
+		Vector3 fwd = -GlobalTransform.Basis.Z;
+		fwd.Y = 0f;
+		fwd = fwd.LengthSquared() > 0.0001f ? fwd.Normalized() : Vector3.Forward;
+		return GlobalPosition + fwd * AttackMoveDistance;
+	}
+
 	// Load a weapon's profile into the active fields, show its mesh, and resize the thrust
 	// hitbox so its forward length matches the weapon's reach (the box grows out along -Z from
 	// the pivot). Called on spawn and on every swap.
@@ -357,6 +402,11 @@ public partial class Player : Unit
 		// Swap weapons between thrusts (not mid-swing, so the hitbox never resizes live).
 		if (!_swinging && SwapJustPressed())
 			SwapWeapon();
+
+		// Direct the squad (M7): recall to formation / plant a hold / push an attack-move.
+		if (CommandFollowPressed()) IssueSquadCommand(Ally.CommandMode.Follow);
+		if (CommandHoldPressed())   IssueSquadCommand(Ally.CommandMode.Hold);
+		if (CommandAttackPressed()) IssueSquadCommand(Ally.CommandMode.AttackMove);
 
 		UpdateSwing(dt);
 	}
@@ -563,6 +613,28 @@ public partial class Player : Unit
 		ControlScheme.KeyboardMouse => Input.IsMouseButtonPressed(MouseButton.Right) || Input.IsPhysicalKeyPressed(Key.Space),
 		ControlScheme.Gamepad       => Input.IsJoyButtonPressed(DeviceId, BraceButton),
 		_                           => Input.IsActionPressed("brace"),
+	};
+
+	// Squad-command edges (M7, Chunk 49): F / H / G (keyboard) or left-shoulder / d-pad (gamepad).
+	public bool CommandFollowPressed() => Control switch
+	{
+		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.F), ref _cmdFollowPrev),
+		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CmdFollowButton), ref _cmdFollowPrev),
+		_                           => Input.IsActionJustPressed("command_follow"),
+	};
+
+	public bool CommandHoldPressed() => Control switch
+	{
+		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.H), ref _cmdHoldPrev),
+		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CmdHoldButton), ref _cmdHoldPrev),
+		_                           => Input.IsActionJustPressed("command_hold"),
+	};
+
+	public bool CommandAttackPressed() => Control switch
+	{
+		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.G), ref _cmdAttackPrev),
+		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CmdAttackButton), ref _cmdAttackPrev),
+		_                           => Input.IsActionJustPressed("command_attack"),
 	};
 
 	// WASD / arrows as a normalized-ish move vector (KeyboardMouse scheme — keyboard only, so a

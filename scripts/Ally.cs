@@ -71,6 +71,10 @@ public partial class Ally : Unit
 	private Node3D _player;
 	private float _attackTimer; // counts down; > 0 blocks the next fist hit
 
+	// The captain this ally answers to (resolved in _Ready from CaptainPath or the player group).
+	// A captain reads this to dispatch commands only to ITS own squad (M7, Chunk 49).
+	public Node3D Captain => _player;
+
 	public override void _Ready()
 	{
 		Team = TeamId.Player;   // allies fight on the player's side
