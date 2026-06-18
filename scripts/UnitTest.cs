@@ -55,8 +55,9 @@ public partial class UnitTest : Node3D
 		bool deckTuning = TestDeckTuning();
 		bool stickAim = TestStickAim();
 		bool squadOwnership = await TestSquadOwnership();
+		bool coopCamera = TestCoopCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1787,6 +1788,68 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: an ally with CaptainPath follows that captain's slot, not the group head"
 			: $"FAIL: slotOnB={slotOnB}, notOnA={notOnA}, formedOnB={formedOnB}");
+		return pass;
+	}
+
+	// Chunk 46 (M12.7): the shared two-captain camera. With a single Target the focus is that
+	// target (single-player path, unchanged); set a second target and the focus becomes the
+	// MIDPOINT of both, while the dynamic-zoom distance GROWS as the captains pull apart (half
+	// their separation feeds the framing spread, so both stay in shot). Pure math on
+	// FollowCamera.FocusPoint / HalfSeparation / DesiredDistance — no tree or input needed.
+	private bool TestCoopCamera()
+	{
+		GD.Print("=== UnitTest: shared two-captain camera (Chunk 46) ===");
+
+		// Parameters chosen so the framing growth stays well inside [Min, Max] (no clamp masking it).
+		var cam = new FollowCamera
+		{
+			DynamicZoom = true,
+			MinDistance = 10f, MaxDistance = 80f,
+			FitScale = 1.5f, ZoomMargin = 10f,
+		};
+		// In the tree so the captains' GlobalPosition resolves; the test is synchronous (no physics
+		// frame awaited) so the camera's _PhysicsProcess never runs before everything is freed.
+		AddChild(cam);
+		var capA = new Node3D();
+		var capB = new Node3D();
+		AddChild(capA);
+		AddChild(capB);
+
+		// Single target only: focus is exactly that target, and HalfSeparation is 0.
+		cam.Target = capA;
+		cam.Target2 = null;
+		capA.GlobalPosition = new Vector3(4f, 0f, -3f);
+		bool soloFocus = cam.FocusPoint().DistanceTo(capA.GlobalPosition) < 0.001f;
+		bool soloNoSep = Mathf.IsZeroApprox(cam.HalfSeparation());
+		GD.Print($"solo: focus={cam.FocusPoint()} (onTarget={soloFocus}), halfSep={cam.HalfSeparation():0.00} (zero={soloNoSep})");
+
+		// Two targets: focus is their midpoint.
+		cam.Target2 = capB;
+		capA.GlobalPosition = new Vector3(-5f, 0f, 0f);
+		capB.GlobalPosition = new Vector3(5f, 0f, 0f);          // 10 m apart -> midpoint at origin, halfSep 5
+		Vector3 mid = cam.FocusPoint();
+		bool midpointOk = mid.DistanceTo(Vector3.Zero) < 0.001f;
+		bool halfSepOk = Mathf.IsEqualApprox(cam.HalfSeparation(), 5f, 0.01f);
+		float nearDist = cam.DesiredDistance(cam.HalfSeparation());   // 5*1.5 + 10 = 17.5
+		GD.Print($"close: focus={mid} (midpoint={midpointOk}), halfSep={cam.HalfSeparation():0.00} (ok={halfSepOk}), dist={nearDist:0.0}");
+
+		// Pull the captains apart: the framing distance must GROW (more spread to cover).
+		capA.GlobalPosition = new Vector3(-20f, 0f, 0f);
+		capB.GlobalPosition = new Vector3(20f, 0f, 0f);        // 40 m apart -> halfSep 20
+		Vector3 mid2 = cam.FocusPoint();
+		bool stillMidpoint = mid2.DistanceTo(Vector3.Zero) < 0.001f;
+		float farDist = cam.DesiredDistance(cam.HalfSeparation());   // 20*1.5 + 10 = 40
+		bool grew = farDist > nearDist;
+		GD.Print($"apart: halfSep={cam.HalfSeparation():0.00}, dist={farDist:0.0} (grew={grew}, stillMidpoint={stillMidpoint})");
+
+		cam.Free();
+		capA.Free();
+		capB.Free();
+
+		bool pass = soloFocus && soloNoSep && midpointOk && halfSepOk && stillMidpoint && grew;
+		GD.Print(pass
+			? "PASS: two targets focus on their midpoint and the camera pulls back as they separate"
+			: $"FAIL: soloFocus={soloFocus}, soloNoSep={soloNoSep}, midpoint={midpointOk}, halfSep={halfSepOk}, stillMidpoint={stillMidpoint}, grew={grew}");
 		return pass;
 	}
 }

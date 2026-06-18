@@ -17,9 +17,15 @@ using System.Collections.Generic;
 // camera out or push it in WITHOUT turning auto-zoom off. The bias is added to the base
 // distance and the result is clamped, so in DynamicZoom mode the auto framing keeps
 // working, just shifted by the player's preference.
+// TWO-TARGET MODE (Chunk 46, M12.7): for couch co-op the camera frames BOTH captains. Set
+// Target2 and the camera centres on the MIDPOINT of the two and grows its distance to keep
+// both (plus the crowd spread) in shot, reusing the dynamic-zoom fit — half the captains'
+// separation feeds the same framing spread as a flung unit. Leaving Target2 null is the
+// classic single-target path, byte-for-byte unchanged, so every other level is untouched.
 public partial class FollowCamera : Camera3D
 {
 	[Export] public Node3D Target;                            // the player to follow
+	[Export] public Node3D Target2;                           // optional 2nd captain (co-op); null = single-target
 	[Export] public Vector3 Offset = new Vector3(0, 13, 14);  // up & back from target; also sets the view ANGLE
 	[Export] public float FollowLerp = 12.0f;                 // higher = snappier position follow
 	[Export] public float FieldOfView = 80.0f;                // wider = more ground visible (but >85 starts to stretch the edges)
@@ -73,11 +79,14 @@ public partial class FollowCamera : Camera3D
 		if (Input.IsActionJustPressed("zoom_out"))
 			StepZoom(+1f);
 
+		// Centre on the focus point: the single target, or the midpoint of both captains in co-op.
+		Vector3 focus = FocusPoint();
+
 		// Decide how far back to sit this frame.
 		float distance;
 		if (DynamicZoom)
 		{
-			float spread = FarthestTrackedUnit(Target.GlobalPosition);
+			float spread = FramingSpread(focus);
 			float zt = 1f - Mathf.Exp(-ZoomLerp * (float)delta);
 			_currentDistance = Mathf.Lerp(_currentDistance, DesiredDistance(spread), zt);
 			distance = _currentDistance;
@@ -88,14 +97,42 @@ public partial class FollowCamera : Camera3D
 			distance = DesiredDistance(0f);
 		}
 
-		Vector3 desiredPos = Target.GlobalPosition + _offsetDir * distance;
+		Vector3 desiredPos = focus + _offsetDir * distance;
 		// Frame-rate-independent smoothing toward the desired spot.
 		float t = 1f - Mathf.Exp(-FollowLerp * (float)delta);
 		GlobalPosition = GlobalPosition.Lerp(desiredPos, t);
 
-		// Always aim at the target — keeps it centered for any distance/angle.
-		LookAt(Target.GlobalPosition, Vector3.Up);
+		// Always aim at the focus — keeps it centered for any distance/angle.
+		LookAt(focus, Vector3.Up);
 	}
+
+	// The point the camera centres on: the lone Target, or the MIDPOINT of both captains when a
+	// valid Target2 is set (co-op). Pure read of the targets' positions.
+	public Vector3 FocusPoint()
+	{
+		if (HasTwoTargets())
+			return (Target.GlobalPosition + Target2.GlobalPosition) * 0.5f;
+		return Target.GlobalPosition;
+	}
+
+	// Half the distance between the two captains (0 in single-target mode). That's how far each
+	// captain sits from the focus midpoint, so feeding it into the framing spread guarantees the
+	// frame opens up enough to keep BOTH on screen as they split apart.
+	public float HalfSeparation()
+	{
+		return HasTwoTargets()
+			? Target.GlobalPosition.DistanceTo(Target2.GlobalPosition) * 0.5f
+			: 0f;
+	}
+
+	private bool HasTwoTargets() =>
+		Target != null && Target2 != null && IsInstanceValid(Target) && IsInstanceValid(Target2);
+
+	// The spread that drives the dynamic-zoom distance this frame: the LARGER of the farthest
+	// tracked unit from the focus and half the captains' separation — so in co-op the camera
+	// pulls back to fit both captains even when no unit is flung wide. Single-target: just the units.
+	public float FramingSpread(Vector3 focus) =>
+		Mathf.Max(FarthestTrackedUnit(focus), HalfSeparation());
 
 	// Nudge the live player bias by `direction` steps (negative = zoom IN, positive = OUT),
 	// clamped to [ZoomBiasMin, ZoomBiasMax]. Pure state change — safe to call headless.

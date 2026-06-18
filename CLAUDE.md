@@ -259,8 +259,8 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [~] **M12.7 — Two-player couch co-op ⭐:** a local same-screen 2-player level — P1 on keyboard+mouse,
       P2 on gamepad — each captain leads 6 pikemen + 2 bowmen, fighting a shared AI enemy force; one
       shared camera frames both captains; lose only when BOTH captains fall. Per-captain control schemes +
-      controller aim + squad ownership landed (Chunks 44–45); shared camera / scene next (Chunks 46–47). Removes
-      the first four levels from the menu. *Local* couch co-op — NOT the networked M13.
+      controller aim + squad ownership + the shared two-captain camera landed (Chunks 44–46); co-op scene next
+      (Chunk 47). Removes the first four levels from the menu. *Local* couch co-op — NOT the networked M13.
 - [ ] **M13 — Multiplayer:** 2 players over the network, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -516,7 +516,7 @@ captain, single-target camera, lose-on-player-death) must behave EXACTLY as they
   (NodePath export); when set, the ally resolves its captain from it and anchors slot + facing to
   that captain; unset = today's first-`player`-group behavior. **Headless-test:** an ally with an
   explicit captain follows that captain's slot, not another captain's.
-- [ ] **Chunk 46 — Shared two-player camera.** Give `FollowCamera` an optional second target
+- [x] **Chunk 46 — Shared two-player camera.** Give `FollowCamera` an optional second target
   (`Target2`); when set, center on the **midpoint** of both captains and size the distance to keep
   both (plus crowd spread) framed, reusing the dynamic-zoom fit. Single-target path unchanged.
   **Headless-test:** with two targets the focus point is their midpoint and the distance grows as
