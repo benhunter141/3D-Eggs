@@ -256,7 +256,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
       smaller fully on-screen field with two endzones; deploy units in your endzone and they
       march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43, all done).
-- [ ] **M12.7 — Two-player couch co-op ⭐:** a local same-screen 2-player level — P1 on keyboard+mouse,
+- [~] **M12.7 — Two-player couch co-op ⭐:** a local same-screen 2-player level — P1 on keyboard+mouse,
       P2 on gamepad — each captain leads 6 pikemen + 2 bowmen, fighting a shared AI enemy force; one
       shared camera frames both captains; lose only when BOTH captains fall (Chunks 44–47). Removes the
       first four levels from the menu. *Local* couch co-op — NOT the networked M13.
@@ -504,7 +504,7 @@ captain, single-target camera, lose-on-player-death) must behave EXACTLY as they
   (co-op scene), LOSE fires only once EVERY `player`-group captain is dead/gone; WIN is unchanged
   (all enemies cleared).
 
-- [ ] **Chunk 44 — Per-captain control schemes + controller aim.** Add `Player.ControlScheme`
+- [x] **Chunk 44 — Per-captain control schemes + controller aim.** Add `Player.ControlScheme`
   (`Any`|`KeyboardMouse`|`Gamepad`) + `DeviceId`, default `Any` = current behavior. Route move /
   aim / attack / brace / swap / mount / zoom through scheme-aware reads: `Gamepad` uses left stick
   to move, **right stick to aim** (turn toward the stick direction, rate-limited like the mouse

@@ -38,6 +38,31 @@ public partial class Player : Unit
 	[Export] public float Friction = 50.0f;     // how fast we slow to a stop
 	[Export] public float TurnSpeed = 480.0f;   // max aim turn rate (deg/s) — caps how fast we (and the phalanx) can pivot
 
+	// --- Control scheme (M12.7, Chunk 44) ---
+	// Which input device(s) drive this captain. `Any` (default) is today's blended read —
+	// keyboard+gamepad move via the action map, mouse aims — so every existing single-player level
+	// is untouched. The two-player couch level (M12.7) sets one captain to `KeyboardMouse` and the
+	// other to `Gamepad` (with a `DeviceId`) so the two read DIFFERENT, isolated devices: the
+	// keyboard captain ignores the pad and vice-versa, and the gamepad captain aims with its RIGHT
+	// STICK instead of the (shared) mouse cursor. Buttons are read per-scheme too — the gamepad
+	// captain off its own pad, the keyboard captain off mouse/keys — so one player's press can't
+	// trip the other's action.
+	public enum Scheme { Any, KeyboardMouse, Gamepad }
+	[Export] public Scheme ControlScheme = Scheme.Any;
+	[Export] public int DeviceId = 0;            // (Gamepad) which joypad device this captain reads
+	[Export] public float StickDeadzone = 0.2f;  // (Gamepad) ignore left/right stick inside this radius
+
+	// Gamepad button indices, matching the joypad events bound to each action in project.godot's
+	// input map (so the per-device reads line up with what `Any` reads through the action map).
+	private const JoyButton AttackButton = (JoyButton)7;
+	private const JoyButton SwapButton   = (JoyButton)2;
+	private const JoyButton MountButton  = (JoyButton)1;
+	private const JoyButton BraceButton  = (JoyButton)4;
+
+	// Edge-detection for the device-specific (gamepad/keyboard) button reads, which — unlike the
+	// action map's IsActionJustPressed — have no built-in just-pressed tracking. Keyed per action.
+	private readonly Dictionary<string, bool> _buttonEdge = new();
+
 	// --- Weapon loadout (Chunk 26) ---
 	[Export] public WeaponType StartingWeapon = WeaponType.Spear;  // which weapon the captain spawns holding (per-level default)
 
@@ -293,9 +318,10 @@ public partial class Player : Unit
 			return;
 		}
 
-		// GetVector auto-normalizes, so diagonals aren't faster.
-		// Screen-up (W) maps to -Z (away from the camera).
-		Vector2 input = Input.GetVector("move_left", "move_right", "move_up", "move_down");
+		// Read movement per control scheme (blended action map / keyboard-only / a specific pad's
+		// left stick). Auto-normalized so diagonals aren't faster; screen-up maps to -Z (away from
+		// the camera).
+		Vector2 input = ReadMove();
 		Vector3 direction = new Vector3(input.X, 0f, input.Y);
 
 		// Keep tracking intended input velocity every frame (no special "shoved" branch). When a
@@ -315,28 +341,34 @@ public partial class Player : Unit
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // captain bounces off walls/bumpers/units like everyone else
 
-		AimAtMouse(dt);
+		Aim(dt);   // mouse cursor, or (Gamepad) the right stick
 
-		// Climb onto / off a nearby mount (read once here so it never double-fires across mounts).
-		if (Input.IsActionJustPressed("mount"))
+		// Poll the per-frame button reads up front so the gamepad/keyboard edge state stays current
+		// even on frames the press is gated out below (e.g. mid-swing). Mount is read once here so
+		// it never double-fires across mounts.
+		bool mountPressed = MountPressed();
+		bool swapPressed = SwapPressed();
+		bool attackPressed = AttackPressed();
+
+		if (mountPressed)
 			ToggleMount();
 
 		// Swap weapons between thrusts (not mid-swing, so the hitbox never resizes live).
-		if (!_swinging && Input.IsActionJustPressed("swap_weapon"))
+		if (!_swinging && swapPressed)
 			SwapWeapon();
 
-		UpdateSwing(dt);
+		UpdateSwing(dt, attackPressed);
 	}
 
 	// Drive the thrust state machine: trigger on attack, jab the pike straight out
 	// along our facing and retract it over a timed window, keep the hitbox live during
 	// the lunge, then cool down.
-	private void UpdateSwing(float dt)
+	private void UpdateSwing(float dt, bool attackPressed)
 	{
 		if (_cooldownTimer > 0f)
 			_cooldownTimer -= dt;
 
-		if (!_swinging && _cooldownTimer <= 0f && Input.IsActionJustPressed("attack"))
+		if (!_swinging && _cooldownTimer <= 0f && attackPressed)
 			StartSwing();
 
 
@@ -421,12 +453,19 @@ public partial class Player : Unit
 		GD.Print("[Player] GAME OVER");
 	}
 
+	// Aim per control scheme: the gamepad captain turns toward its RIGHT STICK, everyone else toward
+	// the mouse cursor. Both feed the same rate-limited TurnTowardYaw so the feel is identical.
+	private void Aim(float dt)
+	{
+		if (ControlScheme == Scheme.Gamepad)
+			AimWithStick(dt);
+		else
+			AimAtMouse(dt);
+	}
+
 	// Rotate the player toward the mouse cursor. We shoot a ray from the camera
 	// through the cursor and intersect it with the horizontal plane at the player's
-	// height, then turn toward that point (forward is -Z). The turn is RATE-LIMITED
-	// to TurnSpeed (deg/s) rather than snapping with LookAt: a real captain can't
-	// pivot instantly, and because the phalanx's slots rotate with our facing, an
-	// instant snap would whip the whole wall around in a single frame.
+	// height, then turn toward that point (forward is -Z).
 	private void AimAtMouse(float dt)
 	{
 		Camera3D cam = GetViewport().GetCamera3D();
@@ -454,8 +493,27 @@ public partial class Player : Unit
 		// Desired yaw toward the cursor (forward is -Z, so negate the delta).
 		Vector3 toTarget = target - GlobalPosition;
 		float desiredYaw = Mathf.Atan2(-toTarget.X, -toTarget.Z);
+		TurnTowardYaw(desiredYaw, dt);
+	}
 
-		// Step toward it by at most TurnSpeed*dt this frame, taking the shortest way around.
+	// Rotate the player toward this pad's right stick (directional aim, no cursor). The stick
+	// vector → desired yaw lives in the pure CaptainInput helper; a resting stick (inside the
+	// deadzone) leaves our facing as-is.
+	private void AimWithStick(float dt)
+	{
+		Vector2 stick = new Vector2(
+			Input.GetJoyAxis(DeviceId, JoyAxis.RightX),
+			Input.GetJoyAxis(DeviceId, JoyAxis.RightY));
+		if (CaptainInput.TryStickToYaw(stick, StickDeadzone, out float desiredYaw))
+			TurnTowardYaw(desiredYaw, dt);
+	}
+
+	// Step our yaw toward `desiredYaw` by at most TurnSpeed*dt this frame, the shortest way around.
+	// The turn is RATE-LIMITED rather than snapping with LookAt: a real captain can't pivot
+	// instantly, and because the phalanx's slots rotate with our facing, an instant snap would whip
+	// the whole wall around in a single frame.
+	private void TurnTowardYaw(float desiredYaw, float dt)
+	{
 		float maxStep = Mathf.DegToRad(TurnSpeed) * dt;
 		float diff = Mathf.Wrap(desiredYaw - Rotation.Y, -Mathf.Pi, Mathf.Pi);
 		diff = Mathf.Clamp(diff, -maxStep, maxStep);
@@ -463,5 +521,81 @@ public partial class Player : Unit
 		Vector3 rot = Rotation;
 		rot.Y += diff;
 		Rotation = rot;
+	}
+
+	// --- Scheme-aware input reads (Chunk 44) ---
+
+	// Movement vector for this scheme: blended action map (Any), keyboard-only (KeyboardMouse), or
+	// a specific pad's left stick (Gamepad). All auto-normalized so diagonals aren't faster.
+	private Vector2 ReadMove()
+	{
+		switch (ControlScheme)
+		{
+			case Scheme.Gamepad:
+				return CaptainInput.DeadzoneStick(
+					new Vector2(Input.GetJoyAxis(DeviceId, JoyAxis.LeftX),
+						Input.GetJoyAxis(DeviceId, JoyAxis.LeftY)),
+					StickDeadzone);
+			case Scheme.KeyboardMouse:
+				return ReadKeyboardMove();
+			default:
+				return Input.GetVector("move_left", "move_right", "move_up", "move_down");
+		}
+	}
+
+	// Keyboard-only movement (WASD + arrows), bypassing the action map so a co-op keyboard captain
+	// never picks up the other player's gamepad. Normalized so diagonals match the action read.
+	private static Vector2 ReadKeyboardMove()
+	{
+		float x = (Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right) ? 1f : 0f)
+				- (Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left) ? 1f : 0f);
+		float y = (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down) ? 1f : 0f)
+				- (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up) ? 1f : 0f);
+		Vector2 v = new Vector2(x, y);
+		return v.LengthSquared() > 1f ? v.Normalized() : v;
+	}
+
+	// Just-pressed reads, isolated per scheme: the gamepad captain off its own pad button, the
+	// keyboard captain off mouse/keys, and Any through the shared action map (its own edge
+	// tracking). The device-specific paths edge-detect via _buttonEdge since IsJoyButtonPressed /
+	// IsPhysicalKeyPressed report a held state, not a press.
+	private bool AttackPressed() => ControlScheme switch
+	{
+		Scheme.Gamepad => Edge("attack", Input.IsJoyButtonPressed(DeviceId, AttackButton)),
+		Scheme.KeyboardMouse => Edge("attack", Input.IsMouseButtonPressed(MouseButton.Left)),
+		_ => Input.IsActionJustPressed("attack"),
+	};
+
+	private bool SwapPressed() => ControlScheme switch
+	{
+		Scheme.Gamepad => Edge("swap", Input.IsJoyButtonPressed(DeviceId, SwapButton)),
+		Scheme.KeyboardMouse => Edge("swap", Input.IsPhysicalKeyPressed(Key.Q)),
+		_ => Input.IsActionJustPressed("swap_weapon"),
+	};
+
+	private bool MountPressed() => ControlScheme switch
+	{
+		Scheme.Gamepad => Edge("mount", Input.IsJoyButtonPressed(DeviceId, MountButton)),
+		Scheme.KeyboardMouse => Edge("mount", Input.IsPhysicalKeyPressed(Key.E)),
+		_ => Input.IsActionJustPressed("mount"),
+	};
+
+	// HELD read for the pike-wall brace, consumed by this captain's squad allies (Chunk 45) so each
+	// wall braces off ITS captain's device. Scheme-aware like the rest; the squad's existing global
+	// `brace` action read still serves the single-captain levels.
+	public bool IsBracing() => ControlScheme switch
+	{
+		Scheme.Gamepad => Input.IsJoyButtonPressed(DeviceId, BraceButton),
+		Scheme.KeyboardMouse => Input.IsMouseButtonPressed(MouseButton.Right) || Input.IsPhysicalKeyPressed(Key.Space),
+		_ => Input.IsActionPressed("brace"),
+	};
+
+	// Rising-edge detector for a device-specific button: true only on the frame `now` goes
+	// false→true. Must be polled every frame per key to stay current (the callers do).
+	private bool Edge(string key, bool now)
+	{
+		bool was = _buttonEdge.TryGetValue(key, out bool prev) && prev;
+		_buttonEdge[key] = now;
+		return now && !was;
 	}
 }

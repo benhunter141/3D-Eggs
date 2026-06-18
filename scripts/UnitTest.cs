@@ -53,8 +53,9 @@ public partial class UnitTest : Node3D
 		bool endzone = TestEndzone();
 		bool march = await TestMarch();
 		bool deckTuning = TestDeckTuning();
+		bool controlScheme = await TestControlScheme();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && controlScheme
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1692,6 +1693,55 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: a march-mode unit advances with no foe near, and breaks off to engage one in aggro range"
 			: $"FAIL: advanced={advanced}, movedToFoe={movedToFoe}, damagedFoe={damagedFoe}");
+		return pass;
+	}
+
+	// Chunk 44 (M12.7): per-captain control schemes + controller aim. Two checks:
+	// (a) the pure right-stick → world-yaw helper resolves to the correct facing, matching the
+	//     mouse-aim convention (forward = −Z, yaw 0), and reports "no input" inside the deadzone;
+	// (b) the default `Any` scheme still drives the captain through the blended action map — pressing
+	//     move_right walks it +X, exactly as before this chunk — so single-player levels are untouched.
+	private async Task<bool> TestControlScheme()
+	{
+		GD.Print("=== UnitTest: control schemes + stick aim (Chunk 44) ===");
+
+		// (a) Pure stick→yaw math. Stick up (0,−1) faces −Z (yaw 0); right (1,0) faces +X (yaw −π/2,
+		// matching mouse-aim's Atan2(−x,−z)); down (0,1) faces +Z (yaw π). Deadzone returns false.
+		const float tol = 0.001f;
+		bool upOk = CaptainInput.TryStickToYaw(new Vector2(0f, -1f), 0.2f, out float yUp) && Mathf.Abs(yUp) < tol;
+		bool rightOk = CaptainInput.TryStickToYaw(new Vector2(1f, 0f), 0.2f, out float yRight)
+			&& Mathf.IsEqualApprox(yRight, -Mathf.Pi / 2f, tol);
+		bool downOk = CaptainInput.TryStickToYaw(new Vector2(0f, 1f), 0.2f, out float yDown)
+			&& Mathf.IsEqualApprox(Mathf.Abs(yDown), Mathf.Pi, tol);
+		bool deadzoneOk = !CaptainInput.TryStickToYaw(new Vector2(0.1f, 0f), 0.2f, out _);
+		GD.Print($"stick→yaw: up={yUp:0.000}(ok={upOk}), right={yRight:0.000}(ok={rightOk}), " +
+			$"down={yDown:0.000}(ok={downOk}), deadzone refused={deadzoneOk}");
+
+		// (b) `Any` scheme still reads the blended action map. Drive the real Captain with move_right
+		// and confirm it walks +X (the unchanged single-player path).
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(cap);
+		cap.GlobalPosition = Vector3.Zero;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool defaultIsAny = cap.ControlScheme == Player.Scheme.Any;
+
+		float startX = cap.GlobalPosition.X;
+		Input.ActionPress("move_right");
+		for (int i = 0; i < 30; i++)   // ~0.5 s
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		Input.ActionRelease("move_right");
+		float movedX = cap.GlobalPosition.X;
+		bool anyMoves = movedX > startX + 0.5f;
+		GD.Print($"Any scheme (default={defaultIsAny}): move_right walked x {startX:0.00}->{movedX:0.00} (moved={anyMoves})");
+
+		bool pass = upOk && rightOk && downOk && deadzoneOk && defaultIsAny && anyMoves;
+		GD.Print(pass
+			? "PASS: right-stick vector resolves to the right facing yaw, and the default Any scheme still reads the blended path"
+			: $"FAIL: upOk={upOk}, rightOk={rightOk}, downOk={downOk}, deadzone={deadzoneOk}, defaultAny={defaultIsAny}, anyMoves={anyMoves}");
 		return pass;
 	}
 }
