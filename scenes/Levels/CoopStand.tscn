@@ -1,4 +1,4 @@
-[gd_scene load_steps=28 format=3 uid="uid://b3degg0coopstand"]
+[gd_scene load_steps=37 format=3 uid="uid://b3degg0coopstand"]
 
 [ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="1_camera"]
 [ext_resource type="PackedScene" path="res://scenes/Captain.tscn" id="2_captain"]
@@ -73,6 +73,39 @@ size = Vector3(2, 1.2, 1.6)
 [sub_resource type="SphereMesh" id="SphereMesh_egg"]
 radius = 0.7
 height = 1.4
+
+[sub_resource type="StandardMaterial3D" id="Mat_coop"]
+albedo_color = Color(0.56, 0.21, 0.16, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Mat_roof"]
+albedo_color = Color(0.3, 0.3, 0.34, 1)
+roughness = 0.8
+
+[sub_resource type="StandardMaterial3D" id="Mat_doorDark"]
+albedo_color = Color(0.08, 0.07, 0.06, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_water"]
+transparency = 1
+albedo_color = Color(0.2, 0.46, 0.7, 0.65)
+roughness = 0.2
+metallic = 0.3
+
+[sub_resource type="BoxMesh" id="BoxMesh_coopBody"]
+size = Vector3(3, 2, 2.4)
+
+[sub_resource type="PrismMesh" id="PrismMesh_coopRoof"]
+size = Vector3(3.4, 1.3, 2.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_coopDoor"]
+size = Vector3(0.9, 1.1, 0.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_troughOuter"]
+size = Vector3(3, 0.8, 1.2)
+
+[sub_resource type="BoxMesh" id="BoxMesh_troughWater"]
+size = Vector3(2.6, 0.25, 0.85)
 
 [node name="CoopStand" type="Node3D"]
 
@@ -194,6 +227,37 @@ surface_material_override/0 = SubResource("Mat_egg")
 transform = Transform3D(1, 0, 0, 0, 1.25, 0, 0, 0, 1, 14, 0.88, -3)
 mesh = SubResource("SphereMesh_egg")
 surface_material_override/0 = SubResource("Mat_egg")
+
+[node name="ChickenCoop" type="Node3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13, 0, 12.5)
+
+[node name="Body" type="MeshInstance3D" parent="Decor/ChickenCoop"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+mesh = SubResource("BoxMesh_coopBody")
+surface_material_override/0 = SubResource("Mat_coop")
+
+[node name="Roof" type="MeshInstance3D" parent="Decor/ChickenCoop"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.65, 0)
+mesh = SubResource("PrismMesh_coopRoof")
+surface_material_override/0 = SubResource("Mat_roof")
+
+[node name="Door" type="MeshInstance3D" parent="Decor/ChickenCoop"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 1.3)
+mesh = SubResource("BoxMesh_coopDoor")
+surface_material_override/0 = SubResource("Mat_doorDark")
+
+[node name="WaterTrough" type="Node3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13, 0, 12.5)
+
+[node name="Outer" type="MeshInstance3D" parent="Decor/WaterTrough"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+mesh = SubResource("BoxMesh_troughOuter")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="Water" type="MeshInstance3D" parent="Decor/WaterTrough"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72, 0)
+mesh = SubResource("BoxMesh_troughWater")
+surface_material_override/0 = SubResource("Mat_water")
 
 [node name="Captain1" parent="." instance=ExtResource("2_captain")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1, 11)
