@@ -256,11 +256,12 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **M12.5 — Endzone auto-battler reshape:** reshape Slay the Eggs into a football pitch —
       smaller fully on-screen field with two endzones; deploy units in your endzone and they
       march toward the enemy endzone unless aggro'd; 5 s turns; unit-heavy starter deck (Chunks 40–43, all done).
-- [~] **M12.7 — Two-player couch co-op ⭐:** a local same-screen 2-player level — P1 on keyboard+mouse,
+- [x] **M12.7 — Two-player couch co-op ⭐:** a local same-screen 2-player level — P1 on keyboard+mouse,
       P2 on gamepad — each captain leads 6 pikemen + 2 bowmen, fighting a shared AI enemy force; one
       shared camera frames both captains; lose only when BOTH captains fall. Per-captain control schemes +
-      controller aim + squad ownership + the shared two-captain camera landed (Chunks 44–46); co-op scene next
-      (Chunk 47). Removes the first four levels from the menu. *Local* couch co-op — NOT the networked M13.
+      controller aim + squad ownership + the shared two-captain camera (Chunks 44–46) + the `CoopStand`
+      scene with the both-captains-fall lose rule (Chunk 47). Removed the first four levels from the menu.
+      *Local* couch co-op — NOT the networked M13. Feel-check pending (needs a gamepad for P2).
 - [ ] **M13 — Multiplayer:** 2 players over the network, server-authoritative. Hardest, last.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -521,7 +522,7 @@ captain, single-target camera, lose-on-player-death) must behave EXACTLY as they
   both (plus crowd spread) framed, reusing the dynamic-zoom fit. Single-target path unchanged.
   **Headless-test:** with two targets the focus point is their midpoint and the distance grows as
   they separate.
-- [ ] **Chunk 47 — Co-op level scene + co-op lose rule + menu.** Build
+- [x] **Chunk 47 — Co-op level scene + co-op lose rule + menu.** Build
   `scenes/Levels/CoopStand.tscn`: two captains (P1 `KeyboardMouse`, P2 `Gamepad` device 0), each
   leading **6 Pikemen + 2 bowmen** (friendly archers — re-team a Bowman to the player side or use
   a bow-skinned ranged `Ally`, whichever keeps squad cohesion) wired to their captain via

@@ -67,47 +67,11 @@ size_flags_vertical = 3
 theme_override_constants/separation = 12
 alignment = 1
 
-[node name="Level1Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
-custom_minimum_size = Vector2(440, 58)
-layout_mode = 2
-size_flags_horizontal = 4
-text = "1.  Hold the Line"
-theme_override_font_sizes/font_size = 28
-script = ExtResource("1_btn")
-ScenePath = "res://scenes/Levels/Level1_HoldTheLine.tscn"
-
-[node name="Level2Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
-custom_minimum_size = Vector2(440, 58)
-layout_mode = 2
-size_flags_horizontal = 4
-text = "2.  Pincer"
-theme_override_font_sizes/font_size = 28
-script = ExtResource("1_btn")
-ScenePath = "res://scenes/Levels/Level2_Pincer.tscn"
-
-[node name="Level3Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
-custom_minimum_size = Vector2(440, 58)
-layout_mode = 2
-size_flags_horizontal = 4
-text = "3.  Arrow Storm"
-theme_override_font_sizes/font_size = 28
-script = ExtResource("1_btn")
-ScenePath = "res://scenes/Levels/Level3_ArrowStorm.tscn"
-
-[node name="Level4Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
-custom_minimum_size = Vector2(440, 58)
-layout_mode = 2
-size_flags_horizontal = 4
-text = "4.  Onslaught"
-theme_override_font_sizes/font_size = 28
-script = ExtResource("1_btn")
-ScenePath = "res://scenes/Levels/Level4_Onslaught.tscn"
-
 [node name="Level5Button" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
 size_flags_horizontal = 4
-text = "5.  Pinball Arena"
+text = "1.  Pinball Arena"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Level5_PinballArena.tscn"
@@ -116,7 +80,7 @@ ScenePath = "res://scenes/Levels/Level5_PinballArena.tscn"
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
 size_flags_horizontal = 4
-text = "6.  King of the Hill"
+text = "2.  King of the Hill"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/KingOfTheHill.tscn"
@@ -125,10 +89,19 @@ ScenePath = "res://scenes/Levels/KingOfTheHill.tscn"
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
 size_flags_horizontal = 4
-text = "7.  Slay the Eggs  (WIP)"
+text = "3.  Slay the Eggs  (WIP)"
 theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Cards/CardBattle.tscn"
+
+[node name="CoopButton" type="Button" parent="Margin/VBox/LevelScroll/LevelList"]
+custom_minimum_size = Vector2(440, 58)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "4.  Couch Co-op  (2P)"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")
+ScenePath = "res://scenes/Levels/CoopStand.tscn"
 
 [node name="ControlsSpacer" type="Control" parent="Margin/VBox"]
 custom_minimum_size = Vector2(0, 12)
@@ -146,7 +119,8 @@ layout_mode = 2
 text = "WASD / Arrows — move captain      Mouse — aim
 Left-Click — attack      Right-Click / Space — brace wall
 Q — swap weapon (spear / sword / axe / mace)      E — mount / dismount
-Mouse Wheel  or  + / −  — zoom      R — restart battle"
+Mouse Wheel  or  + / −  — zoom      R — restart battle
+Couch Co-op:  P1 = keyboard + mouse      P2 = gamepad (left stick move, right stick aim)"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.7, 0.72, 0.78, 1)
 theme_override_font_sizes/font_size = 18

@@ -31,6 +31,13 @@ public partial class Player : Unit
 	public enum ControlScheme { Any, KeyboardMouse, Gamepad }
 	[Export] public ControlScheme Control = ControlScheme.Any;
 	[Export] public int DeviceId = 0;            // which gamepad to read when Control == Gamepad
+
+	// Co-op (M12.7, Chunk 47): in single-player a captain's death IS the loss, so OnDeath reveals
+	// the shared "game_over" UI immediately (default true). In the couch co-op scene BOTH captains
+	// must fall before it's a loss, so each co-op captain sets this false — a downed captain just
+	// freezes in place and GameManager (RequireAllPlayersDead) reveals GAME OVER only when the LAST
+	// one falls. Off-by-default keeps every existing level byte-identical.
+	[Export] public bool ShowGameOverOnDeath = true;
 	[Export] public float MoveDeadzone = 0.2f;   // left-stick deadzone (Gamepad move)
 	[Export] public float AimDeadzone = 0.4f;    // right stick must clear this to re-aim (else hold facing)
 
@@ -444,9 +451,11 @@ public partial class Player : Unit
 	{
 		Velocity = Vector3.Zero;
 		SetHitboxActive(false);
-		foreach (Node n in GetTree().GetNodesInGroup("game_over"))
-			if (n is CanvasItem ci)
-				ci.Visible = true;
+		// Co-op captains leave the reveal to GameManager (only when EVERY captain is down).
+		if (ShowGameOverOnDeath)
+			foreach (Node n in GetTree().GetNodesInGroup("game_over"))
+				if (n is CanvasItem ci)
+					ci.Visible = true;
 		GD.Print("[Player] GAME OVER");
 	}
 

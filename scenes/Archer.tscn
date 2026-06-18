@@ -1,0 +1,67 @@
+[gd_scene load_steps=10 format=3 uid="uid://darcher0eggs01"]
+
+[ext_resource type="Script" path="res://scripts/Ally.cs" id="1_ally"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+
+[sub_resource type="StandardMaterial3D" id="Mat_archer"]
+albedo_color = Color(0.24, 0.46, 0.55, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_archer"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_bowlimb"]
+top_radius = 0.025
+bottom_radius = 0.025
+height = 0.55
+radial_segments = 6
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.4, 0.27, 0.14, 1)
+roughness = 0.85
+
+[sub_resource type="BoxMesh" id="BoxMesh_bowgrip"]
+size = Vector3(0.05, 0.2, 0.05)
+
+[sub_resource type="BoxMesh" id="BoxMesh_bowstring"]
+size = Vector3(0.012, 1.18, 0.012)
+
+[sub_resource type="StandardMaterial3D" id="Mat_string"]
+albedo_color = Color(0.85, 0.83, 0.78, 1)
+roughness = 0.6
+
+[node name="Archer" type="CharacterBody3D"]
+script = ExtResource("1_ally")
+Weapon = 1
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_archer")
+script = ExtResource("2_egg")
+Width = 1.0
+Height = 1.7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_archer")
+
+[node name="Bow" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0.2, -0.25)
+
+[node name="Grip" type="MeshInstance3D" parent="Bow"]
+mesh = SubResource("BoxMesh_bowgrip")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="LimbUpper" type="MeshInstance3D" parent="Bow"]
+transform = Transform3D(1, 0, 0, 0, 0.9063, -0.4226, 0, 0.4226, 0.9063, 0, 0.339, -0.116)
+mesh = SubResource("CylinderMesh_bowlimb")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="LimbLower" type="MeshInstance3D" parent="Bow"]
+transform = Transform3D(1, 0, 0, 0, 0.9063, 0.4226, 0, -0.4226, 0.9063, 0, -0.339, -0.116)
+mesh = SubResource("CylinderMesh_bowlimb")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="String" type="MeshInstance3D" parent="Bow"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.232)
+mesh = SubResource("BoxMesh_bowstring")
+surface_material_override/0 = SubResource("Mat_string")

@@ -56,8 +56,9 @@ public partial class UnitTest : Node3D
 		bool stickAim = TestStickAim();
 		bool squadOwnership = await TestSquadOwnership();
 		bool coopCamera = TestCoopCamera();
+		bool coopLose = await TestCoopLose();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1850,6 +1851,67 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: two targets focus on their midpoint and the camera pulls back as they separate"
 			: $"FAIL: soloFocus={soloFocus}, soloNoSep={soloNoSep}, midpoint={midpointOk}, halfSep={halfSepOk}, stillMidpoint={stillMidpoint}, grew={grew}");
+		return pass;
+	}
+
+	// Chunk 47 (M12.7): the co-op lose rule. With GameManager.RequireAllPlayersDead = true the match
+	// is lost only once EVERY captain in the "player" group is down — a single captain falling leaves
+	// the game going (its partner fights on). Mirrors the co-op scene: captains set
+	// ShowGameOverOnDeath = false, so only GameManager reveals "game_over", and only on the LAST death.
+	private async Task<bool> TestCoopLose()
+	{
+		GD.Print("=== UnitTest: co-op lose rule (RequireAllPlayersDead, Chunk 47) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Stand in for ResultMenu's GAME OVER UI: a node in the "game_over" group, hidden to start.
+		var label = new Label { Visible = false };
+		label.AddToGroup("game_over");
+		AddChild(label);
+
+		var capScene = GD.Load<PackedScene>("res://scenes/Captain.tscn");
+		var cap1 = capScene.Instantiate<Player>();
+		cap1.ShowGameOverOnDeath = false;        // co-op: leave the reveal to GameManager
+		AddChild(cap1);
+		cap1.GlobalPosition = new Vector3(-5f, 1f, 0f);
+		var cap2 = capScene.Instantiate<Player>();
+		cap2.ShowGameOverOnDeath = false;
+		AddChild(cap2);
+		cap2.GlobalPosition = new Vector3(5f, 1f, 0f);
+
+		var gm = new GameManager { RequireAllPlayersDead = true };
+		AddChild(gm);
+
+		// Both captains up: no loss, UI stays hidden.
+		for (int i = 0; i < 3; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool aliveNoLose = !label.Visible;
+
+		// One captain down: STILL no loss in co-op (the other plays on).
+		cap1.TakeDamage(9999f);
+		for (int i = 0; i < 3; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool oneDownNoLose = cap1.IsDead && !cap2.IsDead && !label.Visible;
+
+		// Both down: now it's a loss — GameManager reveals GAME OVER.
+		cap2.TakeDamage(9999f);
+		for (int i = 0; i < 3; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool bothDownLose = cap2.IsDead && label.Visible;
+
+		GD.Print($"both up -> hidden={aliveNoLose}; one down -> still hidden={oneDownNoLose}; both down -> GAME OVER={bothDownLose}");
+
+		label.QueueFree();
+		cap1.QueueFree();
+		cap2.QueueFree();
+		gm.QueueFree();
+
+		bool pass = aliveNoLose && oneDownNoLose && bothDownLose;
+		GD.Print(pass
+			? "PASS: co-op loses only when BOTH captains fall"
+			: $"FAIL: aliveNoLose={aliveNoLose}, oneDownNoLose={oneDownNoLose}, bothDownLose={bothDownLose}");
 		return pass;
 	}
 }

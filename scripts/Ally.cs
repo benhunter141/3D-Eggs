@@ -93,7 +93,7 @@ public partial class Ally : Unit
 		// line on the slot, face the captain's yaw, and damage + lightly repel anything in
 		// the pike-front. This is the ONE exception to "only the captain's weapon shoves".
 		// Brace overrides normal target-chasing — a braced wall holds, it doesn't pursue.
-		if (Weapon == WeaponType.Pike && Input.IsActionPressed("brace"))
+		if (Weapon == WeaponType.Pike && CaptainBraceHeld())
 		{
 			desiredVel = SlotArriveVelocity();   // hold the slot
 			UpdateBracePulse();                  // impale/repel the front on cooldown
@@ -274,6 +274,13 @@ public partial class Ally : Unit
 		}
 		return best;
 	}
+
+	// Is OUR captain holding brace? Route through the captain's scheme-aware BraceHeld() so a
+	// co-op squad braces only with ITS captain's device (Chunk 44/47). For a single-player captain
+	// (Control = Any) this resolves to the same global "brace" action as before — byte-identical —
+	// and a non-Player captain (or none) falls back to the global action.
+	private bool CaptainBraceHeld() =>
+		_player is Player p ? p.BraceHeld() : Input.IsActionPressed("brace");
 
 	// World position of this ally's formation slot: the local offset rotated by the
 	// player's current orientation, so the formation rotates as the player turns.
