@@ -57,8 +57,9 @@ public partial class UnitTest : Node3D
 		bool squadOwnership = await TestSquadOwnership();
 		bool coopCamera = TestCoopCamera();
 		bool coopLose = await TestCoopLose();
+		bool allyCommands = await TestAllyCommands();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1912,6 +1913,75 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: co-op loses only when BOTH captains fall"
 			: $"FAIL: aliveNoLose={aliveNoLose}, oneDownNoLose={oneDownNoLose}, bothDownLose={bothDownLose}");
+		return pass;
+	}
+
+	// Chunk 48 (M7): ally commands. Default is Follow (existing behaviour). Hold plants the ally on a
+	// fixed point and engages foes within LeashRadius of THAT point; Attack-move advances it to a far
+	// point, engaging foes within AggroRange en route. Each mode is exercised on a bare fists Ally.
+	private async Task<bool> TestAllyCommands()
+	{
+		GD.Print("=== UnitTest: ally commands (Follow / Hold / Attack-move, Chunk 48) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var allyScene = GD.Load<PackedScene>("res://scenes/Ally.tscn");
+
+		// (1) Default command is Follow — every existing level spawns this, untouched.
+		var def = allyScene.Instantiate<Ally>();
+		AddChild(def);
+		bool defaultFollow = def.Command == Ally.CommandMode.Follow;
+		def.QueueFree();
+
+		// (2) HOLD: plant the ally on a point with no foe nearby; it walks to the point and settles.
+		var holder = allyScene.Instantiate<Ally>();
+		AddChild(holder);
+		holder.GlobalPosition = Vector3.Zero;
+		Vector3 holdPoint = new Vector3(6f, 0f, 0f);
+		holder.HoldAt(holdPoint);
+		for (int i = 0; i < 200; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		float holdDist = holder.GlobalPosition.DistanceTo(holdPoint);
+		bool held = holder.Command == Ally.CommandMode.Hold && holdDist < 0.5f;
+		GD.Print($"hold: {holdDist:0.00} m from the planted point (held={held})");
+		holder.QueueFree();
+
+		// (3) ATTACK-MOVE: send the ally to a distant point with no foe; it advances toward it.
+		var mover = allyScene.Instantiate<Ally>();
+		AddChild(mover);
+		mover.GlobalPosition = Vector3.Zero;
+		Vector3 movePoint = new Vector3(0f, 0f, -20f);
+		mover.AttackMoveTo(movePoint);
+		float moveStart = mover.GlobalPosition.DistanceTo(movePoint);
+		for (int i = 0; i < 120; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		float moveEnd = mover.GlobalPosition.DistanceTo(movePoint);
+		bool advanced = moveEnd < moveStart - 5f;
+		GD.Print($"attack-move: {moveStart:0.0} -> {moveEnd:0.0} m to target (advanced={advanced})");
+		mover.QueueFree();
+
+		// (4) HOLD ENGAGE: a foe within LeashRadius of the held point gets attacked.
+		var guard = allyScene.Instantiate<Ally>();
+		AddChild(guard);
+		guard.GlobalPosition = Vector3.Zero;
+		guard.HoldAt(Vector3.Zero);
+		var foe = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(foe);
+		foe.GlobalPosition = new Vector3(3f, 0f, 0f);   // within LeashRadius (6) of the held point
+		float foeHp0 = foe.Health;
+		for (int i = 0; i < 200; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		bool engaged = foe.Health < foeHp0;
+		GD.Print($"hold-engage: foe HP {foeHp0} -> {foe.Health} (engaged={engaged})");
+		guard.QueueFree();
+		foe.QueueFree();
+
+		bool pass = defaultFollow && held && advanced && engaged;
+		GD.Print(pass
+			? "PASS: Follow default; Hold plants; Attack-move advances; Hold engages a near foe"
+			: $"FAIL: defaultFollow={defaultFollow}, held={held}, advanced={advanced}, engaged={engaged}");
 		return pass;
 	}
 }

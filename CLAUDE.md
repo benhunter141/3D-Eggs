@@ -141,6 +141,15 @@ folds in `KnockbackVelocity`) — revisit if pinball should toss the captain too
   on hit or `MaxLifetime`.
 - Direct player-issued ally commands come later (M7).
 
+**Ally commands (M7, Chunk 48).** Beyond the loose leash, an `Ally` carries a `CommandMode`
+(`Follow` default | `Hold` | `AttackMove`) + a `_commandPoint`. **Follow** = the leash behaviour
+above (anchor = the moving formation slot). **Hold** anchors the leash to a planted world point and
+re-settles on it. **AttackMove** advances to a world point, engaging foes within `AggroRange` en
+route (the same aggro scan MarchMode uses), then holds. The engagement scan anchors on
+`CommandAnchor()` and all re-settle/return motion on a shared `ArriveVelocity(point)`. **Off by
+default** (everyone spawns `Follow`) and resolved AFTER the `MarchMode` branch, so existing levels and
+the football auto-battler are byte-identical. The captain dispatches commands to its squad in Chunk 49.
+
 **Mounts (M10, Chunk 28).** A `Mount` (`CharacterBody3D`, NOT a `Unit` — mounts don't fight/take
 damage) joins the `mounts` group. The **Player** owns the `mount` input (read once, so it never
 double-fires across mounts): `TryMount()` climbs onto the nearest unridden mount within range
@@ -243,7 +252,8 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; pikeman captain leads a braceable pike wall vs swordmen + bowmen across hand-designed levels (Chunks 11–16).
 - [x] **M5 — Crowds:** `UnitRegistry` + staggered re-scan kill the O(n²) group scans; 50/100 units within the 60 FPS budget (Chunks 17–19). Onslaught balance feel-check pending.
 - [~] **M6 — Deeper pinball physics:** bouncy/transferring knockback + `Bumper` posts + Pinball Arena (Chunks 20–22). Balance feel-check pending.
-- [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
+- [~] **M7 — Ally commands:** player directs allies (hold / follow / attack-move). Command model on
+  `Ally` (Follow/Hold/AttackMove, off by default) landed (Chunk 48); captain input dispatch next (Chunk 49).
 - [x] **M8 — Camera & visual identity polish:** live zoom bias, googly eyes on every unit, recognizable weapon meshes (Chunks 23–25). Eyes/weapon feel-check pending.
 - [x] **M9 — Weapons & loadouts:** data-driven `WeaponType→WeaponProfile`; `swap_weapon` (Q) cycles spear/sword/axe/mace with distinct reach/damage/knockback/mesh (Chunks 26–27). Archetype balance feel-check pending.
 - [x] **M10 — Mounts:** rideable Donkey + faster Chocobo (mount/dismount via `mount`, mounted combat); both flank the Level 1 spawn (Chunks 28–29). Chocobo-speed feel-check pending.
@@ -306,7 +316,8 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **Chunk 22** — Level 5 "Pinball Arena" (walled 44×44 arena + 8 bumpers).
 - [x] **Chunk 23** — Adjustable dynamic zoom (`ZoomBias` on mouse wheel / keys).
 
-**M7 — Ally commands:** no chunk breakdown yet — plan when it comes up.
+**M7 — Ally commands:** now planned + in progress as Chunks 48–49 — see the dedicated section
+near the end of §7 (it builds late, after the M12.x chunks, so its chunk numbers follow Chunk 47).
 
 ---
 
@@ -530,6 +541,34 @@ captain, single-target camera, lose-on-player-death) must behave EXACTLY as they
   `GameManager` with `RequireAllPlayersDead = true`. **Remove Level 1–4** from `LevelSelect.tscn`
   and delete their scene files (git keeps history); renumber the menu and add the co-op level +
   a P1/P2 controls note. **User feel-check** (needs a gamepad to test P2).
+
+---
+
+### ▶ PLANNED — M7 Ally Commands (Chunks 48–49)
+
+**Goal:** let the captain DIRECT the squad beyond the default loose leash — recall to formation,
+hold a spot, or push forward — without disturbing any existing level. Every behaviour is **off by
+default** (allies spawn `Follow` = today's loose-leash) and `MarchMode` is resolved before commands,
+so the football auto-battler is untouched too.
+
+- [x] **Chunk 48 — Ally command model (Follow / Hold / Attack-move).** `Ally.CommandMode`
+  (`Follow` default | `Hold` | `AttackMove`) + a `_commandPoint` anchor and `HoldAt` / `AttackMoveTo`
+  / `FollowCaptain` setters. **Follow** = today's behaviour (leash to the moving formation slot).
+  **Hold** plants on a fixed point and engages foes within `LeashRadius` of THAT point, else settles
+  back on it. **Attack-move** advances to a fixed point, engaging foes within `AggroRange` en route,
+  then holds. The leash scan now anchors on `CommandAnchor()` and the arrive logic on a shared
+  `ArriveVelocity(point)`. Headless-tested: default is Follow; Hold plants; Attack-move advances; a
+  held ally engages a near foe.
+- [ ] **Chunk 49 — Captain issues squad commands.** Player reads scheme-aware command edges
+  (Follow / Hold / Attack-move) and dispatches them to the allies bound to it (its `CaptainPath`
+  squad, or the whole player squad in single-player): **Hold** plants each ally where it stands,
+  **Attack-move** sends them to a point ahead of the captain's facing, **Follow** recalls them to
+  formation. Per-captain (co-op: P1 keys, P2 gamepad) so squads take orders independently. New
+  `command_follow` / `command_hold` / `command_attack` input actions + a small on-screen hint.
+  Headless-test: a captain's command sets each owned ally's mode/target.
+
+**(Later — M7 polish, unnumbered for now: a command-state HUD marker over each ally, and an
+attack-move ground-target reticle.)**
 
 ---
 

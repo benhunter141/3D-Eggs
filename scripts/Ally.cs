@@ -51,6 +51,23 @@ public partial class Ally : Unit
 	// behaviour, so every single-player level is untouched.
 	[Export] public NodePath CaptainPath;
 
+	// Ally commands (M7, Chunk 48). The player can direct a squad beyond the default loose leash:
+	//   • Follow (default) — today's behaviour: leash to the moving formation slot, re-form when idle.
+	//   • Hold — plant on a fixed world point; engage foes within LeashRadius of THAT point, else hold it.
+	//   • AttackMove — advance to a fixed world point, engaging any foe within AggroRange en route, then hold.
+	// OFF by default (every unit spawns Follow) so existing levels AND the MarchMode auto-battler are
+	// untouched — MarchMode is resolved before the command branches, so a pitch unit ignores commands.
+	// Chunk 49 wires the captain's input to issue these to its squad.
+	public enum CommandMode { Follow, Hold, AttackMove }
+	public CommandMode Command { get; private set; } = CommandMode.Follow;
+	private Vector3 _commandPoint;                  // world anchor for Hold / AttackMove
+	public Vector3 CommandPoint => _commandPoint;   // read for tests / HUD
+
+	// Issue a command (called by the captain in Chunk 49, or directly in tests).
+	public void HoldAt(Vector3 worldPoint)       { Command = CommandMode.Hold;       _commandPoint = worldPoint; }
+	public void AttackMoveTo(Vector3 worldPoint) { Command = CommandMode.AttackMove; _commandPoint = worldPoint; }
+	public void FollowCaptain()                  { Command = CommandMode.Follow; }
+
 	private Node3D _player;
 	private float _attackTimer; // counts down; > 0 blocks the next fist hit
 
@@ -101,14 +118,17 @@ public partial class Ally : Unit
 		}
 		else
 		{
-			// Throttled leash scan (M5): re-pick our in-leash target only every few frames,
-			// but keep engaging the cached target's live position every frame. In MarchMode
-			// (Chunk 42) we instead pick the nearest foe within AggroRange — there's no captain
-			// slot to leash to on the pitch — and fall back to marching when none is near.
+			// Throttled leash scan (M5): re-pick our target only every few frames, but keep engaging
+			// the cached target's live position every frame. The SCAN anchor depends on the command
+			// (M7): Follow leashes to the moving formation slot, Hold leashes to its planted point,
+			// while AttackMove (and the MarchMode auto-battler, Chunk 42) instead pick the nearest foe
+			// within AggroRange of US — they push forward, so there's no fixed post to leash to.
+			Vector3 anchor = CommandAnchor();
+			bool aggroScan = MarchMode || Command == CommandMode.AttackMove;
 			if (ShouldRescanTarget())
-				CachedTarget = MarchMode
+				CachedTarget = aggroScan
 					? UnitRegistry.FindNearestOpponent(Team, GlobalPosition, AggroRange)
-					: FindTargetInLeash();
+					: FindTargetInLeash(anchor);
 			Unit target = LiveTarget;
 			if (target != null)
 			{
@@ -157,9 +177,22 @@ public partial class Ally : Unit
 				FaceTowards(GlobalPosition + MarchGoalDirection, dt);
 				facingHandled = true;
 			}
+			else if (Command == CommandMode.AttackMove)
+			{
+				// Attack-move (M7): no foe in range — keep advancing to the commanded point (arrive-
+				// slowdown, then hold it). Face the way we're pushing.
+				desiredVel = ArriveVelocity(_commandPoint);
+				FaceTowards(_commandPoint, dt);
+				facingHandled = true;
+			}
+			else if (Command == CommandMode.Hold)
+			{
+				// Hold (M7): plant on the commanded point and keep it (no captain needed).
+				desiredVel = ArriveVelocity(_commandPoint);
+			}
 			else if (_player != null)
 			{
-				// No enemy in leash: fall back to the formation slot (Chunk 6 arrive behaviour).
+				// Follow: no enemy in leash — fall back to the formation slot (Chunk 6 arrive behaviour).
 				desiredVel = SlotArriveVelocity();
 			}
 		}
@@ -186,14 +219,31 @@ public partial class Ally : Unit
 	{
 		if (_player == null)
 			return Vector3.Zero;
-		Vector3 toSlot = SlotWorldPosition() - GlobalPosition;
-		toSlot.Y = 0f;
-		float dist = toSlot.Length();
+		return ArriveVelocity(SlotWorldPosition());
+	}
+
+	// Arrive-slowdown velocity toward a flat world point: full speed when far, eased down inside
+	// ArriveRadius so we settle instead of overshoot, zero within StopRadius. Shared by the formation
+	// re-form, the brace stance, and the Hold / Attack-move commands (M7).
+	private Vector3 ArriveVelocity(Vector3 worldPoint)
+	{
+		Vector3 to = worldPoint - GlobalPosition;
+		to.Y = 0f;
+		float dist = to.Length();
 		if (dist <= StopRadius)
 			return Vector3.Zero;
 		float speed = MoveSpeed * Mathf.Min(1f, dist / ArriveRadius);
-		return toSlot.Normalized() * speed;
+		return to.Normalized() * speed;
 	}
+
+	// The point our leash/return logic anchors to this frame: the moving formation slot (Follow),
+	// or the planted command point (Hold / Attack-move). Pure read.
+	private Vector3 CommandAnchor() => Command switch
+	{
+		CommandMode.Hold => _commandPoint,
+		CommandMode.AttackMove => _commandPoint,
+		_ => SlotWorldPosition(),
+	};
 
 	// Braced-pike pulse: on cooldown, damage AND lightly repel every enemy that sits within
 	// PikeReach inside our front cone. The repel (small knockback) is the phalanx's whole
@@ -248,12 +298,12 @@ public partial class Ally : Unit
 		GD.Print($"[Ally] {Name} threw a stone at {target.Name}");
 	}
 
-	// Nearest living enemy-team unit whose distance to OUR SLOT is within LeashRadius.
-	// Gating on the slot (not the ally) keeps the squad from chasing a fleeing enemy
-	// across the map — it returns null once nothing is near the slot, and we re-form.
-	private Unit FindTargetInLeash()
+	// Nearest living enemy-team unit whose distance to our ANCHOR (formation slot for Follow, the
+	// planted point for Hold) is within LeashRadius. Gating on the anchor (not the ally) keeps the
+	// squad from chasing a fleeing enemy across the map — it returns null once nothing is near the
+	// anchor, and we re-form / re-settle.
+	private Unit FindTargetInLeash(Vector3 anchor)
 	{
-		Vector3 slot = SlotWorldPosition();
 		float leashSq = LeashRadius * LeashRadius;
 		Unit best = null;
 		float bestSq = float.MaxValue;
@@ -263,7 +313,7 @@ public partial class Ally : Unit
 			Unit u = foes[i];
 			if (u == null || !IsInstanceValid(u) || u.IsDead)
 				continue;
-			if (slot.DistanceSquaredTo(u.GlobalPosition) > leashSq)
+			if (anchor.DistanceSquaredTo(u.GlobalPosition) > leashSq)
 				continue;   // too far from our post — leave it alone
 			float d = GlobalPosition.DistanceSquaredTo(u.GlobalPosition);
 			if (d < bestSq)
