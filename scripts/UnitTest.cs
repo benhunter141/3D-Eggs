@@ -53,8 +53,9 @@ public partial class UnitTest : Node3D
 		bool endzone = TestEndzone();
 		bool march = await TestMarch();
 		bool deckTuning = TestDeckTuning();
+		bool stickAim = TestStickAim();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1692,6 +1693,44 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: a march-mode unit advances with no foe near, and breaks off to engage one in aggro range"
 			: $"FAIL: advanced={advanced}, movedToFoe={movedToFoe}, damagedFoe={damagedFoe}");
+		return pass;
+	}
+
+	// Chunk 44: the gamepad right-stick aim helper resolves to the correct facing yaw, and the
+	// Any control scheme still reads the blended move path (the single-player default).
+	private bool TestStickAim()
+	{
+		GD.Print("=== UnitTest: control scheme + stick aim (Chunk 44) ===");
+
+		// Forward is -Z (yaw 0). Stick up is reported NEGATIVE on the Y axis -> should aim forward.
+		bool up    = Mathf.IsEqualApprox(AimMath.StickToYaw(new Vector2(0f, -1f)), 0f, 0.001f);
+		bool down  = Mathf.IsEqualApprox(Mathf.Abs(AimMath.StickToYaw(new Vector2(0f, 1f))), Mathf.Pi, 0.001f);
+		bool right = Mathf.IsEqualApprox(AimMath.StickToYaw(new Vector2(1f, 0f)), -Mathf.Pi / 2f, 0.001f);
+		bool left  = Mathf.IsEqualApprox(AimMath.StickToYaw(new Vector2(-1f, 0f)), Mathf.Pi / 2f, 0.001f);
+
+		// A diagonal: up-right (forward + right) lands between yaw 0 and -π/2.
+		float diag = AimMath.StickToYaw(new Vector2(1f, -1f));
+		bool diagonal = Mathf.IsEqualApprox(diag, -Mathf.Pi / 4f, 0.001f);
+
+		GD.Print($"yaws: up={up}, down={down}, right={right}, left={left}, diag={diagonal}");
+
+		// Default control scheme is Any, and MoveInput() in Any reads the blended action vector
+		// (zero here with no input) — the same path single-player levels use, untouched.
+		var p = new Player();
+		bool defaultsAny = p.Control == Player.ControlScheme.Any;
+		bool anyBlended = p.MoveInput() == Input.GetVector("move_left", "move_right", "move_up", "move_down");
+		// A device-scoped scheme reads only its own pad — no phantom input from an unused device.
+		p.Control = Player.ControlScheme.Gamepad;
+		p.DeviceId = 99;   // no such pad in a headless run
+		bool gamepadIsolated = p.MoveInput() == Vector2.Zero;
+		p.Free();
+
+		GD.Print($"defaultsAny={defaultsAny}, anyBlended={anyBlended}, gamepadIsolated={gamepadIsolated}");
+
+		bool pass = up && down && right && left && diagonal && defaultsAny && anyBlended && gamepadIsolated;
+		GD.Print(pass
+			? "PASS: stick aim resolves to the right yaw; Any reads the blended path, Gamepad stays device-scoped"
+			: "FAIL: control-scheme/stick-aim wrong");
 		return pass;
 	}
 }
