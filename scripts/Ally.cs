@@ -81,7 +81,7 @@ public partial class Ally : Unit
 		base._Ready();
 		// Pick our captain once: an explicit CaptainPath binds us to ONE captain (co-op squads,
 		// Chunk 45); otherwise fall back to the first node in the "player" group (single-player).
-		if (CaptainPath != null && !CaptainPath.IsEmpty())
+		if (CaptainPath != null && !string.IsNullOrEmpty(CaptainPath.ToString()))
 			_player = GetNodeOrNull<Node3D>(CaptainPath);
 		if (_player == null)
 			_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
