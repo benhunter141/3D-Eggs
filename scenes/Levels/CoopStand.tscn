@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://b3degg0coopstand"]
+[gd_scene load_steps=28 format=3 uid="uid://b3degg0coopstand"]
 
 [ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="1_camera"]
 [ext_resource type="PackedScene" path="res://scenes/Captain.tscn" id="2_captain"]
@@ -25,13 +25,54 @@ ambient_light_source = 3
 tonemap_mode = 2
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
-size = Vector2(50, 50)
+size = Vector2(32, 38)
 
 [sub_resource type="StandardMaterial3D" id="Mat_ground"]
-albedo_color = Color(0.21, 0.28, 0.22, 1)
+albedo_color = Color(0.46, 0.36, 0.23, 1)
+roughness = 1.0
 
 [sub_resource type="BoxShape3D" id="BoxShape_ground"]
-size = Vector3(50, 0.2, 50)
+size = Vector3(32, 0.2, 38)
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.45, 0.3, 0.16, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Mat_woodDark"]
+albedo_color = Color(0.31, 0.19, 0.1, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Mat_hay"]
+albedo_color = Color(0.85, 0.72, 0.3, 1)
+roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_egg"]
+albedo_color = Color(0.97, 0.94, 0.87, 1)
+roughness = 0.55
+
+[sub_resource type="BoxMesh" id="BoxMesh_fenceNS"]
+size = Vector3(30, 2, 0.7)
+
+[sub_resource type="BoxMesh" id="BoxMesh_fenceEW"]
+size = Vector3(0.7, 2, 36)
+
+[sub_resource type="BoxShape3D" id="BoxShape_fenceNS"]
+size = Vector3(30, 2, 0.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape_fenceEW"]
+size = Vector3(0.7, 2, 36)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_post"]
+top_radius = 0.35
+bottom_radius = 0.35
+height = 2.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_hay"]
+size = Vector3(2, 1.2, 1.6)
+
+[sub_resource type="SphereMesh" id="SphereMesh_egg"]
+radius = 0.7
+height = 1.4
 
 [node name="CoopStand" type="Node3D"]
 
@@ -52,6 +93,108 @@ surface_material_override/0 = SubResource("Mat_ground")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
 shape = SubResource("BoxShape_ground")
 
+[node name="FenceN" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -18)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FenceN"]
+mesh = SubResource("BoxMesh_fenceNS")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FenceN"]
+shape = SubResource("BoxShape_fenceNS")
+
+[node name="FenceS" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 18)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FenceS"]
+mesh = SubResource("BoxMesh_fenceNS")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FenceS"]
+shape = SubResource("BoxShape_fenceNS")
+
+[node name="FenceE" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 1, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FenceE"]
+mesh = SubResource("BoxMesh_fenceEW")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FenceE"]
+shape = SubResource("BoxShape_fenceEW")
+
+[node name="FenceW" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FenceW"]
+mesh = SubResource("BoxMesh_fenceEW")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FenceW"]
+shape = SubResource("BoxShape_fenceEW")
+
+[node name="Decor" type="Node3D" parent="."]
+
+[node name="PostNW" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.3, -18)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="PostNE" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 1.3, -18)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="PostSW" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 1.3, 18)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="PostSE" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 1.3, 18)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="Hay1" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 0.6, 15.5)
+mesh = SubResource("BoxMesh_hay")
+surface_material_override/0 = SubResource("Mat_hay")
+
+[node name="Hay2" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0.6, 15.5)
+mesh = SubResource("BoxMesh_hay")
+surface_material_override/0 = SubResource("Mat_hay")
+
+[node name="Hay3" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.5, 0.6, -15.5)
+mesh = SubResource("BoxMesh_hay")
+surface_material_override/0 = SubResource("Mat_hay")
+
+[node name="Hay4" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.5, 0.6, -15.5)
+mesh = SubResource("BoxMesh_hay")
+surface_material_override/0 = SubResource("Mat_hay")
+
+[node name="Egg1" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1.25, 0, 0, 0, 1, -14, 0.88, 1)
+mesh = SubResource("SphereMesh_egg")
+surface_material_override/0 = SubResource("Mat_egg")
+
+[node name="Egg2" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1.25, 0, 0, 0, 1, 14, 0.88, 6)
+mesh = SubResource("SphereMesh_egg")
+surface_material_override/0 = SubResource("Mat_egg")
+
+[node name="Egg3" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1.25, 0, 0, 0, 1, -14, 0.88, -7)
+mesh = SubResource("SphereMesh_egg")
+surface_material_override/0 = SubResource("Mat_egg")
+
+[node name="Egg4" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1.25, 0, 0, 0, 1, 14, 0.88, -3)
+mesh = SubResource("SphereMesh_egg")
+surface_material_override/0 = SubResource("Mat_egg")
+
 [node name="Captain1" parent="." instance=ExtResource("2_captain")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1, 11)
 Control = 1
@@ -71,9 +214,9 @@ Target2 = NodePath("../Captain2")
 Offset = Vector3(0, 18, 15)
 DynamicZoom = true
 MinDistance = 26.0
-MaxDistance = 62.0
+MaxDistance = 52.0
 FitScale = 1.4
-ZoomMargin = 12.0
+ZoomMargin = 10.0
 
 [node name="P1_Pike1" parent="." instance=ExtResource("3_pikeman")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 1, 8.5)
@@ -209,7 +352,7 @@ anchor_right = 1.0
 offset_top = 22.0
 offset_bottom = 58.0
 grow_horizontal = 2
-text = "COUCH CO-OP — P1 (keyboard + mouse) & P2 (gamepad) each lead a phalanx. You lose only when BOTH captains fall."
+text = "BARNYARD BRAWL (CO-OP) — P1 (keyboard + mouse) & P2 (gamepad) each lead a phalanx in the pen. You lose only when BOTH captains fall."
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
 theme_override_font_sizes/font_size = 20
