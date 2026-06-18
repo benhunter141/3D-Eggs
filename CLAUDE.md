@@ -139,7 +139,14 @@ folds in `KnockbackVelocity`) — revisit if pinball should toss the captain too
   hold near slot, lob a `Stone` every `ThrowCooldown`, close in only if past `ThrowRange`.
 - `Stone` projectile: aimed straight on launch, proximity-hits enemy-team units, frees
   on hit or `MaxLifetime`.
-- Direct player-issued ally commands come later (M7).
+- **Ally commands (M7, Chunk 44).** Each `Ally` carries a `Command` standing order (default
+  `Follow` = the loose-leash above). The captain broadcasts orders to the `allies` group (every
+  `Ally` joins it in `_Ready`): `cmd_hold` (H) → `Command.Hold`, `cmd_follow` (G) → `Command.Follow`.
+  **Hold** pins the ally to a FIXED world post captured where it stood when ordered (`HoldPost`):
+  it leashes/engages around the POST instead of the moving slot and re-settles there when no foe
+  is near — the squad holds ground. Follow restores slot-following. Leash gating + arrive steering
+  funnel through `LeashAnchor()` (post when holding, slot when following) and `ArriveVelocityTo()`.
+  Attack-move = Chunk 45.
 
 **Mounts (M10, Chunk 28).** A `Mount` (`CharacterBody3D`, NOT a `Unit` — mounts don't fight/take
 damage) joins the `mounts` group. The **Player** owns the `mount` input (read once, so it never
@@ -243,7 +250,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **M4.5 — Level select + phalanx battles ⭐:** front-end menu; pikeman captain leads a braceable pike wall vs swordmen + bowmen across hand-designed levels (Chunks 11–16).
 - [x] **M5 — Crowds:** `UnitRegistry` + staggered re-scan kill the O(n²) group scans; 50/100 units within the 60 FPS budget (Chunks 17–19). Onslaught balance feel-check pending.
 - [~] **M6 — Deeper pinball physics:** bouncy/transferring knockback + `Bumper` posts + Pinball Arena (Chunks 20–22). Balance feel-check pending.
-- [ ] **M7 — Ally commands:** player directs allies (hold / follow / attack-move).
+- [~] **M7 — Ally commands:** captain directs the squad — `Ally.Command` standing order broadcast to the `allies` group: Hold/Follow done (Chunk 44), attack-move next (Chunk 45).
 - [x] **M8 — Camera & visual identity polish:** live zoom bias, googly eyes on every unit, recognizable weapon meshes (Chunks 23–25). Eyes/weapon feel-check pending.
 - [x] **M9 — Weapons & loadouts:** data-driven `WeaponType→WeaponProfile`; `swap_weapon` (Q) cycles spear/sword/axe/mace with distinct reach/damage/knockback/mesh (Chunks 26–27). Archetype balance feel-check pending.
 - [x] **M10 — Mounts:** rideable Donkey + faster Chocobo (mount/dismount via `mount`, mounted combat); both flank the Level 1 spawn (Chunks 28–29). Chocobo-speed feel-check pending.
@@ -300,7 +307,26 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **Chunk 22** — Level 5 "Pinball Arena" (walled 44×44 arena + 8 bumpers).
 - [x] **Chunk 23** — Adjustable dynamic zoom (`ZoomBias` on mouse wheel / keys).
 
-**M7 — Ally commands:** no chunk breakdown yet — plan when it comes up.
+### ▶ PLANNED — M7 Ally Commands (Chunks 44–45)
+
+**Goal:** let the captain DIRECT the squad live instead of always loose-leashing. A standing
+order on each `Ally` (broadcast from the player to the `allies` group) overrides the default
+follow behaviour. The default order is `Follow`, exactly the pre-M7 behaviour, so every existing
+level plays identically until the player issues a command.
+
+- [x] **Chunk 44 — Hold / Follow commands.** Add an `Ally.Command { Follow, Hold }` standing
+  order. `Follow` = the loose-leash formation (unchanged). `Hold` plants the ally on a FIXED
+  world post (captured where it stood when ordered): it engages enemies within `LeashRadius`
+  of the POST and re-settles on the post when none are near, ignoring the moving slot. `Player`
+  reads `cmd_hold` (H / D-pad Left) + `cmd_follow` (G / D-pad Right) and broadcasts to the
+  `allies` group; allies join that group in `_Ready`. Leash/arrive logic generalised to anchor
+  on the post or the slot. Headless-tested: Hold pins the squad to its post (still defending it)
+  while the captain walks off; Follow re-forms on the slot.
+- [ ] **Chunk 45 — Attack-move command.** Add `Command.AttackMove`: advance toward a
+  captain-designated ground point (from the mouse-aim ray), engaging any enemy met within
+  `LeashRadius` of the ally en route, then hold near the point once arrived. `Player` reads
+  `cmd_attack_move` (T) and sets the target point on every ally. Headless-test: an attack-move
+  ally advances to its point and engages an enemy encountered along the way.
 
 ---
 

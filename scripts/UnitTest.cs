@@ -53,8 +53,9 @@ public partial class UnitTest : Node3D
 		bool endzone = TestEndzone();
 		bool march = await TestMarch();
 		bool deckTuning = TestDeckTuning();
+		bool allyCommands = await TestAllyCommands();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && allyCommands
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1692,6 +1693,70 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: a march-mode unit advances with no foe near, and breaks off to engage one in aggro range"
 			: $"FAIL: advanced={advanced}, movedToFoe={movedToFoe}, damagedFoe={damagedFoe}");
+		return pass;
+	}
+
+	// Chunk 44 (M7): ally HOLD / FOLLOW commands. (a) HOLD pins the squad to a fixed post: after
+	// the order, moving the captain (so the formation SLOT swings far away) must NOT drag the
+	// ally — it stays on its post; (b) a held ally still engages an enemy that wanders within
+	// LeashRadius of that post; (c) FOLLOW resumes the loose leash — the ally re-forms on the now
+	// far-away slot. A plain Node3D stands in for the captain so only the ally moves.
+	private async Task<bool> TestAllyCommands()
+	{
+		GD.Print("=== UnitTest: ally hold / follow commands (Chunk 44) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var player = new Node3D();
+		AddChild(player);
+		player.AddToGroup("player");
+		player.GlobalPosition = Vector3.Zero;
+
+		var ally = GD.Load<PackedScene>("res://scenes/Ally.tscn").Instantiate<Ally>();
+		ally.FormationOffset = new Vector3(2f, 0f, 1.5f);
+		AddChild(ally);                                 // _Ready grabs the captain + joins "allies"
+		ally.GlobalPosition = ally.SlotWorldPosition(); // parked in its slot
+
+		// (a) HOLD here, then shove the captain 20 m away: the slot follows the captain, the post stays.
+		Vector3 post = ally.GlobalPosition;
+		ally.SetCommand(Ally.Command.Hold);
+		bool holdsCommand = ally.CurrentCommand == Ally.Command.Hold;
+		player.GlobalPosition = new Vector3(0f, 0f, -20f);
+		float slotAway = ally.SlotWorldPosition().DistanceTo(post);   // sanity: the slot really moved off
+
+		for (int i = 0; i < 120; i++)   // ~2 s
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float driftFromPost = ally.GlobalPosition.DistanceTo(post);
+		bool heldPost = driftFromPost < 1.0f;            // stayed on its post, ignored the moved slot
+		GD.Print($"hold: slot moved {slotAway:0.00} m off post; ally drifted {driftFromPost:0.00} m (heldPost={heldPost})");
+
+		// (b) A held ally still defends its post: enemy walks in within LeashRadius of the post.
+		var foe = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 100f };
+		AddChild(foe);
+		foe.GlobalPosition = post + new Vector3(2f, 0f, 0f);   // inside the leash of the post
+		for (int i = 0; i < 120; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		bool defendedPost = foe.Health < foe.MaxHealth;
+		GD.Print($"hold-defend: foe HP={foe.Health}/{foe.MaxHealth} (defendedPost={defendedPost})");
+
+		// (c) FOLLOW again: the ally abandons the post and re-forms on the far-away slot.
+		foe.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		ally.SetCommand(Ally.Command.Follow);
+		for (int i = 0; i < 240; i++)   // ~4 s to march the full 20 m back to the slot
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float fromSlot = ally.GlobalPosition.DistanceTo(ally.SlotWorldPosition());
+		bool reformed = fromSlot < 0.5f;
+		GD.Print($"follow: ally {fromSlot:0.00} m from slot (reformed={reformed})");
+
+		bool pass = holdsCommand && heldPost && defendedPost && reformed;
+		GD.Print(pass
+			? "PASS: Hold pins the squad to a fixed post (still defending it); Follow re-forms on the slot"
+			: $"FAIL: holdsCommand={holdsCommand}, heldPost={heldPost}, defendedPost={defendedPost}, reformed={reformed}");
 		return pass;
 	}
 }

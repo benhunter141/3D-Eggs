@@ -15,6 +15,17 @@ public partial class Ally : Unit
 {
 	public enum WeaponType { Fists, Stones, Pike }
 
+	// --- Ally commands (M7, Chunk 44) ---
+	// The captain can re-task the whole squad live (Player broadcasts to the "allies" group):
+	//   Follow — the default loose-leash behaviour (steer to the player-relative slot, engage
+	//            enemies within LeashRadius of that slot). Everything before M7 is this mode.
+	//   Hold   — plant on a FIXED world post (captured where the ally stood when ordered) and
+	//            ignore the moving slot: engage enemies within LeashRadius of the POST, else
+	//            return to it. The squad holds ground instead of trailing the captain.
+	// Attack-move lands in Chunk 45. Default Follow, so any level that never issues a command
+	// behaves exactly as it did before.
+	public enum Command { Follow, Hold }
+
 	[Export] public float MoveSpeed = 7.5f;      // top follow speed (m/s); a margin over player Speed so it can catch up
 	[Export] public float Acceleration = 60.0f;  // how fast it ramps toward the target velocity
 	[Export] public float ArriveRadius = 1.5f;   // begin slowing within this distance of the slot
@@ -48,16 +59,34 @@ public partial class Ally : Unit
 	private Node3D _player;
 	private float _attackTimer; // counts down; > 0 blocks the next fist hit
 
+	// Current standing order + (for Hold) the fixed world post to anchor on.
+	private Command _command = Command.Follow;
+	private Vector3 _holdPost;
+	public Command CurrentCommand => _command;   // read-only views for the HUD / headless tests
+	public Vector3 HoldPost => _holdPost;
+
 	public override void _Ready()
 	{
 		Team = TeamId.Player;   // allies fight on the player's side
 		base._Ready();
+		// Join the "allies" group so the captain can broadcast commands to the whole squad (M7).
+		AddToGroup("allies");
 		// The player tags itself into the "player" group on ready; grab it once.
 		_player = GetTree().GetFirstNodeInGroup("player") as Node3D;
 
 		// Stone-throwers need a projectile scene; auto-load one if none was wired in.
 		if (Weapon == WeaponType.Stones && StoneScene == null)
 			StoneScene = GD.Load<PackedScene>("res://scenes/Stone.tscn");
+	}
+
+	// Re-task this ally (the captain calls this on every "allies"-group member). Switching to
+	// Hold pins the post to WHERE THE ALLY STANDS RIGHT NOW, so "hold here" means exactly that.
+	public void SetCommand(Command cmd)
+	{
+		_command = cmd;
+		if (cmd == Command.Hold)
+			_holdPost = GlobalPosition;
+		GD.Print($"[Ally] {Name} command -> {cmd}");
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -98,7 +127,7 @@ public partial class Ally : Unit
 			if (ShouldRescanTarget())
 				CachedTarget = MarchMode
 					? UnitRegistry.FindNearestOpponent(Team, GlobalPosition, AggroRange)
-					: FindTargetInLeash();
+					: FindTargetInLeash(LeashAnchor());
 			Unit target = LiveTarget;
 			if (target != null)
 			{
@@ -147,6 +176,11 @@ public partial class Ally : Unit
 				FaceTowards(GlobalPosition + MarchGoalDirection, dt);
 				facingHandled = true;
 			}
+			else if (_command == Command.Hold)
+			{
+				// Hold order (Chunk 44): no enemy near the post — settle back onto the fixed post.
+				desiredVel = ArriveVelocityTo(_holdPost);
+			}
 			else if (_player != null)
 			{
 				// No enemy in leash: fall back to the formation slot (Chunk 6 arrive behaviour).
@@ -169,20 +203,28 @@ public partial class Ally : Unit
 			FacePlayerYaw(dt);
 	}
 
-	// Velocity that walks us toward our formation slot with arrive-slowdown — full speed
-	// when far, scaled down inside ArriveRadius so we settle instead of overshooting, and
-	// zero once within StopRadius. Shared by the re-form fallback and the brace stance.
-	private Vector3 SlotArriveVelocity()
+	// The point our leash + re-form fallback anchor on: the fixed Hold post when standing our
+	// ground, otherwise the player-relative formation slot (the default Follow behaviour).
+	private Vector3 LeashAnchor() =>
+		_command == Command.Hold ? _holdPost : SlotWorldPosition();
+
+	// Velocity that walks us toward our formation slot with arrive-slowdown. Wrapper kept for
+	// the brace stance (a braced pike always holds its slot regardless of standing order).
+	private Vector3 SlotArriveVelocity() =>
+		_player == null ? Vector3.Zero : ArriveVelocityTo(SlotWorldPosition());
+
+	// Arrive-steer toward a world point: full speed when far, scaled down inside ArriveRadius so
+	// we settle instead of overshooting, and zero once within StopRadius. Shared by the re-form
+	// fallback, the brace stance, and the Hold post.
+	private Vector3 ArriveVelocityTo(Vector3 dest)
 	{
-		if (_player == null)
-			return Vector3.Zero;
-		Vector3 toSlot = SlotWorldPosition() - GlobalPosition;
-		toSlot.Y = 0f;
-		float dist = toSlot.Length();
+		Vector3 to = dest - GlobalPosition;
+		to.Y = 0f;
+		float dist = to.Length();
 		if (dist <= StopRadius)
 			return Vector3.Zero;
 		float speed = MoveSpeed * Mathf.Min(1f, dist / ArriveRadius);
-		return toSlot.Normalized() * speed;
+		return to.Normalized() * speed;
 	}
 
 	// Braced-pike pulse: on cooldown, damage AND lightly repel every enemy that sits within
@@ -238,12 +280,13 @@ public partial class Ally : Unit
 		GD.Print($"[Ally] {Name} threw a stone at {target.Name}");
 	}
 
-	// Nearest living enemy-team unit whose distance to OUR SLOT is within LeashRadius.
-	// Gating on the slot (not the ally) keeps the squad from chasing a fleeing enemy
-	// across the map — it returns null once nothing is near the slot, and we re-form.
-	private Unit FindTargetInLeash()
+	// Nearest living enemy-team unit whose distance to our leash ANCHOR is within LeashRadius.
+	// Gating on the anchor (the slot when following, the post when holding — not the ally)
+	// keeps the squad from chasing a fleeing enemy across the map: it returns null once nothing
+	// is near the anchor, and we re-form / re-settle on it.
+	private Unit FindTargetInLeash(Vector3 anchor)
 	{
-		Vector3 slot = SlotWorldPosition();
+		Vector3 slot = anchor;
 		float leashSq = LeashRadius * LeashRadius;
 		Unit best = null;
 		float bestSq = float.MaxValue;

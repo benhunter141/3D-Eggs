@@ -246,6 +246,19 @@ public partial class Player : Unit
 		GD.Print($"[Player] dismounted {m.Name} (speed -> {Speed:0.0})");
 	}
 
+	// Broadcast a standing order to every ally in the "allies" group (M7, Chunk 44).
+	private void CommandAllies(Ally.Command cmd)
+	{
+		int n = 0;
+		foreach (Node node in GetTree().GetNodesInGroup("allies"))
+			if (node is Ally a)
+			{
+				a.SetCommand(cmd);
+				n++;
+			}
+		GD.Print($"[Player] ordered {n} ally(s): {cmd}");
+	}
+
 	// Load a weapon's profile into the active fields, show its mesh, and resize the thrust
 	// hitbox so its forward length matches the weapon's reach (the box grows out along -Z from
 	// the pivot). Called on spawn and on every swap.
@@ -320,6 +333,13 @@ public partial class Player : Unit
 		// Climb onto / off a nearby mount (read once here so it never double-fires across mounts).
 		if (Input.IsActionJustPressed("mount"))
 			ToggleMount();
+
+		// Re-task the squad (M7, Chunk 44): Hold plants them where they stand, Follow resumes
+		// the loose-leash formation. Broadcast to every ally so the whole wall obeys at once.
+		if (Input.IsActionJustPressed("cmd_hold"))
+			CommandAllies(Ally.Command.Hold);
+		else if (Input.IsActionJustPressed("cmd_follow"))
+			CommandAllies(Ally.Command.Follow);
 
 		// Swap weapons between thrusts (not mid-swing, so the hitbox never resizes live).
 		if (!_swinging && Input.IsActionJustPressed("swap_weapon"))
