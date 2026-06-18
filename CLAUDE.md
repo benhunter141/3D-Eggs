@@ -277,7 +277,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       controller aim + squad ownership + the shared two-captain camera (Chunks 44–46) + the `CoopStand`
       scene with the both-captains-fall lose rule (Chunk 47). Removed the first four levels from the menu.
       *Local* couch co-op — NOT the networked M13. Feel-check pending (needs a gamepad for P2).
-- [ ] **M13 — Multiplayer:** 2 players over the network, server-authoritative. Hardest, last.
+- [~] **M13 — Multiplayer:** 2 players over the network, server-authoritative. Hardest, last.
+  Now broken into Chunks 50–54 (net bootstrap → captain spawn/ownership → state replication →
+  server-authoritative combat/input RPCs → networked co-op level + synced match state) — see §7.
+  **Build gated** on M1–M5 feeling great (and the outstanding feel-checks); plan is laid out so
+  the netcode build can start when the user is ready.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -578,7 +582,64 @@ attack-move ground-target reticle.)**
 
 ---
 
-Then proceed to **M13 — Multiplayer** (§6), updating checkboxes and §8 as you go.
+### ▶ PLANNED — M13 Multiplayer (Chunks 50–54)
+
+**Goal:** 2 players over the network, **server-authoritative** — the hardest, last milestone.
+One player **hosts** (acts as server + plays); the other **joins** by address. The server owns
+all simulation (units, AI, combat, knockback, match state); clients send input and render
+replicated state. Built on **Godot 4 high-level multiplayer** — `ENetMultiplayerPeer`,
+`MultiplayerSpawner`, `MultiplayerSynchronizer`, and `[Rpc]` methods — so it layers on the
+existing `Unit`/`Player`/`GameManager` spine without rewriting combat.
+
+**Invariant — don't disturb single-player / couch co-op.** All netcode is **off unless a peer
+is active** (`Multiplayer.MultiplayerPeer` set / `GetTree().GetMultiplayer().HasMultiplayerPeer()`).
+With no peer, every unit keeps simulating locally exactly as today (offline play, the couch-coop
+scene, the card battler must be byte-identical). Authority checks short-circuit to "I am authority"
+when there's no peer.
+
+**New durable rules (promote into §5 as chunks land):**
+- **Server is the sole authority.** Only the server runs AI, applies damage/knockback, spawns/frees
+  units, and decides win/lose. Clients are thin: send input via RPC, display synchronized state.
+- **One Player per peer.** Each connected peer owns exactly one captain; `SetMultiplayerAuthority`
+  ties that captain (input) to its peer. AI units stay under server authority.
+- **Net play is opt-in by scene.** A networked level sets up the peer + spawner; offline scenes
+  never create a peer, so the authority short-circuit keeps them unchanged.
+
+- [ ] **Chunk 50 — Net bootstrap: host/join lobby + ENet peer.** A `scenes/Menu/Lobby.tscn` +
+  `scripts/Net/NetGame.cs` (autoload-style singleton or scene script): **Host** creates an
+  `ENetMultiplayerPeer.CreateServer(port)`, **Join** does `CreateClient(address, port)`; show a
+  live connected-peer list and a Start button (host only). Wire `peer_connected` /
+  `peer_disconnected` / `connected_to_server` / `connection_failed` signals. No gameplay yet —
+  just establish and tear down the connection cleanly. Add Lobby to `LevelSelect`. **Headless-test:**
+  a server peer reports `IsServer`/peer count; the authority short-circuit returns true with no peer.
+- [ ] **Chunk 51 — Networked captain spawn + ownership.** A `scenes/Levels/NetStand.tscn` with a
+  `MultiplayerSpawner` that spawns one captain per peer on the server and replicates it to clients;
+  `SetMultiplayerAuthority(peerId)` on each so a client only drives its own captain. `Player` reads
+  input **only when it is the multiplayer authority** (and the authority check short-circuits to true
+  offline, so existing scenes are untouched). **Headless-test:** authority resolves to the owning peer
+  id; a non-authority Player skips its input read.
+- [ ] **Chunk 52 — State replication (transforms + health).** Attach `MultiplayerSynchronizer`s (or a
+  hand-rolled server→client state RPC) to units replicating position, yaw, and `Health` from the
+  server. The server spawns/frees all AI + ally units via the spawner; clients never spawn. Dead units
+  free server-side and the despawn replicates. **Headless-test:** a server-side health change is the
+  value clients would read from the synced property; only the server mutates it.
+- [ ] **Chunk 53 — Server-authoritative combat & input RPCs.** Client captain input (move dir, aim yaw,
+  attack/brace/swap/command edges) goes to the server via `[Rpc(RpcMode.AnyPeer)]`; the server applies
+  it to that peer's captain, resolves all `TakeDamage`/`AddKnockback`/death there, and lets replication
+  carry results back. Clients never resolve damage locally. **Headless-test:** an input RPC routed to
+  the server moves/acts the right captain; a client-side damage call is ignored when not authority.
+- [ ] **Chunk 54 — Networked co-op level + synced match state + menu.** Make `NetStand` a full battle:
+  two captains (one per peer) each leading a squad vs a shared server-run enemy force; `GameManager`
+  runs **only on the server** and broadcasts win/lose to clients (drives the shared `victory`/`game_over`
+  groups so `ResultMenu` works for everyone); `RequireAllPlayersDead` reused so it ends only when both
+  captains fall. Listed on `LevelSelect`. **Headless-test:** server-decided match result propagates to a
+  client; clients don't independently declare win/lose. **User feel-check** (needs two machines / two
+  instances).
+
+---
+
+Then proceed to multiplayer polish & netcode hardening as needed (lag handling, reconnection),
+updating checkboxes and §8 as you go.
 
 ## 8. Quick Reference
 
