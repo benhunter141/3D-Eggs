@@ -132,6 +132,7 @@ public partial class CrackTest : Node3D
 
 		switch (key.Keycode)
 		{
+			case Key.Escape: GetTree().ChangeSceneToFile("res://scenes/Menu/LevelSelect.tscn"); break;
 			case Key.Key1: _styleIndex = 0; ApplyStyle(); break;
 			case Key.Key2: _styleIndex = 1; ApplyStyle(); break;
 			case Key.R: _rotate = !_rotate; UpdateHud(); break;
@@ -185,6 +186,8 @@ public partial class CrackTest : Node3D
 			$"  seg length [E/D]  {_segLen:0.000}\n" +
 			$"  count      [Z/X]  {_count}\n" +
 			$"  grow/len   [C/V]  {_grow:0}\n" +
-			$"  branches   [B]    {(_branches ? "on" : "off")}";
+			$"  branches   [B]    {(_branches ? "on" : "off")}\n" +
+			"\n" +
+			"[Esc] back to menu";
 	}
 }
