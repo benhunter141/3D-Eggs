@@ -170,7 +170,14 @@ public partial class Unit : CharacterBody3D, ICardUnit
 			_bodyMat.EmissionEnabled = true;        // emission drives the "pop"; energy 0 at rest
 			_bodyMat.Emission = FlashColor;
 			_bodyMat.EmissionEnergyMultiplier = 0f;
-			_bodyMesh.SetSurfaceOverrideMaterial(0, _bodyMat);
+			// Assign back to whichever slot the source came from so our copy actually renders:
+			// material_override OUTRANKS a surface override, so for the unit bodies (which set
+			// material_override in the scene) we must replace THAT slot — writing a surface
+			// override here would be silently shadowed (and with it the flash + crack next_pass).
+			if (_bodyMesh.MaterialOverride != null)
+				_bodyMesh.MaterialOverride = _bodyMat;
+			else
+				_bodyMesh.SetSurfaceOverrideMaterial(0, _bodyMat);
 			SetupCracks();
 		}
 
