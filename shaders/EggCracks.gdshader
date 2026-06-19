@@ -22,7 +22,16 @@ uniform vec3 crack_color : source_color = vec3(0.03, 0.02, 0.02);
 // Voronoi-only: how many shell plates span the egg's UV.
 uniform float plate_scale = 5.0;
 
-const int MAX_CRACKS = 4;
+// --- Bold-branching tuning knobs (live-tunable from the CrackTest harness) ---
+uniform float crack_thickness = 0.018;   // line half-width in UV (bigger = chunkier)
+uniform float crack_jitter = 0.9;        // heading wobble per step (bigger = more jagged)
+uniform float crack_seg_len = 0.05;      // step length per segment (bigger = longer strides)
+uniform int crack_count = 4;             // how many cracks at full death (1..MAX_CRACKS)
+uniform float crack_grow = 5.0;          // max segments a crack grows out to near death
+uniform bool crack_branches = true;      // whether cracks fork a side branch
+
+const int MAX_CRACKS = 6;
+const int MAX_SEG = 6;
 
 // Sin-free hash (Dave Hoskins) — stable at the Compatibility renderer's float precision,
 // unlike fract(sin(p)*big) which quantised into blocky steps on older GPUs.
@@ -49,41 +58,44 @@ float branching_cracks(vec2 uv, float dmg) {
 	float aa = fwidth(uv.x) * 1.5 + 0.0012;
 	float result = 0.0;
 
+	int count = clamp(crack_count, 1, MAX_CRACKS);
 	for (int i = 0; i < MAX_CRACKS; i++) {
+		if (i >= count) {
+			break;
+		}
 		float fi = float(i);
 		// This crack only appears once damage passes its staggered threshold.
-		float ti = fi / float(MAX_CRACKS) * 0.8;
+		float ti = fi / float(count) * 0.8;
 		float appear = smoothstep(ti - 0.06, ti + 0.06, dmg);
 		if (appear <= 0.0) {
 			continue;
 		}
-		// How far this crack has grown out (1 segment at its threshold -> 5 near death).
-		float grow = mix(1.0, 5.0, clamp((dmg - ti) / max(1.0 - ti, 0.001), 0.0, 1.0));
+		// How far this crack has grown out (1 segment at its threshold -> crack_grow near death).
+		float grow = mix(1.0, crack_grow, clamp((dmg - ti) / max(1.0 - ti, 0.001), 0.0, 1.0));
 
 		vec2 h = hash2(seed + vec2(fi * 7.31, 3.7));
 		vec2 origin = vec2(0.18 + 0.64 * h.x, 0.12 + 0.62 * h.y);  // front/upper-ish, off the seam
 		float dir = hash2(seed + vec2(fi * 5.1, 9.2)).x * 6.2831853;
-		float seg_len = 0.05;
-		float thick = mix(0.012, 0.024, dmg);
+		float thick = crack_thickness * mix(0.8, 1.2, dmg);
 
 		vec2 p = origin;
 		float dmin = 1e9;
-		for (int k = 0; k < 5; k++) {
+		for (int k = 0; k < MAX_SEG; k++) {
 			vec2 hk = hash2(seed + vec2(fi * 13.0 + float(k), 2.0));
-			dir += (hk.x - 0.5) * 0.9;                              // jitter heading -> jagged
-			vec2 q = p + vec2(cos(dir), sin(dir)) * seg_len;
+			dir += (hk.x - 0.5) * crack_jitter;                    // jitter heading -> jagged
+			vec2 q = p + vec2(cos(dir), sin(dir)) * crack_seg_len;
 			float w = clamp(grow - float(k), 0.0, 1.0);            // segment grows in over k..k+1
 			if (w > 0.0) {
 				dmin = min(dmin, seg_dist(uv, p, mix(p, q, w)));   // growing tip
 			}
 			// Fork a short branch off the middle segment once the crack is long enough.
-			if (k == 2 && grow > 2.5) {
+			if (crack_branches && k == 2 && grow > 2.5) {
 				float bdir = dir + (hk.y > 0.5 ? 1.0 : -1.0) * 0.9;
 				vec2 b = p;
 				for (int j = 0; j < 2; j++) {
 					vec2 hb = hash2(seed + vec2(fi * 17.0 + float(j), 5.0));
 					bdir += (hb.x - 0.5) * 0.8;
-					vec2 bn = b + vec2(cos(bdir), sin(bdir)) * seg_len * 0.8;
+					vec2 bn = b + vec2(cos(bdir), sin(bdir)) * crack_seg_len * 0.8;
 					float bw = clamp(grow - 2.5 - float(j), 0.0, 1.0);
 					if (bw > 0.0) {
 						dmin = min(dmin, seg_dist(uv, b, mix(b, bn, bw)));

@@ -28,12 +28,21 @@ public partial class CrackTest : Node3D
 	private readonly List<ShaderMaterial> _crackMats = new();
 	private Label _hud;
 
+	// Bold-branching tuning knobs (live-adjustable; defaults match the shader).
+	private float _thickness = 0.018f;
+	private float _jitter = 0.9f;
+	private float _segLen = 0.05f;
+	private int _count = 4;
+	private float _grow = 5f;
+	private bool _branches = true;
+
 	public override void _Ready()
 	{
 		BuildEnvironment();
 		BuildEggs();
 		BuildHud();
 		ApplyStyle();
+		PushParams();
 	}
 
 	private void BuildEnvironment()
@@ -126,6 +135,19 @@ public partial class CrackTest : Node3D
 			case Key.Key1: _styleIndex = 0; ApplyStyle(); break;
 			case Key.Key2: _styleIndex = 1; ApplyStyle(); break;
 			case Key.R: _rotate = !_rotate; UpdateHud(); break;
+
+			// Bold-branching knobs: upper key raises, lower key lowers.
+			case Key.Q: _thickness = Mathf.Min(0.05f, _thickness + 0.002f); PushParams(); break;
+			case Key.A: _thickness = Mathf.Max(0.004f, _thickness - 0.002f); PushParams(); break;
+			case Key.W: _jitter = Mathf.Min(2.0f, _jitter + 0.1f); PushParams(); break;
+			case Key.S: _jitter = Mathf.Max(0f, _jitter - 0.1f); PushParams(); break;
+			case Key.E: _segLen = Mathf.Min(0.12f, _segLen + 0.005f); PushParams(); break;
+			case Key.D: _segLen = Mathf.Max(0.02f, _segLen - 0.005f); PushParams(); break;
+			case Key.Z: _count = Mathf.Min(6, _count + 1); PushParams(); break;
+			case Key.X: _count = Mathf.Max(1, _count - 1); PushParams(); break;
+			case Key.C: _grow = Mathf.Min(6f, _grow + 1f); PushParams(); break;
+			case Key.V: _grow = Mathf.Max(2f, _grow - 1f); PushParams(); break;
+			case Key.B: _branches = !_branches; PushParams(); break;
 		}
 	}
 
@@ -137,11 +159,32 @@ public partial class CrackTest : Node3D
 		UpdateHud();
 	}
 
+	// Push the current tuning values into every egg's crack material.
+	private void PushParams()
+	{
+		foreach (ShaderMaterial mat in _crackMats)
+		{
+			mat.SetShaderParameter("crack_thickness", _thickness);
+			mat.SetShaderParameter("crack_jitter", _jitter);
+			mat.SetShaderParameter("crack_seg_len", _segLen);
+			mat.SetShaderParameter("crack_count", _count);
+			mat.SetShaderParameter("crack_grow", _grow);
+			mat.SetShaderParameter("crack_branches", _branches);
+		}
+		UpdateHud();
+	}
+
 	private void UpdateHud()
 	{
 		_hud.Text =
-			$"Crack style: {Styles[_styleIndex].Name}\n" +
-			"[1] Bold branching   [2] Voronoi (old)\n" +
-			$"[R] spin: {(_rotate ? "on" : "off")}";
+			$"Crack style: {Styles[_styleIndex].Name}    [1] branching  [2] voronoi  [R] spin {(_rotate ? "on" : "off")}\n" +
+			"\n" +
+			"Bold-branching knobs (UPPER raises / LOWER lowers):\n" +
+			$"  thickness  [Q/A]  {_thickness:0.000}\n" +
+			$"  jitter     [W/S]  {_jitter:0.0}   (jaggedness)\n" +
+			$"  seg length [E/D]  {_segLen:0.000}\n" +
+			$"  count      [Z/X]  {_count}\n" +
+			$"  grow/len   [C/V]  {_grow:0}\n" +
+			$"  branches   [B]    {(_branches ? "on" : "off")}";
 	}
 }
