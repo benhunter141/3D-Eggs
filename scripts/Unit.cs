@@ -124,6 +124,16 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	private Color _baseColor;
 	private float _flash;   // 1 = full flash, decays to 0
 
+	// --- Health-as-cracks (shell damage overlay) ---
+	// A next_pass shader on the body material paints crack lines whose extent tracks
+	// missing health: a couple of hairlines at ~90% HP spreading to a shattered shell
+	// near death. The flash system above is untouched — this rides on top of it. The
+	// Shader resource is shared by every unit; each unit owns a per-instance material
+	// so it can carry its own random crack seed + live damage value. CrackDamage 0 at
+	// full health -> 1 at death; updated each time TakeDamage changes Health.
+	private static Shader _crackShader;
+	private ShaderMaterial _crackMat;
+
 	// One generated impact sound, shared by every unit; each unit owns a 3D player.
 	private static AudioStreamWav _hitSound;
 	private AudioStreamPlayer3D _audio;
@@ -161,6 +171,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 			_bodyMat.Emission = FlashColor;
 			_bodyMat.EmissionEnergyMultiplier = 0f;
 			_bodyMesh.SetSurfaceOverrideMaterial(0, _bodyMat);
+			SetupCracks();
 		}
 
 		_audio = new AudioStreamPlayer3D
@@ -172,6 +183,34 @@ public partial class Unit : CharacterBody3D, ICardUnit
 			VolumeDb = -3f,
 		};
 		AddChild(_audio);
+	}
+
+	// Hang a crack overlay off the body material as a next_pass: same egg geometry drawn
+	// again with the EggCracks shader, blended on top so the base colour + hit-flash are
+	// untouched. The Shader is loaded once and shared; the ShaderMaterial is per-instance so
+	// each egg cracks from its own random seed and carries its own live damage value.
+	private void SetupCracks()
+	{
+		_crackShader ??= GD.Load<Shader>("res://shaders/EggCracks.gdshader");
+		if (_crackShader == null)
+			return;
+
+		_crackMat = new ShaderMaterial { Shader = _crackShader };
+		// Per-unit random offset so no two shells crack identically.
+		_crackMat.SetShaderParameter("seed", new Vector2(
+			(float)GD.RandRange(0.0, 100.0), (float)GD.RandRange(0.0, 100.0)));
+		_bodyMat.NextPass = _crackMat;
+		UpdateCrackDamage();
+	}
+
+	// Push the current missing-health fraction (0 pristine -> 1 near death) into the crack
+	// shader. Called on spawn and after every hit; cheap, so no per-frame work is needed.
+	private void UpdateCrackDamage()
+	{
+		if (_crackMat == null)
+			return;
+		float damage = MaxHealth > 0f ? Mathf.Clamp(1f - Health / MaxHealth, 0f, 1f) : 0f;
+		_crackMat.SetShaderParameter("damage", damage);
 	}
 
 	// Shared, build-once eye assets so 100 units cost two materials + one sphere, not 600.
@@ -290,6 +329,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 			return;
 
 		Health = Mathf.Max(0f, Health - amount);
+		UpdateCrackDamage();   // shell cracks spread as HP drops
 		GD.Print($"[Unit] {Name} took {amount} dmg -> {Health}/{MaxHealth} HP");
 
 		if (knockbackStrength > 0f)
