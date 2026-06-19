@@ -277,6 +277,12 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       controller aim + squad ownership + the shared two-captain camera (Chunks 44–46) + the `CoopStand`
       scene with the both-captains-fall lose rule (Chunk 47). Removed the first four levels from the menu.
       *Local* couch co-op — NOT the networked M13. Feel-check pending (needs a gamepad for P2).
+- [ ] **M12.8 — Slay-the-Spire-feel pass (Slay the Eggs look & UX):** make the card mode LOOK and (in the
+      PAUSE phase) PLAY like StS without ripping out the real-time march. Real card frames (cost orb / title
+      banner / art panel / desc), a compact fanned hover-lift hand that stops eating ~40% of the screen,
+      board/tray separation + camera reframe, StS HUD chrome (energy orb + card-back pile stacks), and play
+      juice (Chunks 55–59). **Visual reskin only** — two-click play and the auto-battler stay. Drag-to-target +
+      enemy intent (was "Chunk F") and a full turn-based remake are explicitly OUT of scope unless asked.
 - [~] **M13 — Multiplayer:** 2 players over the network, server-authoritative. Hardest, last.
   Now broken into Chunks 50–54 (net bootstrap → captain spawn/ownership → state replication →
   server-authoritative combat/input RPCs → networked co-op level + synced match state) — see §7.
@@ -635,6 +641,55 @@ when there's no peer.
   captains fall. Listed on `LevelSelect`. **Headless-test:** server-decided match result propagates to a
   client; clients don't independently declare win/lose. **User feel-check** (needs two machines / two
   instances).
+
+---
+
+---
+
+### ▶ PLANNED — M12.8 Slay-the-Spire-Feel Pass (Chunks 55–59)
+
+**Goal:** the card mode (`scenes/Cards/CardBattle.tscn` + `scripts/Cards/CardBattle.cs`) currently
+renders each hand card as a bare `Button` whose face is one multi-line text string — it reads as an
+"ugly transparent block," the hand band eats ~40% of the screen, and the hand `CanvasLayer` overlaps
+the near edge of the 3D pitch. This milestone makes it LOOK like Slay the Spire (and PLAY like it in
+the PAUSE phase) **without** changing the model or the real-time auto-battler. **Visual reskin only.**
+
+**Invariant — model & play untouched.** No changes to `Deck`/`Card`/`EnergyPool`/`RunMap`/`CardPlay`
+or the two-click aim (click card → click ground/unit). The round loop, energy gating, endzone march,
+and run structure all behave EXACTLY as today. These chunks only touch how `CardBattle` *draws* the
+hand/HUD and how the `Camera3D`/layout frame the board. Each is independently feel-checkable.
+
+**OUT of scope (don't build unless asked):** drag-to-target play, enemy intent telegraph icons, and a
+full turn-based remake (dropping the real-time march). Decided against in the planning convo.
+
+- [ ] **Chunk 55 — `CardView` card frame (keystone).** Replace the `Button`-with-text in
+  `CardBattle.MakeCardButton` with a reusable composite control (a small `scenes/Cards/CardView.tscn`
+  or an in-code builder): rounded `StyleBoxFlat` frame, a **cost orb** badge (circular, top-left, the
+  `EnergyCost` number), a **title banner** colored by kind (Unit=blue / Action=amber), an **art panel**
+  (solid tint / simple per-kind icon placeholder for now — real art later), and a **description box**
+  at the bottom. Preserve today's behavior: click-to-select (`OnCardSelected`), pending-card highlight,
+  and affordability dimming (`Disabled = _pendingReward != null || !_energy.CanAfford(card)`). Biggest
+  single visual win; the rest build on it. Pure visual; user feel-check.
+- [ ] **Chunk 56 — Compact fanned hand + hover-lift.** Stop the hand eating ~40% of the screen at rest:
+  render the `CardView`s smaller and **overlapping in a slight arc** (manual fan / negative separation
+  instead of the plain `HandBox` row), and on hover **enlarge + raise** the focused card above its
+  neighbors (mouse enter/exit → scale + z-order). At rest the hand is a thin ribbon; hovering "opens" a
+  card. Reclaims most of the bottom-screen real estate. Pure visual; feel-check.
+- [ ] **Chunk 57 — Board/tray separation + camera reframe.** Tilt/raise the `Camera3D` (currently
+  `y=30, z=23`, ~50° tilt) and/or drop FOV so the whole pitch sits in the upper portion and its near
+  edge no longer hides behind the hand; add a dark **hand-tray band** (styled panel strip) behind the
+  cards so board and hand are visually distinct (the StS shelf). Feel-check nothing important clips.
+- [ ] **Chunk 58 — StS HUD chrome (energy orb + pile stacks).** Reskin existing widgets only: turn the
+  centered "ENERGY x/y" `EnergyLabel` into a **crystal orb** bottom-center/left (big number in a circular
+  `StyleBox`), and turn the flat `DrawPanel`/`DiscardPanel` into little **card-back stacks** with the
+  count overlaid (bottom-left / bottom-right); make End Turn the big rounded bottom-right button. No
+  logic change — same labels/counts, new look.
+- [ ] **Chunk 59 — Play juice.** Cheap `Tween`s, no model change: cards slide up into the hand on draw,
+  fly toward the discard stack on play, the energy orb pulses on refill, hovered cards tween smoothly.
+  Final polish pass; feel-check.
+
+**(Independent of M13 — these can be built whenever the user asks; they don't gate, and aren't gated by,
+the netcode chunks. Build order recommendation: 55 → 57 → 58 → 56 → 59, but 55 first regardless.)**
 
 ---
 
