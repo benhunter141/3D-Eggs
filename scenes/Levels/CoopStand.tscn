@@ -278,9 +278,11 @@ Target2 = NodePath("../Captain2")
 Offset = Vector3(0, 18, 15)
 DynamicZoom = true
 MinDistance = 26.0
-MaxDistance = 52.0
-FitScale = 1.4
+MaxDistance = 38.0
+FitScale = 0.6
 ZoomMargin = 10.0
+ZoomBiasMin = -8.0
+ZoomBiasMax = 10.0
 
 [node name="P1_Pike1" parent="." instance=ExtResource("3_pikeman")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 1, 8.5)
