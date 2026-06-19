@@ -67,6 +67,12 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	[Export] public bool ShowEyes = true;
 	[Export] public float EyeScale = 1.0f;   // per-archetype multiplier on eye size
 
+	// --- Health-as-cracks look (shell damage overlay) ---
+	// Which crack pattern the EggCracks shader draws (we're trying a few looks; see the
+	// shader's `style` uniform). Maps 1:1 to that int, so the enum order is load-bearing.
+	public enum CrackStyle { Voronoi = 0, BoldBranching = 1 }
+	[Export] public CrackStyle CrackPattern = CrackStyle.BoldBranching;
+
 	// --- Card-mode actions (M12, Chunk 33) ---
 	// When an Action card is played onto this (friendly) unit it runs PerformAction below.
 	// Effects are deliberately simple/visible; Str/Int scaling wired in Chunk 36 (see below).
@@ -206,6 +212,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		// Per-unit random offset so no two shells crack identically.
 		_crackMat.SetShaderParameter("seed", new Vector2(
 			(float)GD.RandRange(0.0, 100.0), (float)GD.RandRange(0.0, 100.0)));
+		_crackMat.SetShaderParameter("style", (int)CrackPattern);
 		_bodyMat.NextPass = _crackMat;
 		UpdateCrackDamage();
 	}
