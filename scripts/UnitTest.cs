@@ -157,7 +157,7 @@ public partial class UnitTest : Node3D
 			ZoomStep = 3f, ZoomBiasMin = -24f, ZoomBiasMax = 24f,
 		};
 
-		const float spread = 20f;                       // base = 20*1.5 + 10 = 40 m (mid-band)
+		const float spread = 20f;                       // framed = clamp(20*1.5 + 10, 30, 60) = 40 m (mid-band)
 		float baseDist = cam.DesiredDistance(spread);
 		bool baseOk = Mathf.IsEqualApprox(baseDist, 40f, 0.01f);
 
@@ -165,15 +165,19 @@ public partial class UnitTest : Node3D
 		float outOne = cam.DesiredDistance(spread);
 		bool shiftsOut = outOne > baseDist;
 
+		// Bias sits ON TOP of the auto-frame now, so saturating outward pushes PAST MaxDistance
+		// (framed 40 + ZoomBiasMax 24 = 64), not capped at it.
 		for (int i = 0; i < 50; i++) cam.StepZoom(+1f); // saturate outward
 		float far = cam.DesiredDistance(spread);
 		bool clampHi = Mathf.IsEqualApprox(cam.ZoomBias, cam.ZoomBiasMax, 0.01f)
-		             && Mathf.IsEqualApprox(far, cam.MaxDistance, 0.01f);
+		             && Mathf.IsEqualApprox(far, 40f + cam.ZoomBiasMax, 0.01f);
 
+		// Saturating inward now pulls CLOSER than MinDistance (framed 40 + ZoomBiasMin -24 = 16,
+		// above the MinFixedDistance floor), the whole point of this change.
 		for (int i = 0; i < 100; i++) cam.StepZoom(-1f); // saturate inward
 		float near = cam.DesiredDistance(spread);
 		bool clampLo = Mathf.IsEqualApprox(cam.ZoomBias, cam.ZoomBiasMin, 0.01f)
-		             && Mathf.IsEqualApprox(near, cam.MinDistance, 0.01f);
+		             && Mathf.IsEqualApprox(near, 40f + cam.ZoomBiasMin, 0.01f);
 
 		// Fixed mode: bias hangs off the authored Offset length, floored at MinFixedDistance
 		// so a hard zoom-in can't pass through the player.

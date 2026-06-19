@@ -142,16 +142,20 @@ public partial class FollowCamera : Camera3D
 	}
 
 	// The target camera distance this frame (BEFORE the position/zoom smoothing), given the
-	// crowd `spread` (ignored when DynamicZoom is off). Folds in the live ZoomBias and clamps:
-	// dynamic mode keeps the auto framing inside [MinDistance, MaxDistance]; fixed mode hangs
-	// the bias off the authored Offset length down to a MinFixedDistance floor. Pure function
-	// of the camera's exports + ZoomBias, so the headless test can drive it without a tree.
+	// crowd `spread` (ignored when DynamicZoom is off). Dynamic mode auto-frames the fight inside
+	// [MinDistance, MaxDistance], THEN adds the player's live ZoomBias ON TOP — so the wheel can
+	// pull CLOSER than MinDistance (the default rests at the current max-in: the tightest auto
+	// frame) or push past MaxDistance, instead of the bias being swallowed by the clamp. The
+	// MinFixedDistance floor still stops a hard zoom-in from passing through the player. Fixed mode
+	// hangs the bias off the authored Offset length down to the same floor. Pure function of the
+	// camera's exports + ZoomBias, so the headless test can drive it without a tree.
 	public float DesiredDistance(float spread)
 	{
 		if (DynamicZoom)
 		{
 			float baseDist = spread * FitScale + ZoomMargin;
-			return Mathf.Clamp(baseDist + ZoomBias, MinDistance, MaxDistance);
+			float framed = Mathf.Clamp(baseDist, MinDistance, MaxDistance);
+			return Mathf.Max(framed + ZoomBias, MinFixedDistance);
 		}
 		return Mathf.Max(Offset.Length() + ZoomBias, MinFixedDistance);
 	}
