@@ -18,6 +18,7 @@ public partial class CrackTest : Node3D
 	// (shader style id, label). Index 0 is the current default look.
 	private static readonly (int Id, string Name)[] Styles =
 	{
+		(2, "Cartoon stages"),
 		(1, "Bold branching"),
 		(0, "Voronoi (old)"),
 	};
@@ -135,6 +136,7 @@ public partial class CrackTest : Node3D
 			case Key.Escape: GetTree().ChangeSceneToFile("res://scenes/Menu/LevelSelect.tscn"); break;
 			case Key.Key1: _styleIndex = 0; ApplyStyle(); break;
 			case Key.Key2: _styleIndex = 1; ApplyStyle(); break;
+			case Key.Key3: _styleIndex = 2; ApplyStyle(); break;
 			case Key.R: _rotate = !_rotate; UpdateHud(); break;
 
 			// Bold-branching knobs: upper key raises, lower key lowers.
@@ -178,9 +180,9 @@ public partial class CrackTest : Node3D
 	private void UpdateHud()
 	{
 		_hud.Text =
-			$"Crack style: {Styles[_styleIndex].Name}    [1] branching  [2] voronoi  [R] spin {(_rotate ? "on" : "off")}\n" +
+			$"Crack style: {Styles[_styleIndex].Name}    [1] cartoon  [2] branching  [3] voronoi  [R] spin {(_rotate ? "on" : "off")}\n" +
 			"\n" +
-			"Bold-branching knobs (UPPER raises / LOWER lowers):\n" +
+			"Bold-branching knobs only (UPPER raises / LOWER lowers):\n" +
 			$"  thickness  [Q/A]  {_thickness:0.000}\n" +
 			$"  jitter     [W/S]  {_jitter:0.0}   (jaggedness)\n" +
 			$"  seg length [E/D]  {_segLen:0.000}\n" +

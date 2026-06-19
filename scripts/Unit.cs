@@ -70,8 +70,8 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	// --- Health-as-cracks look (shell damage overlay) ---
 	// Which crack pattern the EggCracks shader draws (we're trying a few looks; see the
 	// shader's `style` uniform). Maps 1:1 to that int, so the enum order is load-bearing.
-	public enum CrackStyle { Voronoi = 0, BoldBranching = 1 }
-	[Export] public CrackStyle CrackPattern = CrackStyle.BoldBranching;
+	public enum CrackStyle { Voronoi = 0, BoldBranching = 1, CartoonStages = 2 }
+	[Export] public CrackStyle CrackPattern = CrackStyle.CartoonStages;
 
 	// --- Card-mode actions (M12, Chunk 33) ---
 	// When an Action card is played onto this (friendly) unit it runs PerformAction below.

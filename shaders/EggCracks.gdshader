@@ -6,13 +6,13 @@
 // near death (an extreme crack network).
 //
 // `style` selects the LOOK (we're trying a few — see the plan):
-//   1 = Bold branching  : a FEW thick jagged lines that fork outward from a point,
-//                         growing in count + length as HP drops (the default).
-//   0 = Voronoi         : the original dense cellular net (kept for comparison).
+//   2 = Cartoon stages  : hand-authored bold cracks that snap in at HP stages (the default).
+//   1 = Bold branching  : a few thick jagged lines that fork from a point (kept for compare).
+//   0 = Voronoi         : the original dense cellular net (kept for compare).
 shader_type spatial;
 render_mode blend_mix, depth_draw_never, cull_back, unshaded;
 
-uniform int style = 1;
+uniform int style = 2;
 // 0 = pristine, 1 = about to die. Set per-frame-of-damage by Unit.cs.
 uniform float damage : hint_range(0.0, 1.0) = 0.0;
 // Per-unit random offset so no two eggs crack the same way.
@@ -112,6 +112,56 @@ float branching_cracks(vec2 uv, float dmg) {
 	return result;
 }
 
+// ---- Style 2: Cartoon crack stages -------------------------------------------------
+// HAND-AUTHORED bold cracks (not procedural noise) that SNAP IN at HP thresholds, like a
+// comic-book egg breaking step by step. A few deliberate jagged polylines on the front of
+// the shell, each gated to a damage stage: ~90% HP a small crack, then more + a central
+// shatter-star near death. Drawn thick + crisp (fwidth AA) so it reads as intentional.
+// A seed-driven left/right mirror gives two variants so a crowd isn't all identical.
+float cartoon_cracks(vec2 uv_in, float dmg) {
+	// Mirror half the units so the same authored shapes don't repeat across a crowd.
+	vec2 uv = uv_in;
+	if (hash2(seed + vec2(1.7, 4.2)).x > 0.5) {
+		uv.x = 1.0 - uv.x;
+	}
+
+	float aa = fwidth(uv.x) * 1.2 + 0.001;
+	float thick = 0.020;     // bold, constant width
+	float d = 1e9;
+
+	// Stage 1 — appears ~90% HP (dmg >= 0.10): one small zig-zag crack, top-centre.
+	if (dmg >= 0.10) {
+		d = min(d, seg_dist(uv, vec2(0.50, 0.20), vec2(0.46, 0.28)));
+		d = min(d, seg_dist(uv, vec2(0.46, 0.28), vec2(0.53, 0.34)));
+		d = min(d, seg_dist(uv, vec2(0.53, 0.34), vec2(0.48, 0.43)));
+	}
+	// Stage 2 — ~65% HP (dmg >= 0.35): a second crack with a fork, to the right.
+	if (dmg >= 0.35) {
+		d = min(d, seg_dist(uv, vec2(0.62, 0.30), vec2(0.58, 0.39)));
+		d = min(d, seg_dist(uv, vec2(0.58, 0.39), vec2(0.65, 0.47)));
+		d = min(d, seg_dist(uv, vec2(0.65, 0.47), vec2(0.60, 0.56)));
+		d = min(d, seg_dist(uv, vec2(0.58, 0.39), vec2(0.51, 0.45)));   // fork
+	}
+	// Stage 3 — ~40% HP (dmg >= 0.60): a longer crack down the left.
+	if (dmg >= 0.60) {
+		d = min(d, seg_dist(uv, vec2(0.38, 0.24), vec2(0.44, 0.33)));
+		d = min(d, seg_dist(uv, vec2(0.44, 0.33), vec2(0.36, 0.41)));
+		d = min(d, seg_dist(uv, vec2(0.36, 0.41), vec2(0.43, 0.50)));
+		d = min(d, seg_dist(uv, vec2(0.43, 0.50), vec2(0.37, 0.60)));
+	}
+	// Stage 4 — ~15% HP (dmg >= 0.85): a central shatter-star (impact burst).
+	if (dmg >= 0.85) {
+		vec2 c = vec2(0.50, 0.44);
+		d = min(d, seg_dist(uv, c, vec2(0.50, 0.28)));
+		d = min(d, seg_dist(uv, c, vec2(0.40, 0.40)));
+		d = min(d, seg_dist(uv, c, vec2(0.61, 0.39)));
+		d = min(d, seg_dist(uv, c, vec2(0.45, 0.58)));
+		d = min(d, seg_dist(uv, c, vec2(0.57, 0.59)));
+	}
+
+	return 1.0 - smoothstep(thick - aa, thick + aa, d);
+}
+
 // ---- Style 0: Voronoi net (legacy, kept for comparison) ----------------------------
 float voronoi_edge(vec2 uv, out float cell_rand) {
 	vec2 g = floor(uv);
@@ -158,7 +208,10 @@ float voronoi_cracks(vec2 uv_in, float dmg) {
 }
 
 void fragment() {
-	float crack = (style == 0) ? voronoi_cracks(UV, damage) : branching_cracks(UV, damage);
+	float crack =
+		(style == 0) ? voronoi_cracks(UV, damage) :
+		(style == 1) ? branching_cracks(UV, damage) :
+		cartoon_cracks(UV, damage);
 	// Hard gate so a full-health shell is perfectly clean.
 	crack *= smoothstep(0.0, 0.04, damage);
 
