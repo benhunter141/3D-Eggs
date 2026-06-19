@@ -1,5 +1,6 @@
 using Godot;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 // Visual harness for the shell-crack LOOK (run windowed, NOT headless). Builds a row of
 // eggs frozen at fixed HP levels so a crack style can be judged at a glance, and lets us
@@ -37,13 +38,51 @@ public partial class CrackTest : Node3D
 	private float _grow = 5f;
 	private bool _branches = true;
 
-	public override void _Ready()
+	public override async void _Ready()
 	{
 		BuildEnvironment();
 		BuildEggs();
 		BuildHud();
 		ApplyStyle();
 		PushParams();
+
+		// Diagnostic: `godot --path . res://scenes/Tests/CrackTest.tscn ++ --shot`
+		// saves a PNG of each style to user:// then quits, so the look can be reviewed.
+		if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--shot") >= 0)
+			await CaptureAll();
+	}
+
+	private async Task CaptureAll()
+	{
+		_rotate = false;
+		foreach ((int idx, string name) in new[] { (0, "cartoon"), (1, "branching"), (2, "voronoi") })
+		{
+			_styleIndex = idx;
+			ApplyStyle();
+			for (int i = 0; i < 20; i++)
+				await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			Image img = GetViewport().GetTexture().GetImage();
+			img.SavePng($"user://crack_{name}.png");
+			GD.Print($"[CrackTest] saved crack_{name}.png");
+		}
+
+		// Close-up of the two most-damaged eggs (30% & 10% HP) for each style, so the
+		// actual crack shapes can be judged, not just the wide row.
+		Camera3D cam = GetViewport().GetCamera3D();
+		Vector3 focus = new Vector3(4f, 0.7f, 0f);   // between the x=3 (30%) and x=5 (10%) eggs
+		cam.Position = focus + new Vector3(0f, 13f, 14f).Normalized() * 5.0f;
+		cam.Fov = 50f;
+		cam.LookAt(focus, Vector3.Up);
+		foreach ((int idx, string name) in new[] { (0, "cartoon"), (1, "branching"), (2, "voronoi") })
+		{
+			_styleIndex = idx;
+			ApplyStyle();
+			for (int i = 0; i < 20; i++)
+				await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			GetViewport().GetTexture().GetImage().SavePng($"user://crackdetail_{name}.png");
+			GD.Print($"[CrackTest] saved crackdetail_{name}.png");
+		}
+		GetTree().Quit();
 	}
 
 	private void BuildEnvironment()
@@ -61,9 +100,13 @@ public partial class CrackTest : Node3D
 		var light = new DirectionalLight3D { RotationDegrees = new Vector3(-50f, -35f, 0f) };
 		AddChild(light);
 
-		var cam = new Camera3D { Position = new Vector3(0f, 1.1f, 9.0f) };
+		// Match the in-game FollowCamera angle (offset 0,13,14 = up & back, looking down) so
+		// what we evaluate here is the same view the top-down battle camera shows.
+		Vector3 focus = new Vector3(0f, 0.4f, 0f);
+		Vector3 dir = new Vector3(0f, 13f, 14f).Normalized();
+		var cam = new Camera3D { Position = focus + dir * 15f, Fov = 70f };
 		AddChild(cam);
-		cam.LookAt(new Vector3(0f, 0.95f, 0f), Vector3.Up);
+		cam.LookAt(focus, Vector3.Up);
 	}
 
 	private void BuildEggs()

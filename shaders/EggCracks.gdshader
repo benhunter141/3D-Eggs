@@ -112,51 +112,62 @@ float branching_cracks(vec2 uv, float dmg) {
 	return result;
 }
 
-// ---- Style 2: Cartoon crack stages -------------------------------------------------
-// HAND-AUTHORED bold cracks (not procedural noise) that SNAP IN at HP thresholds, like a
-// comic-book egg breaking step by step. A few deliberate jagged polylines on the front of
-// the shell, each gated to a damage stage: ~90% HP a small crack, then more + a central
-// shatter-star near death. Drawn thick + crisp (fwidth AA) so it reads as intentional.
-// A seed-driven left/right mirror gives two variants so a crowd isn't all identical.
-float cartoon_cracks(vec2 uv_in, float dmg) {
-	// Mirror half the units so the same authored shapes don't repeat across a crowd.
-	vec2 uv = uv_in;
-	if (hash2(seed + vec2(1.7, 4.2)).x > 0.5) {
-		uv.x = 1.0 - uv.x;
-	}
+// Segment distance in UV with the U axis treated as CYCLIC (the egg wraps around u=0/1),
+// so a crack near the seam doesn't tear. Works for segments shorter than half the wrap.
+float seg_dist_uw(vec2 p, vec2 a, vec2 b) {
+	float pu = (p.x - a.x) - round(p.x - a.x);   // u relative to a, wrapped to [-0.5,0.5]
+	float bu = (b.x - a.x) - round(b.x - a.x);
+	return seg_dist(vec2(pu, p.y), vec2(0.0, a.y), vec2(bu, b.y));
+}
 
-	float aa = fwidth(uv.x) * 1.2 + 0.001;
-	float thick = 0.020;     // bold, constant width
+// ---- Style 2: Cartoon crack stages -------------------------------------------------
+// HAND-AUTHORED bold cracks (not procedural noise) that grow as HP drops, like a comic-book
+// egg cracking from a bonk on the head. The cracks SPIDER OUT FROM THE TOP of the shell and
+// run down the sides — the top is the one region the top-down game camera always sees, so the
+// damage always reads no matter which way the unit is facing. More damage = more + longer
+// spokes. Drawn thick + crisp (fwidth AA) so it looks intentional, and seeded per unit.
+float cartoon_cracks(vec2 uv, float dmg) {
+	if (dmg < 0.10) {
+		return 0.0;                       // clean shell until the first real damage
+	}
+	float f = clamp((dmg - 0.10) / 0.80, 0.0, 1.0);
+	float thick = 0.012;                  // thin, crack-like (constant width)
+	float top = 0.10;                     // start below the pole so spokes don't blob together
+	float aa = fwidth(uv.y) * 1.2 + 0.0012;
 	float d = 1e9;
 
-	// Stage 1 — appears ~90% HP (dmg >= 0.10): one small zig-zag crack, top-centre.
-	if (dmg >= 0.10) {
-		d = min(d, seg_dist(uv, vec2(0.50, 0.20), vec2(0.46, 0.28)));
-		d = min(d, seg_dist(uv, vec2(0.46, 0.28), vec2(0.53, 0.34)));
-		d = min(d, seg_dist(uv, vec2(0.53, 0.34), vec2(0.48, 0.43)));
+	// Radial spokes spidering down from the top — jagged random walks in u.
+	int spokes = int(round(mix(2.0, 6.0, f)));   // 2 cracks at ~90% HP -> 6 near death
+	float maxlen = mix(0.18, 0.55, f);
+	for (int i = 0; i < 6; i++) {
+		if (i >= spokes) {
+			break;
+		}
+		float fi = float(i);
+		float u0 = fract(seed.x * 0.137 + fi / float(max(spokes, 1))
+			+ (hash2(vec2(fi, seed.x)).x - 0.5) * 0.05);
+		float len = maxlen * (0.65 + 0.35 * hash2(vec2(fi * 2.3, seed.x + 1.0)).x);
+		float cur_u = u0;
+		for (int k = 0; k < 5; k++) {
+			float fk = float(k);
+			float v0 = top + len * (fk / 5.0);
+			float v1 = top + len * ((fk + 1.0) / 5.0);
+			float ju = (hash2(vec2(fi * 3.1 + fk, seed.x + 0.7)).x - 0.5) * 0.11;   // strong zig-zag
+			d = min(d, seg_dist_uw(uv, vec2(cur_u, v0), vec2(cur_u + ju, v1)));
+			cur_u += ju;
+		}
 	}
-	// Stage 2 — ~65% HP (dmg >= 0.35): a second crack with a fork, to the right.
-	if (dmg >= 0.35) {
-		d = min(d, seg_dist(uv, vec2(0.62, 0.30), vec2(0.58, 0.39)));
-		d = min(d, seg_dist(uv, vec2(0.58, 0.39), vec2(0.65, 0.47)));
-		d = min(d, seg_dist(uv, vec2(0.65, 0.47), vec2(0.60, 0.56)));
-		d = min(d, seg_dist(uv, vec2(0.58, 0.39), vec2(0.51, 0.45)));   // fork
+
+	// Concentric jagged rings join the spokes into a spiderweb shatter as damage mounts.
+	if (f > 0.40) {
+		float c = floor(uv.x * 14.0);
+		float lvl = 0.26 + (hash2(vec2(c, seed.x + 5.0)).x - 0.5) * 0.05;
+		d = min(d, abs(uv.y - lvl));
 	}
-	// Stage 3 — ~40% HP (dmg >= 0.60): a longer crack down the left.
-	if (dmg >= 0.60) {
-		d = min(d, seg_dist(uv, vec2(0.38, 0.24), vec2(0.44, 0.33)));
-		d = min(d, seg_dist(uv, vec2(0.44, 0.33), vec2(0.36, 0.41)));
-		d = min(d, seg_dist(uv, vec2(0.36, 0.41), vec2(0.43, 0.50)));
-		d = min(d, seg_dist(uv, vec2(0.43, 0.50), vec2(0.37, 0.60)));
-	}
-	// Stage 4 — ~15% HP (dmg >= 0.85): a central shatter-star (impact burst).
-	if (dmg >= 0.85) {
-		vec2 c = vec2(0.50, 0.44);
-		d = min(d, seg_dist(uv, c, vec2(0.50, 0.28)));
-		d = min(d, seg_dist(uv, c, vec2(0.40, 0.40)));
-		d = min(d, seg_dist(uv, c, vec2(0.61, 0.39)));
-		d = min(d, seg_dist(uv, c, vec2(0.45, 0.58)));
-		d = min(d, seg_dist(uv, c, vec2(0.57, 0.59)));
+	if (f > 0.75) {
+		float c = floor(uv.x * 18.0);
+		float lvl = 0.42 + (hash2(vec2(c, seed.x + 9.0)).x - 0.5) * 0.05;
+		d = min(d, abs(uv.y - lvl));
 	}
 
 	return 1.0 - smoothstep(thick - aa, thick + aa, d);
