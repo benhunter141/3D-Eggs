@@ -288,6 +288,12 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
   server-authoritative combat/input RPCs → networked co-op level + synced match state) — see §7.
   **Build gated** on M1–M5 feeling great (and the outstanding feel-checks); plan is laid out so
   the netcode build can start when the user is ready.
+- [ ] **M14 — Traversable terrain (fighting on slopes):** units walk + fight up and down real terrain
+      elevation in the **Highlands** level — heightmap collision + gravity + floor-snapping, terrain-aware
+      spawns/formation, ballistic projectiles, and a terrain-following camera (Chunks 60–65). **Highlands
+      ONLY**, opt-in via a `Grounded` flag (default OFF), so every flat level (Pinball / KotH / Co-op / card
+      battler) stays byte-identical. Highest-risk change so far — it touches the shared movement core of every
+      unit type. **Not started — scope recorded (this convo); build when the user says go.**
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -690,6 +696,62 @@ full turn-based remake (dropping the real-time march). Decided against in the pl
 
 **(Independent of M13 — these can be built whenever the user asks; they don't gate, and aren't gated by,
 the netcode chunks. Build order recommendation: 55 → 57 → 58 → 56 → 59, but 55 first regardless.)**
+
+---
+
+### ▶ PLANNED — M14 Traversable Terrain — fighting on slopes (Chunks 60–65)
+
+**Goal:** in the **Highlands** level, units WALK AND FIGHT up and down real terrain elevation — not just a
+visual backdrop ridge. The current `scenes/Levels/Highlands.tscn` is a flat field ringed by visual-only
+hills (`scripts/Scenery.cs`); this milestone makes that terrain solid and the units climb it.
+
+**Why this is the project's highest-risk change.** Every fighter shares ONE movement pattern: build a
+horizontal (X/Z) velocity, force `Y = 0`, then `MoveAndSlide()` on a flat plane — **no gravity, no floor
+snapping** — and spawns sit at a fixed `y ≈ 1` (`Player.cs` "Flat ground for now", `Ally.ArriveVelocity`
+zeroes Y, etc.). The terrain mesh has **no collision**. Projectiles fly dead level (`Stone.cs`/`Arrow.cs`
+set `direction.Y = 0`). The camera and formation slots assume a fixed height. So slopes touch the movement
+core of `Player`/`Ally`/`Enemy`/`Swordman`/`Bowman`/`Mount` at once.
+
+**Invariant — flat levels stay byte-identical.** All grounded behaviour is **opt-in** via a `Unit.Grounded`
+export, **default OFF**; only Highlands turns it on. With it OFF the `Y = 0` + flat-plane motion every other
+level (Pinball / KotH / Co-op / card battler / crowd tests) relies on must be UNCHANGED. Headless-test that a
+non-grounded unit moves exactly as before.
+
+**New durable rules (promote into §5 as chunks land):**
+- **Grounded movement.** When `Grounded` is on, a unit applies gravity to a Y velocity, sets
+  `UpDirection = Vector3.Up` + a `FloorSnapLength` so it sticks to downhill slopes, and `FloorMaxAngle` so
+  shallow hills are walkable but cliffs block. Off = today's `Y = 0` flat motion.
+- **Heightmap terrain.** `Scenery` exposes its height function as solid collision via a `HeightMapShape3D`
+  generated from the SAME height field that draws the mesh, so visuals and collision match exactly.
+- **Ballistic projectiles.** On grounded levels stones/arrows lob in an arc (gravity) toward the target's
+  actual height instead of flying level, so up/downhill shots connect.
+
+- [ ] **Chunk 60 — Terrain collision (heightmap).** Give `Scenery`'s hills a `HeightMapShape3D` (or trimesh)
+  built from its height function under a `StaticBody3D`, with `FloorMaxAngle`-friendly slope; keep the flat
+  centre level. Replace Highlands' separate flat ground plane with the terrain collision (keep boundary walls).
+  **Headless-test:** a downward ray / a dropped body lands at the height the function predicts.
+- [ ] **Chunk 61 — Grounded movement on `Unit` (keystone).** Add `Unit.Grounded` (default OFF) + shared
+  gravity/floor-snap helper; route every subclass's `Velocity = horizontal*scale + knockback` through it so
+  Y becomes the gravity term when grounded, untouched (0) when not. Set `UpDirection`/`FloorSnapLength`/
+  `FloorMaxAngle`. **Headless-test:** a grounded unit on a slope settles to the surface and can climb it; a
+  non-grounded unit's motion is byte-identical to today.
+- [ ] **Chunk 62 — Spawn / formation / facing height.** Grounded units settle to terrain on spawn (ray-place
+  or let gravity drop them); formation-slot + command points sample terrain height so allies don't steer at a
+  point in the air; mounts follow the ground under the rider. **Headless-test:** a slot point on a slope
+  resolves to the terrain surface height.
+- [ ] **Chunk 63 — Ballistic projectiles.** On grounded levels, `Stone`/`Arrow` lob in a gravity arc aimed at
+  the target's real position (height included) instead of level flight; flat levels keep the straight shot.
+  **Headless-test:** an arced shot's trajectory reaches a target above/below the launch height.
+- [ ] **Chunk 64 — Terrain-following camera.** Damp `FollowCamera`'s focus height (and lift it) so the view
+  doesn't jolt as the captain climbs/descends, reusing the dynamic-zoom fit. Single-target + flat path
+  unchanged. **Headless-test:** the focus height eases toward the target's Y rather than snapping.
+- [ ] **Chunk 65 — Highlands redesign + tune.** Rebuild `Highlands.tscn` with real ROLLING PLAYABLE terrain
+  (bring elevation into the field — a ridge / valley / hillside to fight over), re-place both armies on the
+  slopes, set `Grounded` on every unit, and tune slope steepness + knockback-on-slopes (the pinball system
+  zeroes Y — flung units on a hillside need a tuning pass) so it feels good. **User feel-check.**
+
+**(Highlands-scoped by decision: do NOT roll `Grounded` out to other levels unless asked. Build order is
+60 → 61 → 62 → 63 → 64 → 65; 60 + 61 are the load-bearing pair.)**
 
 ---
 
