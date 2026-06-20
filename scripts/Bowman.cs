@@ -40,7 +40,7 @@ public partial class Bowman : Unit
 		if (IsDead)
 		{
 			// Dead bodies are freed shortly after; ride out any lingering shove meanwhile.
-			Velocity = KnockbackVelocity;
+			Velocity = ComposeMovement(KnockbackVelocity, dt);
 			MoveAndSlide();
 			return;
 		}
@@ -88,7 +88,8 @@ public partial class Bowman : Unit
 
 		// A strong shove takes over (ride it out and slow down); as it decays the unit eases its
 		// kite back in (OwnMovementScale) instead of snapping it on — no spurious second bump.
-		Velocity = move * OwnMovementScale + KnockbackVelocity;
+		// ComposeMovement folds in gravity on grounded terrain (flat levels: Y stays 0, unchanged).
+		Velocity = ComposeMovement(move * OwnMovementScale + KnockbackVelocity, dt);
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
 	}

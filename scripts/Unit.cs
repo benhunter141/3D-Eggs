@@ -52,6 +52,23 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	[Export] public float AggroRange = 8.0f;             // (march only) break off the advance to engage a foe within this range
 	public Vector3 MarchGoalDirection = Vector3.Zero;    // unit vector toward the enemy endzone (set per team by CardBattle)
 
+	// --- Grounded movement (M14, Chunk 61: traversable terrain) ---
+	// OPT-IN so a unit walks real terrain elevation instead of the flat XZ plane every other level
+	// assumes. With Grounded OFF (the default) movement is byte-identical to today: every subclass
+	// builds a FLAT (Y=0) velocity and ComposeMovement leaves it untouched, so no gravity, no floor
+	// snap — the Pinball / KotH / Co-op / card-battler levels never change. With it ON (Highlands,
+	// Chunk 65) the unit accumulates a gravity Y term, sticks to downhill slopes (FloorSnapLength),
+	// and treats anything steeper than MaxSlopeAngle as an unclimbable wall (FloorMaxAngle). Every
+	// subclass routes its `Velocity = horizontal + knockback` through ComposeMovement so this lands
+	// uniformly across Player/Ally/Enemy/Swordman/Bowman.
+	[Export] public bool Grounded = false;          // walk terrain (gravity + floor-snap) instead of the flat plane
+	[Export] public float Gravity = 24.0f;          // downward accel (m/s^2) applied while airborne
+	[Export] public float FloorSnap = 0.6f;         // FloorSnapLength: keeps the unit glued to downhill slopes
+	[Export] public float MaxSlopeAngle = 50.0f;    // FloorMaxAngle (deg): shallower = walkable, steeper = a wall
+
+	private float _verticalVelocity = 0f;           // accumulated gravity term (grounded only; 0 otherwise)
+	public float VerticalVelocity => _verticalVelocity;   // read-only view for headless tests
+
 	// --- Hit feedback (juice) ---
 	[Export] public Color FlashColor = new Color(1f, 1f, 1f); // colour the body pops toward on a hit
 	[Export] public float FlashDuration = 0.12f;              // seconds for one flash to fade out
@@ -155,6 +172,16 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		UnitRegistry.Register(this);
 		SetupHitFeedback();
 		SetupEyes();
+
+		// Grounded units lean on CharacterBody3D's floor handling: stand upright, stick to downhill
+		// slopes, and refuse to climb anything past MaxSlopeAngle. Left at scene defaults when OFF, so
+		// every flat level's MoveAndSlide behaves exactly as before.
+		if (Grounded)
+		{
+			UpDirection = Vector3.Up;
+			FloorSnapLength = FloorSnap;
+			FloorMaxAngle = Mathf.DegToRad(MaxSlopeAngle);
+		}
 	}
 
 	// Leave the registry the moment we leave the tree (death-free, scene reload, etc.) so
@@ -435,6 +462,29 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	protected void DecayKnockback(float dt)
 	{
 		KnockbackVelocity = KnockbackVelocity.MoveToward(Vector3.Zero, KnockbackDecay * dt);
+	}
+
+	// Compose the final Velocity from a FLAT (XZ) intended velocity, the single chokepoint every
+	// subclass routes its `horizontal*scale + knockback` through right before MoveAndSlide (M14,
+	// Chunk 61). Off the grounded path it returns the flat vector untouched — callers already pass
+	// Y=0, so flat levels stay byte-identical. On the grounded path it folds in a gravity Y term so
+	// the unit walks up and down terrain: zero the accumulator while standing on the floor (per the
+	// LAST MoveAndSlide's IsOnFloor), else accelerate it downward. Knockback stays flat (AddKnockback
+	// zeroes Y) and the bounce resolver reads KnockbackVelocity, not this Y, so gravity never feeds
+	// the pinball chain.
+	protected Vector3 ComposeMovement(Vector3 flatVelocity, float dt)
+	{
+		flatVelocity.Y = 0f;
+		if (!Grounded)
+			return flatVelocity;
+
+		if (IsOnFloor())
+			_verticalVelocity = 0f;
+		else
+			_verticalVelocity -= Gravity * dt;
+
+		flatVelocity.Y = _verticalVelocity;
+		return flatVelocity;
 	}
 
 	// Inject a shove with NO damage — the canonical way to add knockback (the sword routes

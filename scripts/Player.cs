@@ -381,7 +381,7 @@ public partial class Player : Unit
 		{
 			// Game over: ignore input/aim, just bleed off momentum in place.
 			_moveVel = _moveVel.MoveToward(Vector3.Zero, Friction * dt);
-			Velocity = _moveVel + KnockbackVelocity;
+			Velocity = ComposeMovement(_moveVel + KnockbackVelocity, dt);
 			MoveAndSlide();
 			return;
 		}
@@ -400,12 +400,13 @@ public partial class Player : Unit
 			? _moveVel.MoveToward(target, Acceleration * dt)
 			: _moveVel.MoveToward(Vector3.Zero, Friction * dt);
 
-		// Flat ground for now — no gravity/vertical motion. A bumper / chained pinball hit reads as
-		// one clean launch: while the shove is strong OwnMovementScale suppresses steering, then
-		// eases it back in PROPORTIONALLY as the shove decays (no hard threshold snap that read as
-		// a second bump). Add in the lingering shove only here.
+		// A bumper / chained pinball hit reads as one clean launch: while the shove is strong
+		// OwnMovementScale suppresses steering, then eases it back in PROPORTIONALLY as the shove
+		// decays (no hard threshold snap that read as a second bump). Add in the lingering shove
+		// only here. ComposeMovement folds in gravity on grounded terrain (Highlands); on every flat
+		// level it leaves Y at 0 so motion is byte-identical to before.
 		float own = OwnMovementScale;
-		Velocity = new Vector3(_moveVel.X * own, 0f, _moveVel.Z * own) + KnockbackVelocity;
+		Velocity = ComposeMovement(new Vector3(_moveVel.X * own, 0f, _moveVel.Z * own) + KnockbackVelocity, dt);
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // captain bounces off walls/bumpers/units like everyone else
 

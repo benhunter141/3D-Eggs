@@ -60,8 +60,9 @@ public partial class UnitTest : Node3D
 		bool allyCommands = await TestAllyCommands();
 		bool squadCommands = await TestSquadCommands();
 		bool terrainCollision = await TestTerrainCollision();
+		bool groundedMovement = await TestGroundedMovement();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -2130,6 +2131,95 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: terrain collision matches the height function on the flat centre and the hills"
 			: $"FAIL: centreOk={centreOk}, hillRaised={hillRaised}, hillOk={hillOk}");
+		return pass;
+	}
+
+	// Chunk 61 (M14): grounded movement. Three checks over one gentle landscape:
+	//   (a) NON-GROUNDED (Grounded off, today's behaviour) — a skeleton parked in the air with no
+	//       foe never falls: gravity is off and its motion is byte-identical to the flat-plane levels.
+	//   (b) GROUNDED SETTLE — a grounded skeleton dropped above a hill falls, lands ON the terrain
+	//       (IsOnFloor) and comes to rest near the height function's surface (capsule sits ~0.9 m up).
+	//   (c) GROUNDED CLIMB — a grounded skeleton marching uphill advances AND gains elevation, so it
+	//       genuinely walks up the slope rather than skimming a fixed plane.
+	private async Task<bool> TestGroundedMovement()
+	{
+		GD.Print("=== UnitTest: grounded movement (M14, Chunk 61) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// A gentle landscape: a flat centre, a wide shallow ramp, low hills — every slope walkable.
+		var scenery = new Scenery
+		{
+			FieldHalf = 10f,
+			RampWidth = 24f,
+			TerrainHalf = 60f,
+			CellSize = 2.5f,
+			RimHeight = 4f,
+			HillAmplitude = 2f,
+			CenterDrop = 0f,
+			TreeCount = 0,
+		};
+		AddChild(scenery);
+		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		Enemy Spawn(Vector3 pos)
+		{
+			var e = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+			AddChild(e);
+			e.GlobalPosition = pos;
+			return e;
+		}
+
+		// (a) Non-grounded skeleton floating high over the flat centre (terrain ≈ 0, no collider to
+		// depenetrate against) with no opponents — must NOT fall: gravity is off when Grounded is.
+		var floater = Spawn(new Vector3(0f, 8f, 3f));   // Grounded defaults to false
+		float floatStartY = floater.GlobalPosition.Y;
+
+		// (b) Grounded skeleton dropped just above a hillside — should settle onto the surface.
+		float settleX = -25f, settleZ = -25f;
+		float settleTerrain = scenery.SampleHeight(settleX, settleZ);
+		var settler = Spawn(new Vector3(settleX, settleTerrain + 1.5f, settleZ));
+		settler.Grounded = true;
+
+		// (c) Grounded marcher placed on the ramp, marching toward +X (uphill) with no foe in range.
+		float climbX = 14f;
+		var climber = Spawn(new Vector3(climbX, scenery.SampleHeight(climbX, 0f) + 1.5f, 0f));
+		climber.Grounded = true;
+		climber.MarchMode = true;
+		climber.MarchGoalDirection = new Vector3(1f, 0f, 0f);
+
+		// Let everyone settle onto (or float above) the terrain.
+		for (int i = 0; i < 60; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		bool floatStayedUp = Mathf.Abs(floater.GlobalPosition.Y - floatStartY) < 0.05f;
+		GD.Print($"(a) non-grounded floater Y {floatStartY:0.00} -> {floater.GlobalPosition.Y:0.00} (stayedUp={floatStayedUp})");
+
+		float settleRest = settler.GlobalPosition.Y;
+		bool settledOnFloor = settler.IsOnFloor();
+		bool settledHeight = settleRest > settleTerrain + 0.3f && settleRest < settleTerrain + 1.6f;
+		GD.Print($"(b) grounded settler rest Y={settleRest:0.00}, terrain={settleTerrain:0.00}, onFloor={settledOnFloor} (heightOk={settledHeight})");
+
+		// Baseline the climber after it has settled on the slope, then let it climb.
+		float climbY0 = climber.GlobalPosition.Y;
+		float climbX0 = climber.GlobalPosition.X;
+		for (int i = 0; i < 150; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		float climbY1 = climber.GlobalPosition.Y;
+		float climbX1 = climber.GlobalPosition.X;
+		bool advanced = climbX1 - climbX0 > 2f;     // walked forward up the ramp
+		bool climbed = climbY1 - climbY0 > 0.5f;    // and genuinely gained elevation
+		GD.Print($"(c) grounded climber: X {climbX0:0.00}->{climbX1:0.00} (advanced={advanced}), Y {climbY0:0.00}->{climbY1:0.00} (climbed={climbed})");
+
+		scenery.QueueFree();
+
+		bool pass = floatStayedUp && settledOnFloor && settledHeight && advanced && climbed;
+		GD.Print(pass
+			? "PASS: grounded units fall/settle/climb terrain; a non-grounded unit ignores gravity (flat-level behaviour intact)"
+			: $"FAIL: floatStayedUp={floatStayedUp}, settledOnFloor={settledOnFloor}, settledHeight={settledHeight}, advanced={advanced}, climbed={climbed}");
 		return pass;
 	}
 }
