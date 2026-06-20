@@ -96,6 +96,15 @@ theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/CoopStand.tscn"
 
+[node name="HighlandsButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
+custom_minimum_size = Vector2(440, 58)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "5.  Highland Clash"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")
+ScenePath = "res://scenes/Levels/Highlands.tscn"
+
 [node name="CrackTestButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
