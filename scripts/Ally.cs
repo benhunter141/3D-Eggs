@@ -19,7 +19,7 @@ public partial class Ally : Unit
 	[Export] public float Acceleration = 60.0f;  // how fast it ramps toward the target velocity
 	[Export] public float ArriveRadius = 1.5f;   // begin slowing within this distance of the slot
 	[Export] public float StopRadius = 0.12f;    // close enough — hold position
-	[Export] public float TurnLerp = 10.0f;      // how fast it rotates to match the player's facing
+	[Export] public float TurnSpeed = 120.0f;    // max turn rate (deg/s) — a subordinate pivots deliberately, never snaps (180° ≈ 1.5 s)
 
 	// --- Combat (loose leash) ---
 	[Export] public WeaponType Weapon = WeaponType.Fists; // fist-fighter or stone-thrower
@@ -336,16 +336,19 @@ public partial class Ally : Unit
 	private bool CaptainBraceHeld() =>
 		_player is Player p ? p.BraceHeld() : Input.IsActionPressed("brace");
 
-	// World position of this ally's formation slot: the local offset rotated by the
-	// player's current orientation, so the formation rotates as the player turns.
+	// World position of this ally's formation slot: the local offset rotated by the captain's
+	// FORMATION yaw (the slow wheel), not its instant aim — so the whole wall of slots wheels
+	// deliberately when the captain flicks the mouse instead of teleporting to the far side. Falls
+	// back to a plain Node3D captain's live basis (non-Player anchors) so other rigs still work.
 	public Vector3 SlotWorldPosition()
 	{
 		if (_player == null)
 			return GlobalPosition;
-		return _player.GlobalPosition + _player.GlobalTransform.Basis * FormationOffset;
+		Basis basis = _player is Player p ? p.FormationBasis : _player.GlobalTransform.Basis;
+		return _player.GlobalPosition + basis * FormationOffset;
 	}
 
-	// Smoothly rotate to face a world point on the flat plane (forward is -Z).
+	// Rotate to face a world point on the flat plane (forward is -Z), capped to TurnSpeed.
 	private void FaceTowards(Vector3 worldPos, float dt)
 	{
 		Vector3 flat = new Vector3(worldPos.X, GlobalPosition.Y, worldPos.Z);
@@ -354,19 +357,25 @@ public partial class Ally : Unit
 
 		// Forward is -Z, so negate the delta: atan2(dx,dz) would aim our BACK at the target.
 		Vector3 dir = flat - GlobalPosition;
-		float desiredYaw = Mathf.Atan2(-dir.X, -dir.Z);
-		float t = 1f - Mathf.Exp(-TurnLerp * dt);
-		Vector3 rot = Rotation;
-		rot.Y = Mathf.LerpAngle(rot.Y, desiredYaw, t);
-		Rotation = rot;
+		TurnTowardYaw(Mathf.Atan2(-dir.X, -dir.Z), dt);
 	}
 
-	// Smoothly match the player's yaw so the ally faces wherever the player is aiming.
+	// Match the captain's FORMATION yaw (the slow wheel), not its instant aim, so an idle squad
+	// wheels together deliberately. Falls back to a plain captain's body yaw for non-Player anchors.
 	private void FacePlayerYaw(float dt)
 	{
-		float t = 1f - Mathf.Exp(-TurnLerp * dt);
+		float yaw = _player is Player p ? p.FormationYaw : _player.Rotation.Y;
+		TurnTowardYaw(yaw, dt);
+	}
+
+	// Turn toward a desired yaw by at most TurnSpeed*dt this frame, shortest way around — a hard rate
+	// cap (not an exponential lerp), so a subordinate can never snap-spin to a new facing.
+	private void TurnTowardYaw(float desiredYaw, float dt)
+	{
+		float maxStep = Mathf.DegToRad(TurnSpeed) * dt;
+		float diff = Mathf.Clamp(Mathf.Wrap(desiredYaw - Rotation.Y, -Mathf.Pi, Mathf.Pi), -maxStep, maxStep);
 		Vector3 rot = Rotation;
-		rot.Y = Mathf.LerpAngle(rot.Y, _player.Rotation.Y, t);
+		rot.Y += diff;
 		Rotation = rot;
 	}
 }

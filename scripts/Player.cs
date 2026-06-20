@@ -75,7 +75,13 @@ public partial class Player : Unit
 	[Export] public float Speed = 6.0f;         // top movement speed (m/s) — a notch above the AI, not double
 	[Export] public float Acceleration = 60.0f; // how fast we ramp up to Speed
 	[Export] public float Friction = 50.0f;     // how fast we slow to a stop
-	[Export] public float TurnSpeed = 480.0f;   // max aim turn rate (deg/s) — caps how fast we (and the phalanx) can pivot
+	[Export] public float TurnSpeed = 480.0f;   // max aim turn rate (deg/s) — the CAPTAIN's body/weapon tracks the cursor fast
+	// The phalanx wheels on its OWN slow yaw, decoupled from the captain's fast aim (M7 turn-feel pass).
+	// FormationYaw lags Rotation.Y at this rate, and the allies anchor their slots + facing to it
+	// (via FormationBasis), so the wall of pikemen can't snap 180° when you flick the mouse — it
+	// wheels deliberately like a real formation while your sword still points where you aim instantly.
+	[Export] public float FormationTurnSpeed = 90.0f;   // max formation wheel rate (deg/s) — 90 ≈ 2 s for a 180° turn
+	private float _formationYaw;                          // the squad's current facing; eases toward Rotation.Y
 
 	// --- Weapon loadout (Chunk 26) ---
 	[Export] public WeaponType StartingWeapon = WeaponType.Spear;  // which weapon the captain spawns holding (per-level default)
@@ -206,7 +212,15 @@ public partial class Player : Unit
 		ApplyWeapon(StartingWeapon);   // sets reach/damage/knockback/feel + shows the right mesh
 		SetThrustOffset(0f);
 		SetHitboxActive(false);
+
+		_formationYaw = Rotation.Y;   // squad starts wheeled to wherever we spawn facing
 	}
+
+	// The squad's current facing yaw, and the basis allies rotate their formation offset by. Public so
+	// every Ally bound to this captain anchors its slot + facing to the SLOW wheel rather than the
+	// captain's instant aim (M7 turn-feel pass).
+	public float FormationYaw => _formationYaw;
+	public Basis FormationBasis => new Basis(Vector3.Up, _formationYaw);
 
 	// Cycle to the next weapon in enum order (bound to `swap_weapon`), wrapping around.
 	public void SwapWeapon()
@@ -394,6 +408,11 @@ public partial class Player : Unit
 		ResolveKnockbackBounce();   // captain bounces off walls/bumpers/units like everyone else
 
 		Aim(dt);   // mouse (Any/KeyboardMouse) or this pad's right stick (Gamepad)
+
+		// Wheel the formation slowly toward our (fast) aim: the squad can't snap around (M7 turn-feel pass).
+		float wheelStep = Mathf.DegToRad(FormationTurnSpeed) * dt;
+		float wheelDiff = Mathf.Clamp(Mathf.Wrap(Rotation.Y - _formationYaw, -Mathf.Pi, Mathf.Pi), -wheelStep, wheelStep);
+		_formationYaw += wheelDiff;
 
 		// Climb onto / off a nearby mount (read once here so it never double-fires across mounts).
 		if (MountJustPressed())
