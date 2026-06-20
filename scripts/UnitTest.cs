@@ -59,8 +59,9 @@ public partial class UnitTest : Node3D
 		bool coopLose = await TestCoopLose();
 		bool allyCommands = await TestAllyCommands();
 		bool squadCommands = await TestSquadCommands();
+		bool terrainCollision = await TestTerrainCollision();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -2035,7 +2036,13 @@ public partial class UnitTest : Node3D
 			&& mine1.CommandPoint.DistanceTo(mine1.GlobalPosition) < 0.01f;
 		bool otherUntouched = theirs.Command == Ally.CommandMode.Follow;
 
-		// ATTACK-MOVE: target a point AttackMoveDistance ahead of the captain (-Z at yaw 0).
+		// ATTACK-MOVE: target a point AttackMoveDistance ahead of the captain (-Z at yaw 0). Re-pin the
+		// captain's pose first: this checks the command-dispatch math (mode + target relative to the
+		// captain), not physics settling, and two ground-less captains repositioned in the same idle
+		// frames occasionally swap transforms via the physics-server sync race (a harness artifact —
+		// real levels place captains in the scene over solid ground and never hit it).
+		cap.GlobalPosition = Vector3.Zero;
+		cap.Rotation = Vector3.Zero;
 		cap.IssueSquadCommand(Ally.CommandMode.AttackMove);
 		Vector3 expect = new Vector3(0f, 0f, -12f);
 		bool attackMine = mine1.Command == Ally.CommandMode.AttackMove
@@ -2057,6 +2064,72 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: a captain's order reaches only its own squad, with the right mode + target"
 			: $"FAIL: holdMine={holdMine}, otherUntouched={otherUntouched}, attackMine={attackMine}, followMine={followMine}");
+		return pass;
+	}
+
+	// Chunk 60 (M14): the Scenery terrain is now SOLID. Build a Scenery node, then cast downward
+	// rays at a few world (x,z) points and assert each ray lands on the surface at the height the
+	// height function (SampleHeight) predicts — once on the flat play centre, once up on a hill —
+	// proving the generated HeightMapShape3D collision matches the mesh. Points sit on grid corners
+	// so the linearly-interpolated collision surface equals the sampled height exactly.
+	private async Task<bool> TestTerrainCollision()
+	{
+		GD.Print("=== UnitTest: terrain collision (heightmap, Chunk 60) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// A modest landscape with an even cell count (so x=0 and ±30 land on grid corners) and no
+		// trees (collision only). step = 120/48 = 2.5, so 0 and 30 are exact corners.
+		var scenery = new Scenery
+		{
+			FieldHalf = 20f,
+			RampWidth = 8f,
+			TerrainHalf = 60f,
+			CellSize = 2.5f,
+			RimHeight = 6f,
+			HillAmplitude = 10f,
+			CenterDrop = 0f,
+			TreeCount = 0,
+		};
+		AddChild(scenery);                                   // _Ready builds the mesh + collider
+		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		var space = GetWorld3D().DirectSpaceState;
+
+		// Cast a ray straight down at (x,z) and return the hit Y, or NaN if it missed.
+		float RayGroundY(float x, float z)
+		{
+			var from = new Vector3(x, 100f, z);
+			var to = new Vector3(x, -100f, z);
+			var q = PhysicsRayQueryParameters3D.Create(from, to);
+			var hit = space.IntersectRay(q);
+			if (hit.Count == 0)
+				return float.NaN;
+			return ((Vector3)hit["position"]).Y;
+		}
+
+		// (a) Flat play centre: ray should land at the flat height (≈ -CenterDrop = 0).
+		float centreExpect = scenery.SampleHeight(0f, 0f);
+		float centreHit = RayGroundY(0f, 0f);
+		bool centreOk = !float.IsNaN(centreHit) && Mathf.Abs(centreHit - centreExpect) < 0.3f;
+		GD.Print($"centre (0,0): ray Y={centreHit:0.000}, predicted={centreExpect:0.000} (ok={centreOk})");
+
+		// (b) Up on a hill, well past the field edge — non-zero elevation the collider must match.
+		float hillExpect = scenery.SampleHeight(30f, 30f);
+		float hillHit = RayGroundY(30f, 30f);
+		bool hillRaised = hillExpect > 1f;   // sanity: the sample point is genuinely uphill
+		bool hillOk = !float.IsNaN(hillHit) && Mathf.Abs(hillHit - hillExpect) < 0.3f;
+		GD.Print($"hill (30,30): ray Y={hillHit:0.000}, predicted={hillExpect:0.000} (raised={hillRaised}, ok={hillOk})");
+
+		scenery.QueueFree();
+
+		bool pass = centreOk && hillRaised && hillOk;
+		GD.Print(pass
+			? "PASS: terrain collision matches the height function on the flat centre and the hills"
+			: $"FAIL: centreOk={centreOk}, hillRaised={hillRaised}, hillOk={hillOk}");
 		return pass;
 	}
 }

@@ -2,16 +2,16 @@ using Godot;
 
 // Procedural rolling-hills backdrop + scattered woodland for a large outdoor level.
 //
-// Why visual-only terrain: every fighter (Player/Ally/Enemy/...) moves on FLAT ground
-// with no gravity or floor-snapping (see Player.cs "Flat ground for now"), so real sloped
-// collision would make units float/clip. Instead this node builds a hilly LANDSCAPE that
-// rings the battlefield: the centre (within FieldHalf) stays flat at ground level so units
-// fight on solid flat ground, and the terrain only RISES into rolling hills past the field
-// edge — purely for looks. A separate flat collision plane + boundary walls (in the scene)
-// keep the actual play on the level centre.
+// M14 (Chunk 60): the terrain is now SOLID, not just a backdrop. This node builds a hilly
+// LANDSCAPE — the centre (within FieldHalf) stays flat at ground level, the ground RISES into
+// rolling hills past the field edge — AND generates matching collision from the SAME height
+// function (a HeightMapShape3D under a StaticBody3D), so units can walk + fight on the slopes
+// once they opt into grounded movement (Unit.Grounded, Chunk 61). Flat levels never use Scenery,
+// so they're untouched. Boundary walls still live in the scene.
 //
 // Everything here is generated in _Ready from a height function (no asset files): a single
-// ArrayMesh for the hills (vertex-coloured grass→highland green) and two MultiMeshes for the
+// ArrayMesh for the hills (vertex-coloured grass→highland green), a HeightMapShape3D collider
+// sampled on the same grid (visuals + collision match exactly), and two MultiMeshes for the
 // trees (trunks + foliage), so a few hundred trees cost a handful of draw calls.
 public partial class Scenery : Node3D
 {
@@ -23,6 +23,7 @@ public partial class Scenery : Node3D
 	[Export] public float HillAmplitude = 7.0f;   // extra height of the rolling sine hills on top of the rim
 	[Export] public float CenterDrop = 0.15f;     // sink the flat centre just below the play plane (no z-fight)
 
+	[Export] public bool Collidable = true;       // build a solid HeightMapShape3D collider matching the mesh
 	[Export] public int TreeCount = 220;          // decorative trees scattered across the hills
 	[Export] public float TreeBandInner = 4.0f;   // trees start this far OUTSIDE the field edge
 	[Export] public int Seed = 1337;
@@ -33,8 +34,15 @@ public partial class Scenery : Node3D
 	{
 		_rng = new System.Random(Seed);
 		BuildHills();
+		if (Collidable)
+			BuildCollision();
 		ScatterTrees();
 	}
+
+	// Public height probe of the landscape at world (x,z). Spawns/formation slots/camera (Chunks
+	// 62, 64) sample this so they sit ON the terrain instead of a fixed plane. Matches the mesh
+	// + collider exactly (all three read HeightAt).
+	public float SampleHeight(float x, float z) => HeightAt(x, z);
 
 	// Height of the landscape at (x,z): flat (slightly sunk) inside the field, smoothly ramping
 	// up past the edge into rolling sine-noise hills. A square distance metric (max of |x|,|z|)
@@ -100,6 +108,36 @@ public partial class Scenery : Node3D
 
 		var mi = new MeshInstance3D { Name = "Hills", Mesh = st.Commit() };
 		AddChild(mi);
+	}
+
+	// Solid collision for the landscape: a HeightMapShape3D sampled from the same HeightAt the mesh
+	// draws, so collision and visuals line up. A HeightMapShape3D's samples are spaced ONE unit apart
+	// in local space and a SCALED HeightMapShape3D is unreliable under GodotPhysics, so we sample at
+	// native 1 m spacing (no shape scaling): local index i maps straight to world coord (i - half).
+	// This is finer than the 2.5 m mesh grid, but both read the same continuous height field so they
+	// still match. The flat centre comes out at HeightAt's flat value (≈ -CenterDrop), giving units a
+	// level floor on the play field.
+	private void BuildCollision()
+	{
+		int span = Mathf.Max(2, (int)(TerrainHalf * 2f));   // world width covered (1 m per cell)
+		int points = span + 1;                              // grid corners along each axis
+		float half = span / 2f;                             // centre the map on the origin
+
+		var data = new float[points * points];
+		for (int iz = 0; iz < points; iz++)
+			for (int ix = 0; ix < points; ix++)
+				data[iz * points + ix] = HeightAt(ix - half, iz - half);
+
+		var shape = new HeightMapShape3D
+		{
+			MapWidth = points,
+			MapDepth = points,
+			MapData = data,
+		};
+
+		var body = new StaticBody3D { Name = "TerrainBody" };
+		body.AddChild(new CollisionShape3D { Name = "TerrainCollision", Shape = shape });
+		AddChild(body);
 	}
 
 	// Scatter trees across the hill band (outside the play field) as two MultiMeshes — a brown

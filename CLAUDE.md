@@ -288,12 +288,13 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
   server-authoritative combat/input RPCs → networked co-op level + synced match state) — see §7.
   **Build gated** on M1–M5 feeling great (and the outstanding feel-checks); plan is laid out so
   the netcode build can start when the user is ready.
-- [ ] **M14 — Traversable terrain (fighting on slopes):** units walk + fight up and down real terrain
+- [~] **M14 — Traversable terrain (fighting on slopes):** units walk + fight up and down real terrain
       elevation in the **Highlands** level — heightmap collision + gravity + floor-snapping, terrain-aware
       spawns/formation, ballistic projectiles, and a terrain-following camera (Chunks 60–65). **Highlands
       ONLY**, opt-in via a `Grounded` flag (default OFF), so every flat level (Pinball / KotH / Co-op / card
       battler) stays byte-identical. Highest-risk change so far — it touches the shared movement core of every
-      unit type. **Not started — scope recorded (this convo); build when the user says go.**
+      unit type. Chunk 60 done: `Scenery` builds a solid `HeightMapShape3D` collider from its height function
+      (+ public `SampleHeight`); Highlands' flat ground plane removed. Grounded movement = Chunk 61 next.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -726,7 +727,7 @@ non-grounded unit moves exactly as before.
 - **Ballistic projectiles.** On grounded levels stones/arrows lob in an arc (gravity) toward the target's
   actual height instead of flying level, so up/downhill shots connect.
 
-- [ ] **Chunk 60 — Terrain collision (heightmap).** Give `Scenery`'s hills a `HeightMapShape3D` (or trimesh)
+- [x] **Chunk 60 — Terrain collision (heightmap).** Give `Scenery`'s hills a `HeightMapShape3D` (or trimesh)
   built from its height function under a `StaticBody3D`, with `FloorMaxAngle`-friendly slope; keep the flat
   centre level. Replace Highlands' separate flat ground plane with the terrain collision (keep boundary walls).
   **Headless-test:** a downward ray / a dropped body lands at the height the function predicts.

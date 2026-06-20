@@ -334,7 +334,9 @@ public partial class Player : Unit
 		Vector3 fwd = -GlobalTransform.Basis.Z;
 		fwd.Y = 0f;
 		fwd = fwd.LengthSquared() > 0.0001f ? fwd.Normalized() : Vector3.Forward;
-		return GlobalPosition + fwd * AttackMoveDistance;
+		Vector3 target = GlobalPosition + fwd * AttackMoveDistance;
+		target.Y = 0f;   // rally point lives on the flat plane, not at the captain's capsule height
+		return target;
 	}
 
 	// Load a weapon's profile into the active fields, show its mesh, and resize the thrust
