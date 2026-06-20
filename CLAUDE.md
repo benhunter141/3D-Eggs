@@ -293,8 +293,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       spawns/formation, ballistic projectiles, and a terrain-following camera (Chunks 60–65). **Highlands
       ONLY**, opt-in via a `Grounded` flag (default OFF), so every flat level (Pinball / KotH / Co-op / card
       battler) stays byte-identical. Highest-risk change so far — it touches the shared movement core of every
-      unit type. Chunk 60 done: `Scenery` builds a solid `HeightMapShape3D` collider from its height function
-      (+ public `SampleHeight`); Highlands' flat ground plane removed. Grounded movement = Chunk 61 next.
+      unit type. Chunks 60–61 done: `Scenery` builds a solid `HeightMapShape3D` collider from its height function
+      (+ public `SampleHeight`), and `Unit.Grounded` (default OFF) folds gravity + floor-snap into movement via the
+      shared `ComposeMovement` chokepoint (every subclass routes through it; flat levels byte-identical). Terrain-aware
+      spawns/formation = Chunk 62 next.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -731,7 +733,7 @@ non-grounded unit moves exactly as before.
   built from its height function under a `StaticBody3D`, with `FloorMaxAngle`-friendly slope; keep the flat
   centre level. Replace Highlands' separate flat ground plane with the terrain collision (keep boundary walls).
   **Headless-test:** a downward ray / a dropped body lands at the height the function predicts.
-- [ ] **Chunk 61 — Grounded movement on `Unit` (keystone).** Add `Unit.Grounded` (default OFF) + shared
+- [x] **Chunk 61 — Grounded movement on `Unit` (keystone).** Add `Unit.Grounded` (default OFF) + shared
   gravity/floor-snap helper; route every subclass's `Velocity = horizontal*scale + knockback` through it so
   Y becomes the gravity term when grounded, untouched (0) when not. Set `UpDirection`/`FloorSnapLength`/
   `FloorMaxAngle`. **Headless-test:** a grounded unit on a slope settles to the surface and can climb it; a
