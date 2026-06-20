@@ -133,7 +133,7 @@ public partial class Scenery : Node3D
 			while (Mathf.Max(Mathf.Abs(x), Mathf.Abs(z)) < innerEdge && guard++ < 8);
 
 			float y = HeightAt(x, z);
-			float scale = 0.8f + (float)_rng.NextDouble() * 1.1f;
+			float scale = 1.1f + (float)_rng.NextDouble() * 1.7f;
 			float yaw = (float)(_rng.NextDouble() * Mathf.Tau);
 			var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * scale);
 

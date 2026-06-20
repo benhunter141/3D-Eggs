@@ -56,10 +56,11 @@ shadow_enabled = true
 [node name="Scenery" type="Node3D" parent="."]
 script = ExtResource("11_scenery")
 FieldHalf = 40.0
-TerrainHalf = 120.0
-HillAmplitude = 7.5
-RimHeight = 2.5
-TreeCount = 240
+RampWidth = 10.0
+TerrainHalf = 150.0
+HillAmplitude = 26.0
+RimHeight = 8.0
+TreeCount = 460
 
 [node name="Ground" type="StaticBody3D" parent="."]
 
