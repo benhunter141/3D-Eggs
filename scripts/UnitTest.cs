@@ -62,8 +62,9 @@ public partial class UnitTest : Node3D
 		bool terrainCollision = await TestTerrainCollision();
 		bool groundedMovement = await TestGroundedMovement();
 		bool spawnFormationHeight = await TestSpawnFormationHeight();
+		bool ballistic = await TestBallisticProjectiles();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -2296,6 +2297,69 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: grounded spawns/slots/command points sit on the terrain; flat-level points keep their Y"
 			: $"FAIL: spawnSnapped={spawnSnapped}, slotOnTerrain={slotOnTerrain}, cmdOnTerrain={cmdOnTerrain}, flatUntouched={flatUntouched}");
+		return pass;
+	}
+
+	// Chunk 63 (M14): ballistic projectiles on grounded levels arc to a target's REAL height, while
+	// flat levels keep the dead-level skim. Four checks:
+	//   (a) UPHILL arc — solving + integrating a stone's velocity reaches a target 6 m ABOVE launch.
+	//   (b) DOWNHILL arc — same, to a target 5 m BELOW launch.
+	//   (c) FLAT INTACT — a Stone aimed with the old Launch() keeps a constant Y (no gravity).
+	//   (d) ARROW arc — the Arrow solver reaches an uphill target too (shared math).
+	private async Task<bool> TestBallisticProjectiles()
+	{
+		GD.Print("=== UnitTest: ballistic projectiles (M14, Chunk 63) ===");
+
+		const float g = Ballistics.Gravity;
+
+		// Integrate a solved arc and return the closest distance it ever passes to `to`.
+		float ClosestApproach(Vector3 from, Vector3 to, float speed)
+		{
+			Vector3 v = Ballistics.SolveArcVelocity(from, to, speed, g);
+			Vector3 p = from;
+			float best = p.DistanceTo(to);
+			const float dt = 1f / 120f;
+			for (int i = 0; i < 600; i++)   // up to 5 s of flight
+			{
+				v.Y -= g * dt;
+				p += v * dt;
+				best = Mathf.Min(best, p.DistanceTo(to));
+			}
+			return best;
+		}
+
+		// (a) Uphill: target 6 m above and 20 m out.
+		float upMiss = ClosestApproach(new Vector3(0f, 1f, 0f), new Vector3(20f, 7f, 0f), 18f);
+		bool uphill = upMiss < 0.5f;
+		GD.Print($"(a) uphill arc closest approach = {upMiss:0.00} m (hit={uphill})");
+
+		// (b) Downhill: target 5 m below and 16 m out.
+		float downMiss = ClosestApproach(new Vector3(0f, 8f, 0f), new Vector3(16f, 3f, 0f), 18f);
+		bool downhill = downMiss < 0.5f;
+		GD.Print($"(b) downhill arc closest approach = {downMiss:0.00} m (hit={downhill})");
+
+		// (c) Flat Launch keeps level flight: a stone fired straight stays at its launch Y.
+		var stone = GD.Load<PackedScene>("res://scenes/Stone.tscn").Instantiate<Stone>();
+		AddChild(stone);
+		stone.GlobalPosition = new Vector3(0f, 3f, 0f);
+		stone.Launch(new Vector3(1f, 0f, 0f), Unit.TeamId.Player);
+		float y0 = stone.GlobalPosition.Y;
+		for (int i = 0; i < 5; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		float y1 = IsInstanceValid(stone) ? stone.GlobalPosition.Y : y0;
+		bool flatLevel = Mathf.IsEqualApprox(y0, y1, 0.001f) && Mathf.IsEqualApprox(y0, 3f, 0.001f);
+		GD.Print($"(c) flat stone Y {y0:0.00} -> {y1:0.00} (level={flatLevel})");
+		if (IsInstanceValid(stone)) stone.QueueFree();
+
+		// (d) Arrow shares the solver — uphill target 24 m out, 8 m up, at arrow speed.
+		float arrowMiss = ClosestApproach(new Vector3(0f, 1f, 0f), new Vector3(24f, 9f, 0f), 24f);
+		bool arrowArc = arrowMiss < 0.5f;
+		GD.Print($"(d) arrow arc closest approach = {arrowMiss:0.00} m (hit={arrowArc})");
+
+		bool pass = uphill && downhill && flatLevel && arrowArc;
+		GD.Print(pass
+			? "PASS: arcs reach up/downhill targets; flat shots stay level"
+			: $"FAIL: uphill={uphill}, downhill={downhill}, flatLevel={flatLevel}, arrowArc={arrowArc}");
 		return pass;
 	}
 }

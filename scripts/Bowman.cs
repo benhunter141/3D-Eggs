@@ -107,7 +107,12 @@ public partial class Bowman : Unit
 		arrow.Damage = ArrowDamage;
 		GetParent().AddChild(arrow);
 		arrow.GlobalPosition = GlobalPosition;
-		arrow.Launch(target.GlobalPosition - GlobalPosition, Team);
+		// Grounded levels lob a gravity arc onto the target's real (up/downhill) position; flat
+		// levels keep the straight level skim (Chunk 63).
+		if (Grounded)
+			arrow.LaunchBallistic(arrow.GlobalPosition, target.GlobalPosition, Team);
+		else
+			arrow.Launch(target.GlobalPosition - GlobalPosition, Team);
 		GD.Print($"[Bowman] {Name} loosed an arrow at {target.Name}");
 	}
 

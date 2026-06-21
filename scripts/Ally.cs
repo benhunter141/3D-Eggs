@@ -310,7 +310,12 @@ public partial class Ally : Unit
 		stone.Damage = StoneDamage;
 		GetParent().AddChild(stone);
 		stone.GlobalPosition = GlobalPosition;
-		stone.Launch(target.GlobalPosition - GlobalPosition, Team);
+		// Grounded levels lob a gravity arc onto the target's real (up/downhill) position; flat
+		// levels keep the straight level skim (Chunk 63).
+		if (Grounded)
+			stone.LaunchBallistic(stone.GlobalPosition, target.GlobalPosition, Team);
+		else
+			stone.Launch(target.GlobalPosition - GlobalPosition, Team);
 		GD.Print($"[Ally] {Name} threw a stone at {target.Name}");
 	}
 
