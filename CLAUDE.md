@@ -304,8 +304,12 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       terrain impact; flat levels keep the straight level skim. Chunk 64 done: `FollowCamera` DAMPS its focus
       HEIGHT (eased toward the target/midpoint Y via `EaseFocusHeight`/`FocusHeightLerp`) so the view doesn't jolt
       as the captain climbs/descends, plus a `FocusHeightLift` to sit the frame above the slope; X/Z still track
-      snappily and flat levels stay byte-identical (constant Y + zero lift = no-op ease). Highlands redesign +
-      tune = Chunk 65 next (last M14 chunk).
+      snappily and flat levels stay byte-identical (constant Y + zero lift = no-op ease). Chunk 65 done:
+      `Scenery.HeightAt` reworked from a flat field ringed by a 26 m wall of hills into GENTLE PLAYABLE
+      terrain — low rolling swells across the whole field (`PlayAmplitude`) + a couple of crossing ridges
+      (`Ridge()`/`RidgeHeight`/`RidgeWidth`), only the distant backdrop rising for a highland horizon
+      (`BackdropHeight`/`RampWidth`); every Highlands unit set `Grounded = true` so they walk/fight the
+      slopes. All M14 chunks built; knockback-on-slopes tuning + Highlands feel-check still open.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -758,10 +762,11 @@ non-grounded unit moves exactly as before.
 - [x] **Chunk 64 — Terrain-following camera.** Damp `FollowCamera`'s focus height (and lift it) so the view
   doesn't jolt as the captain climbs/descends, reusing the dynamic-zoom fit. Single-target + flat path
   unchanged. **Headless-test:** the focus height eases toward the target's Y rather than snapping.
-- [ ] **Chunk 65 — Highlands redesign + tune.** Rebuild `Highlands.tscn` with real ROLLING PLAYABLE terrain
-  (bring elevation into the field — a ridge / valley / hillside to fight over), re-place both armies on the
-  slopes, set `Grounded` on every unit, and tune slope steepness + knockback-on-slopes (the pinball system
-  zeroes Y — flung units on a hillside need a tuning pass) so it feels good. **User feel-check.**
+- [~] **Chunk 65 — Highlands redesign + tune.** Reworked `Scenery.HeightAt` from "flat field ringed by a
+  26 m wall of hills" into GENTLE PLAYABLE terrain: low rolling swells across the whole field
+  (`PlayAmplitude`) + a couple of crossing ridges (`Ridge()`/`RidgeHeight`/`RidgeWidth`), with only the
+  distant backdrop rising for a highland horizon (`BackdropHeight`/`RampWidth`). Set `Grounded = true` on
+  every Highlands unit so they walk/fight the slopes. Knockback-on-slopes tuning still open. **User feel-check.**
 
 **(Highlands-scoped by decision: do NOT roll `Grounded` out to other levels unless asked. Build order is
 60 → 61 → 62 → 63 → 64 → 65; 60 + 61 are the load-bearing pair.)**
