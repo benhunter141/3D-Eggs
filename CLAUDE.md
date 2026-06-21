@@ -301,7 +301,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       terrain, and a ridden `Mount` follows the ground under its rider — all NaN/fallback-guarded so flat levels are
       byte-identical. Chunk 63 done: grounded `Ally`/`Bowman` lob `Stone`/`Arrow` in a gravity arc (shared
       `Ballistics.SolveArcVelocity`) onto the target's REAL height — arrows tip along the arc, lobbed shots free on
-      terrain impact; flat levels keep the straight level skim. Terrain-following camera = Chunk 64 next.
+      terrain impact; flat levels keep the straight level skim. Chunk 64 done: `FollowCamera` DAMPS its focus
+      HEIGHT (eased toward the target/midpoint Y via `EaseFocusHeight`/`FocusHeightLerp`) so the view doesn't jolt
+      as the captain climbs/descends, plus a `FocusHeightLift` to sit the frame above the slope; X/Z still track
+      snappily and flat levels stay byte-identical (constant Y + zero lift = no-op ease). Highlands redesign +
+      tune = Chunk 65 next (last M14 chunk).
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -751,7 +755,7 @@ non-grounded unit moves exactly as before.
   the target's real position (height included) instead of level flight; flat levels keep the straight shot.
   Shared `Ballistics.SolveArcVelocity` solver; arrows tip along the arc; lobbed shots free on terrain impact.
   **Headless-test:** an arced shot's trajectory reaches a target above/below the launch height.
-- [ ] **Chunk 64 — Terrain-following camera.** Damp `FollowCamera`'s focus height (and lift it) so the view
+- [x] **Chunk 64 — Terrain-following camera.** Damp `FollowCamera`'s focus height (and lift it) so the view
   doesn't jolt as the captain climbs/descends, reusing the dynamic-zoom fit. Single-target + flat path
   unchanged. **Headless-test:** the focus height eases toward the target's Y rather than snapping.
 - [ ] **Chunk 65 — Highlands redesign + tune.** Rebuild `Highlands.tscn` with real ROLLING PLAYABLE terrain
