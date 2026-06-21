@@ -56,10 +56,12 @@ public partial class Mount : CharacterBody3D
 			return;
 		}
 
-		// Sit directly under the rider, one RiderHeight down, sharing its yaw — captain + mount
-		// move and turn as one. (The rider drives the movement; we just mirror it.)
+		// Sit under the rider, sharing its yaw — captain + mount move and turn as one. On grounded
+		// terrain (Chunk 62) we rest the mount ON the surface beneath the rider's XZ so the steed
+		// follows the hills; on a flat level (no terrain) we mirror one RiderHeight below the rider
+		// exactly as before — byte-identical.
 		Vector3 pos = Rider.GlobalPosition;
-		pos.Y -= RiderHeight;
+		pos.Y = Scenery.SampleActiveHeight(pos.X, pos.Z, pos.Y - RiderHeight);
 		GlobalPosition = pos;
 
 		Vector3 rot = Rotation;

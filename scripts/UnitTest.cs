@@ -61,8 +61,9 @@ public partial class UnitTest : Node3D
 		bool squadCommands = await TestSquadCommands();
 		bool terrainCollision = await TestTerrainCollision();
 		bool groundedMovement = await TestGroundedMovement();
+		bool spawnFormationHeight = await TestSpawnFormationHeight();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -2220,6 +2221,81 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: grounded units fall/settle/climb terrain; a non-grounded unit ignores gravity (flat-level behaviour intact)"
 			: $"FAIL: floatStayedUp={floatStayedUp}, settledOnFloor={settledOnFloor}, settledHeight={settledHeight}, advanced={advanced}, climbed={climbed}");
+		return pass;
+	}
+
+	// Chunk 62 (M14): spawn / formation / command points sample the terrain so grounded units sit ON
+	// the surface, not the scene's flat plane. Four checks over one gentle landscape:
+	//   (a) SPAWN SNAP — a grounded unit instanced high over a hill lands at terrain + GroundedSpawnLift
+	//       the instant it enters the tree (no waiting on gravity), instead of materialising buried/airborne.
+	//   (b) FORMATION SLOT — a grounded ally's formation slot on a slope resolves to the terrain height
+	//       at the slot's XZ (the named requirement), so it never steers at a point hanging in the air.
+	//   (c) COMMAND POINT — a Hold order on a grounded ally drops the anchor onto the surface.
+	//   (d) FLAT INTACT — a NON-grounded ally's Hold anchor keeps the exact Y it was given (no terrain pull).
+	private async Task<bool> TestSpawnFormationHeight()
+	{
+		GD.Print("=== UnitTest: spawn / formation / command height (M14, Chunk 62) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var scenery = new Scenery
+		{
+			FieldHalf = 10f, RampWidth = 24f, TerrainHalf = 60f, CellSize = 2.5f,
+			RimHeight = 4f, HillAmplitude = 2f, CenterDrop = 0f, TreeCount = 0,
+		};
+		AddChild(scenery);
+		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		// (a) Spawn snap: instance a grounded skeleton high above a hill BEFORE adding it (so Grounded is
+		// set when _Ready runs), then confirm it lands on the terrain the moment it enters the tree.
+		float snapX = 15f, snapZ = 0f;
+		float snapTerrain = scenery.SampleHeight(snapX, snapZ);
+		var dropped = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		dropped.Grounded = true;
+		dropped.Position = new Vector3(snapX, 50f, snapZ);   // local == global under the identity-root test
+		AddChild(dropped);                                   // _Ready -> SnapToGround
+		float snappedY = dropped.GlobalPosition.Y;
+		bool spawnSnapped = Mathf.IsEqualApprox(snappedY, snapTerrain + dropped.GroundedSpawnLift, 0.05f);
+		GD.Print($"(a) spawn snap: Y 50.00 -> {snappedY:0.00}, terrain={snapTerrain:0.00}+lift={dropped.GroundedSpawnLift:0.00} (snapped={spawnSnapped})");
+
+		// A captain (formation anchor) on the flat centre, facing default (FormationYaw 0 -> identity basis).
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(cap);   // joins the "player" group so the ally resolves it
+		cap.GlobalPosition = new Vector3(0f, scenery.SampleHeight(0f, 0f) + 1f, 0f);
+
+		// (b) Grounded ally whose slot offset puts the slot out on the slope.
+		var slotAlly = GD.Load<PackedScene>("res://scenes/Ally.tscn").Instantiate<Ally>();
+		slotAlly.Grounded = true;
+		slotAlly.FormationOffset = new Vector3(20f, 0f, 0f);
+		AddChild(slotAlly);   // _Ready resolves the captain from the "player" group
+		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		Vector3 slot = slotAlly.SlotWorldPosition();
+		float slotTerrain = scenery.SampleHeight(slot.X, slot.Z);
+		bool slotOnTerrain = Mathf.IsEqualApprox(slot.Y, slotTerrain, 0.01f);
+		GD.Print($"(b) formation slot at ({slot.X:0.0},{slot.Z:0.0}): Y={slot.Y:0.00}, terrain={slotTerrain:0.00} (onTerrain={slotOnTerrain})");
+
+		// (c) Hold command on the grounded ally: the anchor is dropped to the surface.
+		slotAlly.HoldAt(new Vector3(18f, 50f, 0f));
+		float cmdTerrain = scenery.SampleHeight(18f, 0f);
+		bool cmdOnTerrain = Mathf.IsEqualApprox(slotAlly.CommandPoint.Y, cmdTerrain, 0.01f);
+		GD.Print($"(c) hold anchor Y={slotAlly.CommandPoint.Y:0.00}, terrain={cmdTerrain:0.00} (onTerrain={cmdOnTerrain})");
+
+		// (d) Flat (non-grounded) ally: the Hold anchor keeps its given Y exactly — flat levels untouched.
+		var flatAlly = GD.Load<PackedScene>("res://scenes/Ally.tscn").Instantiate<Ally>();
+		AddChild(flatAlly);   // Grounded defaults to false
+		flatAlly.HoldAt(new Vector3(18f, 7f, 0f));
+		bool flatUntouched = Mathf.IsEqualApprox(flatAlly.CommandPoint.Y, 7f, 0.0001f);
+		GD.Print($"(d) non-grounded hold anchor Y={flatAlly.CommandPoint.Y:0.00} (kept given 7.00 = {flatUntouched})");
+
+		scenery.QueueFree();
+
+		bool pass = spawnSnapped && slotOnTerrain && cmdOnTerrain && flatUntouched;
+		GD.Print(pass
+			? "PASS: grounded spawns/slots/command points sit on the terrain; flat-level points keep their Y"
+			: $"FAIL: spawnSnapped={spawnSnapped}, slotOnTerrain={slotOnTerrain}, cmdOnTerrain={cmdOnTerrain}, flatUntouched={flatUntouched}");
 		return pass;
 	}
 }

@@ -63,10 +63,21 @@ public partial class Ally : Unit
 	private Vector3 _commandPoint;                  // world anchor for Hold / AttackMove
 	public Vector3 CommandPoint => _commandPoint;   // read for tests / HUD
 
-	// Issue a command (called by the captain in Chunk 49, or directly in tests).
-	public void HoldAt(Vector3 worldPoint)       { Command = CommandMode.Hold;       _commandPoint = worldPoint; }
-	public void AttackMoveTo(Vector3 worldPoint) { Command = CommandMode.AttackMove; _commandPoint = worldPoint; }
+	// Issue a command (called by the captain in Chunk 49, or directly in tests). On grounded terrain the
+	// anchor is dropped onto the surface (Chunk 62) so the leash distance + arrive logic reference a
+	// point ON the ground, not one floating in the air above/below a slope.
+	public void HoldAt(Vector3 worldPoint)       { Command = CommandMode.Hold;       _commandPoint = OnGround(worldPoint); }
+	public void AttackMoveTo(Vector3 worldPoint) { Command = CommandMode.AttackMove; _commandPoint = OnGround(worldPoint); }
 	public void FollowCaptain()                  { Command = CommandMode.Follow; }
+
+	// Drop a world point onto the terrain surface when grounded (a no-op on flat levels — Grounded off,
+	// or no terrain, returns the point unchanged), so anchors/slots sit on the ground (Chunk 62).
+	private Vector3 OnGround(Vector3 p)
+	{
+		if (Grounded)
+			p.Y = SampleGroundHeight(p.X, p.Z, p.Y);
+		return p;
+	}
 
 	private Node3D _player;
 	private float _attackTimer; // counts down; > 0 blocks the next fist hit
@@ -346,7 +357,9 @@ public partial class Ally : Unit
 		if (_player == null)
 			return GlobalPosition;
 		Basis basis = _player is Player p ? p.FormationBasis : _player.GlobalTransform.Basis;
-		return _player.GlobalPosition + basis * FormationOffset;
+		// On grounded terrain the slot rides the surface height at its XZ (Chunk 62) so an ally never
+		// steers at — or measures its leash from — a point hanging in the air over a slope.
+		return OnGround(_player.GlobalPosition + basis * FormationOffset);
 	}
 
 	// Rotate to face a world point on the flat plane (forward is -Z), capped to TurnSpeed.

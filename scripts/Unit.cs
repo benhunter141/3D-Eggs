@@ -65,6 +65,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	[Export] public float Gravity = 24.0f;          // downward accel (m/s^2) applied while airborne
 	[Export] public float FloorSnap = 0.6f;         // FloorSnapLength: keeps the unit glued to downhill slopes
 	[Export] public float MaxSlopeAngle = 50.0f;    // FloorMaxAngle (deg): shallower = walkable, steeper = a wall
+	[Export] public float GroundedSpawnLift = 1.0f; // (grounded only) spawn this far ABOVE the sampled terrain so floor-snap settles cleanly (Chunk 62)
 
 	private float _verticalVelocity = 0f;           // accumulated gravity term (grounded only; 0 otherwise)
 	public float VerticalVelocity => _verticalVelocity;   // read-only view for headless tests
@@ -181,8 +182,29 @@ public partial class Unit : CharacterBody3D, ICardUnit
 			UpDirection = Vector3.Up;
 			FloorSnapLength = FloorSnap;
 			FloorMaxAngle = Mathf.DegToRad(MaxSlopeAngle);
+			SnapToGround();   // settle onto the terrain instead of the scene's fixed spawn height (Chunk 62)
 		}
 	}
+
+	// Place a grounded unit just above the terrain at its own XZ on spawn, so it lands ON the
+	// landscape instead of materialising at the scene's flat y (which on a tall hill could be buried
+	// inside the terrain). A no-op when no terrain is active — flat levels never call this (Grounded
+	// is off) and even on a terrain level a missing sample leaves the scene height untouched.
+	private void SnapToGround()
+	{
+		Vector3 p = GlobalPosition;
+		float h = SampleGroundHeight(p.X, p.Z, float.NaN);
+		if (float.IsNaN(h))
+			return;
+		p.Y = h + GroundedSpawnLift;
+		GlobalPosition = p;
+	}
+
+	// Terrain surface height at world (x,z) for grounded placement — spawn snap, formation slots,
+	// command points (Chunk 62). Returns `fallback` when no terrain is active (every flat level), so
+	// callers stay byte-identical off the grounded path.
+	protected static float SampleGroundHeight(float x, float z, float fallback)
+		=> Scenery.SampleActiveHeight(x, z, fallback);
 
 	// Leave the registry the moment we leave the tree (death-free, scene reload, etc.) so
 	// the team buckets always reflect exactly the units currently in play.

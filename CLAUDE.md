@@ -295,8 +295,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       battler) stays byte-identical. Highest-risk change so far — it touches the shared movement core of every
       unit type. Chunks 60–61 done: `Scenery` builds a solid `HeightMapShape3D` collider from its height function
       (+ public `SampleHeight`), and `Unit.Grounded` (default OFF) folds gravity + floor-snap into movement via the
-      shared `ComposeMovement` chokepoint (every subclass routes through it; flat levels byte-identical). Terrain-aware
-      spawns/formation = Chunk 62 next.
+      shared `ComposeMovement` chokepoint (every subclass routes through it; flat levels byte-identical). Chunk 62 done:
+      `Scenery.SampleActiveHeight` (one active terrain per level) lets grounded units snap onto the surface on spawn
+      (`GroundedSpawnLift`), formation slots + ally command points (`SlotWorldPosition`/`HoldAt`/`AttackMoveTo`) sit on the
+      terrain, and a ridden `Mount` follows the ground under its rider — all NaN/fallback-guarded so flat levels are
+      byte-identical. Ballistic projectiles = Chunk 63 next.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -738,7 +741,7 @@ non-grounded unit moves exactly as before.
   Y becomes the gravity term when grounded, untouched (0) when not. Set `UpDirection`/`FloorSnapLength`/
   `FloorMaxAngle`. **Headless-test:** a grounded unit on a slope settles to the surface and can climb it; a
   non-grounded unit's motion is byte-identical to today.
-- [ ] **Chunk 62 — Spawn / formation / facing height.** Grounded units settle to terrain on spawn (ray-place
+- [x] **Chunk 62 — Spawn / formation / facing height.** Grounded units settle to terrain on spawn (ray-place
   or let gravity drop them); formation-slot + command points sample terrain height so allies don't steer at a
   point in the air; mounts follow the ground under the rider. **Headless-test:** a slot point on a slope
   resolves to the terrain surface height.

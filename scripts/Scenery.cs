@@ -30,8 +30,15 @@ public partial class Scenery : Node3D
 
 	private System.Random _rng;
 
+	// The level's active terrain, so grounded units / formation slots / mounts (Chunk 62) can sample
+	// the surface height WITHOUT a node path or group walk: there is one landscape per level, and a
+	// flat level has none. Set on _Ready, cleared on _ExitTree (guarded by identity so a reload that
+	// builds the next terrain before freeing the old one can't null the new one).
+	private static Scenery _active;
+
 	public override void _Ready()
 	{
+		_active = this;
 		_rng = new System.Random(Seed);
 		BuildHills();
 		if (Collidable)
@@ -39,10 +46,22 @@ public partial class Scenery : Node3D
 		ScatterTrees();
 	}
 
+	public override void _ExitTree()
+	{
+		if (_active == this)
+			_active = null;
+	}
+
 	// Public height probe of the landscape at world (x,z). Spawns/formation slots/camera (Chunks
 	// 62, 64) sample this so they sit ON the terrain instead of a fixed plane. Matches the mesh
 	// + collider exactly (all three read HeightAt).
 	public float SampleHeight(float x, float z) => HeightAt(x, z);
+
+	// Height of the ACTIVE level terrain at world (x,z), or `fallback` when there is no terrain (every
+	// flat level). The single chokepoint Unit/Mount call for grounded placement (Chunk 62) — off a
+	// terrain level it returns the fallback unchanged, so flat levels stay byte-identical.
+	public static float SampleActiveHeight(float x, float z, float fallback)
+		=> _active != null && IsInstanceValid(_active) ? _active.SampleHeight(x, z) : fallback;
 
 	// Height of the landscape at (x,z): flat (slightly sunk) inside the field, smoothly ramping
 	// up past the edge into rolling sine-noise hills. A square distance metric (max of |x|,|z|)
