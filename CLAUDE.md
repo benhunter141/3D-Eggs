@@ -299,7 +299,9 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       `Scenery.SampleActiveHeight` (one active terrain per level) lets grounded units snap onto the surface on spawn
       (`GroundedSpawnLift`), formation slots + ally command points (`SlotWorldPosition`/`HoldAt`/`AttackMoveTo`) sit on the
       terrain, and a ridden `Mount` follows the ground under its rider — all NaN/fallback-guarded so flat levels are
-      byte-identical. Ballistic projectiles = Chunk 63 next.
+      byte-identical. Chunk 63 done: grounded `Ally`/`Bowman` lob `Stone`/`Arrow` in a gravity arc (shared
+      `Ballistics.SolveArcVelocity`) onto the target's REAL height — arrows tip along the arc, lobbed shots free on
+      terrain impact; flat levels keep the straight level skim. Terrain-following camera = Chunk 64 next.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -745,8 +747,9 @@ non-grounded unit moves exactly as before.
   or let gravity drop them); formation-slot + command points sample terrain height so allies don't steer at a
   point in the air; mounts follow the ground under the rider. **Headless-test:** a slot point on a slope
   resolves to the terrain surface height.
-- [ ] **Chunk 63 — Ballistic projectiles.** On grounded levels, `Stone`/`Arrow` lob in a gravity arc aimed at
+- [x] **Chunk 63 — Ballistic projectiles.** On grounded levels, `Stone`/`Arrow` lob in a gravity arc aimed at
   the target's real position (height included) instead of level flight; flat levels keep the straight shot.
+  Shared `Ballistics.SolveArcVelocity` solver; arrows tip along the arc; lobbed shots free on terrain impact.
   **Headless-test:** an arced shot's trajectory reaches a target above/below the launch height.
 - [ ] **Chunk 64 — Terrain-following camera.** Damp `FollowCamera`'s focus height (and lift it) so the view
   doesn't jolt as the captain climbs/descends, reusing the dynamic-zoom fit. Single-target + flat path
