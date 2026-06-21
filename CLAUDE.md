@@ -309,7 +309,14 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       terrain — low rolling swells across the whole field (`PlayAmplitude`) + a couple of crossing ridges
       (`Ridge()`/`RidgeHeight`/`RidgeWidth`), only the distant backdrop rising for a highland horizon
       (`BackdropHeight`/`RampWidth`); every Highlands unit set `Grounded = true` so they walk/fight the
-      slopes. All M14 chunks built; knockback-on-slopes tuning + Highlands feel-check still open.
+      slopes. All M14 chunks built. **Terrain REBUILT for cost + looks** (the first pass "looked bad +
+      tanked FPS"): the collider now covers only the walled play field (`ColliderHalf`, ≈±50) instead of
+      the whole 150 m landscape (a ~100 m heightmap grid vs ~300 m — the big perf win); the visual mesh
+      shrank to `TerrainHalf = 90` at `CellSize = 3`; trees 460→160; `directional_shadow_max_distance = 90`.
+      Height is now smooth layered **value noise** (`Noise2`/`Hash`) for organic rolling ground instead of
+      regular sines, and the mesh colours by **height AND slope** (grass→highland→rock) so it reads as
+      terrain. Headless terrain tests still pass (collider matches the new field). knockback-on-slopes
+      tuning + Highlands feel-check still open.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 

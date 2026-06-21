@@ -42,6 +42,7 @@ environment = SubResource("Env_1")
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.866025, -0.330366, 0.378522, 0, 0.753, 0.658, -0.5, -0.569794, 0.652695, 0, 10, 0)
 shadow_enabled = true
+directional_shadow_max_distance = 90.0
 
 [node name="Scenery" type="Node3D" parent="."]
 script = ExtResource("11_scenery")
@@ -49,10 +50,11 @@ FieldHalf = 40.0
 PlayAmplitude = 2.5
 RidgeHeight = 5.0
 RidgeWidth = 11.0
-RampWidth = 30.0
+RampWidth = 26.0
 BackdropHeight = 12.0
-TerrainHalf = 150.0
-TreeCount = 460
+TerrainHalf = 90.0
+ColliderHalf = 50.0
+TreeCount = 160
 
 [node name="WallN" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -40)
