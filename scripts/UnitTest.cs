@@ -2133,9 +2133,9 @@ public partial class UnitTest : Node3D
 			RampWidth = 8f,
 			TerrainHalf = 60f,
 			CellSize = 2.5f,
-			RimHeight = 6f,
-			HillAmplitude = 10f,
-			CenterDrop = 0f,
+			PlayAmplitude = 2f,
+			RidgeHeight = 4f,
+			BackdropHeight = 10f,
 			TreeCount = 0,
 		};
 		AddChild(scenery);                                   // _Ready builds the mesh + collider
@@ -2156,7 +2156,7 @@ public partial class UnitTest : Node3D
 			return ((Vector3)hit["position"]).Y;
 		}
 
-		// (a) Flat play centre: ray should land at the flat height (≈ -CenterDrop = 0).
+		// (a) Play centre: ray should land at the height function's value there (collider matches mesh).
 		float centreExpect = scenery.SampleHeight(0f, 0f);
 		float centreHit = RayGroundY(0f, 0f);
 		bool centreOk = !float.IsNaN(centreHit) && Mathf.Abs(centreHit - centreExpect) < 0.3f;
@@ -2193,16 +2193,16 @@ public partial class UnitTest : Node3D
 			c.QueueFree();
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
-		// A gentle landscape: a flat centre, a wide shallow ramp, low hills — every slope walkable.
+		// A gentle landscape: low rolling field, a wide shallow backdrop ramp — every slope walkable.
 		var scenery = new Scenery
 		{
 			FieldHalf = 10f,
 			RampWidth = 24f,
 			TerrainHalf = 60f,
 			CellSize = 2.5f,
-			RimHeight = 4f,
-			HillAmplitude = 2f,
-			CenterDrop = 0f,
+			PlayAmplitude = 2f,
+			RidgeHeight = 0f,
+			BackdropHeight = 6f,
 			TreeCount = 0,
 		};
 		AddChild(scenery);
@@ -2286,7 +2286,7 @@ public partial class UnitTest : Node3D
 		var scenery = new Scenery
 		{
 			FieldHalf = 10f, RampWidth = 24f, TerrainHalf = 60f, CellSize = 2.5f,
-			RimHeight = 4f, HillAmplitude = 2f, CenterDrop = 0f, TreeCount = 0,
+			PlayAmplitude = 2f, RidgeHeight = 0f, BackdropHeight = 6f, TreeCount = 0,
 		};
 		AddChild(scenery);
 		await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);

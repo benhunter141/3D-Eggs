@@ -15,13 +15,14 @@ using Godot;
 // trees (trunks + foliage), so a few hundred trees cost a handful of draw calls.
 public partial class Scenery : Node3D
 {
-	[Export] public float FieldHalf = 40.0f;     // half-width of the flat play field (kept level)
-	[Export] public float RampWidth = 16.0f;     // how far past the field the ground ramps up into hills
-	[Export] public float TerrainHalf = 120.0f;  // half-width of the whole generated landscape
-	[Export] public float CellSize = 2.5f;       // grid spacing of the hill mesh (smaller = smoother/heavier)
-	[Export] public float RimHeight = 2.5f;       // base lift the hills sit at once past the ramp
-	[Export] public float HillAmplitude = 7.0f;   // extra height of the rolling sine hills on top of the rim
-	[Export] public float CenterDrop = 0.15f;     // sink the flat centre just below the play plane (no z-fight)
+	[Export] public float FieldHalf = 40.0f;       // half-width of the play field (gentle rolling terrain within)
+	[Export] public float PlayAmplitude = 2.5f;    // how much the playable field gently swells up/down
+	[Export] public float RidgeHeight = 5.0f;      // crest height of the couple of ridges crossing the field
+	[Export] public float RidgeWidth = 11.0f;      // half-thickness of each ridge band (wider = gentler slope)
+	[Export] public float RampWidth = 30.0f;       // distance past the field over which the backdrop rises
+	[Export] public float BackdropHeight = 10.0f;  // how high the distant scenery hills rise beyond the field
+	[Export] public float TerrainHalf = 120.0f;    // half-width of the whole generated landscape
+	[Export] public float CellSize = 2.5f;         // grid spacing of the hill mesh (smaller = smoother/heavier)
 
 	[Export] public bool Collidable = true;       // build a solid HeightMapShape3D collider matching the mesh
 	[Export] public int TreeCount = 220;          // decorative trees scattered across the hills
@@ -63,22 +64,41 @@ public partial class Scenery : Node3D
 	public static float SampleActiveHeight(float x, float z, float fallback)
 		=> _active != null && IsInstanceValid(_active) ? _active.SampleHeight(x, z) : fallback;
 
-	// Height of the landscape at (x,z): flat (slightly sunk) inside the field, smoothly ramping
-	// up past the edge into rolling sine-noise hills. A square distance metric (max of |x|,|z|)
-	// makes the flat region match the square play field + its boundary walls.
+	// Height of the landscape at (x,z). Unlike the old "flat field ringed by a wall of hills" this is
+	// GENTLE PLAYABLE terrain: the whole field rolls up/down by a few metres (low-amplitude layered
+	// sines) with a couple of distinct ridges crossing it, so units climb and fight over real but mild
+	// elevation. Only the DISTANT backdrop (well past the field edge) rises higher, for a highland
+	// horizon. A square distance metric (max of |x|,|z|) keeps the backdrop ramp aligned to the square
+	// field + its boundary walls.
 	private float HeightAt(float x, float z)
 	{
+		// Gentle rolling swells across the whole field — low-frequency layered sines give soft
+		// up-and-down ground (roll ≈ ±1.5, scaled to about ±PlayAmplitude).
+		float roll = Mathf.Sin(x * 0.05f + 0.4f) * Mathf.Cos(z * 0.045f)
+				   + 0.5f * Mathf.Sin(x * 0.11f - 1.2f) * Mathf.Cos(z * 0.09f + 0.7f);
+		float h = roll * 0.66f * PlayAmplitude;
+
+		// A couple of distinct ridges crossing the field, each a raised band along a line.
+		h += Ridge(x, z, 0.25f, 1.0f, -8.0f);    // a low ridge running roughly E–W near z ≈ -8
+		h += Ridge(x, z, 1.0f, -0.35f, 14.0f);   // a cross ridge running roughly N–S near x ≈ 14
+
+		// Distant backdrop: ground swells upward only well outside the play field, so the horizon
+		// reads as highlands while the field edge by the walls stays low.
 		float d = Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
 		float t = Mathf.Clamp((d - FieldHalf) / Mathf.Max(0.001f, RampWidth), 0f, 1f);
-		float ramp = Mathf.SmoothStep(0f, 1f, t);     // 0 inside the field, 1 once fully past the ramp
+		h += Mathf.SmoothStep(0f, 1f, t) * BackdropHeight;
 
-		// Rolling hills: layered sines, normalised to 0..1 then scaled.
-		float h = Mathf.Sin(x * 0.06f) * Mathf.Cos(z * 0.05f)
-				+ 0.5f * Mathf.Sin(x * 0.13f + 1.7f) * Mathf.Cos(z * 0.11f - 0.4f)
-				+ 0.3f * Mathf.Sin((x + z) * 0.09f + 3.1f);
-		float hills = (h * 0.4f + 0.5f) * HillAmplitude;
+		return h;
+	}
 
-		return ramp * (RimHeight + hills) - CenterDrop;
+	// A ridge: a raised band along the line (nx·x + nz·z = offset), peaking RidgeHeight at the line
+	// and falling off over RidgeWidth (gaussian), so it reads as a smooth climbable crest.
+	private float Ridge(float x, float z, float nx, float nz, float offset)
+	{
+		float len = Mathf.Sqrt(nx * nx + nz * nz);
+		float dist = Mathf.Abs(nx * x + nz * z - offset) / Mathf.Max(0.001f, len);
+		float f = dist / Mathf.Max(0.001f, RidgeWidth);
+		return RidgeHeight * Mathf.Exp(-f * f);
 	}
 
 	// Build the hill landscape as one vertex-coloured ArrayMesh. SurfaceTool generates the
@@ -92,7 +112,7 @@ public partial class Scenery : Node3D
 		int cells = Mathf.Max(2, (int)(TerrainHalf * 2f / CellSize));
 		float step = TerrainHalf * 2f / cells;
 
-		float ColorT(float y) => Mathf.Clamp(y / (RimHeight + HillAmplitude), 0f, 1f);
+		float ColorT(float y) => Mathf.Clamp(y / (PlayAmplitude + RidgeHeight + BackdropHeight), 0f, 1f);
 		Color grass = new Color(0.24f, 0.42f, 0.20f);
 		Color high = new Color(0.55f, 0.62f, 0.42f);
 
