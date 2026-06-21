@@ -63,8 +63,9 @@ public partial class UnitTest : Node3D
 		bool groundedMovement = await TestGroundedMovement();
 		bool spawnFormationHeight = await TestSpawnFormationHeight();
 		bool ballistic = await TestBallisticProjectiles();
+		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1861,6 +1862,47 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: two targets focus on their midpoint and the camera pulls back as they separate"
 			: $"FAIL: soloFocus={soloFocus}, soloNoSep={soloNoSep}, midpoint={midpointOk}, halfSep={halfSepOk}, stillMidpoint={stillMidpoint}, grew={grew}");
+		return pass;
+	}
+
+	// Chunk 64: the terrain-following camera DAMPS the focus height instead of snapping to the
+	// target's Y as the captain climbs/descends, and an optional lift raises the framed point. The
+	// flat path stays byte-identical: a constant target Y with zero lift eases to itself every frame.
+	// Pure math on FollowCamera.EaseFocusHeight — no tree or input needed.
+	private bool TestTerrainCamera()
+	{
+		GD.Print("=== UnitTest: terrain-following camera focus height (Chunk 64) ===");
+		double dt = 1.0 / 60.0;
+
+		// Eases toward the target's Y rather than snapping: one step from 0 toward 10 lands strictly
+		// between, and many steps converge on it.
+		var cam = new FollowCamera { FocusHeightLerp = 4.0f, FocusHeightLift = 0f };
+		float oneStep = cam.EaseFocusHeight(0f, 10f, dt);
+		bool eases = oneStep > 0f && oneStep < 10f;
+		float h = 0f;
+		for (int i = 0; i < 600; i++) h = cam.EaseFocusHeight(h, 10f, dt);
+		bool converges = Mathf.IsEqualApprox(h, 10f, 0.01f);
+		GD.Print($"climb: oneStep={oneStep:0.000} (between 0 and 10={eases}), settled={h:0.000} (converges={converges})");
+
+		// Flat invariant: a constant target Y with zero lift is a no-op every frame (byte-identical).
+		float flat = cam.EaseFocusHeight(1f, 1f, dt);
+		bool flatUnchanged = flat == 1f;
+		GD.Print($"flat: ease(1,1)={flat:0.000} (unchanged={flatUnchanged})");
+
+		// Lift raises the settled focus height by exactly FocusHeightLift.
+		var lifted = new FollowCamera { FocusHeightLerp = 4.0f, FocusHeightLift = 2.5f };
+		float lh = 0f;
+		for (int i = 0; i < 600; i++) lh = lifted.EaseFocusHeight(lh, 3f, dt);
+		bool liftedOk = Mathf.IsEqualApprox(lh, 5.5f, 0.01f);   // 3 + 2.5
+		GD.Print($"lift: settled={lh:0.000} (target 3 + lift 2.5 = 5.5, ok={liftedOk})");
+
+		cam.Free();
+		lifted.Free();
+
+		bool pass = eases && converges && flatUnchanged && liftedOk;
+		GD.Print(pass
+			? "PASS: focus height eases toward the target Y, is a no-op when flat, and respects the lift"
+			: $"FAIL: eases={eases}, converges={converges}, flatUnchanged={flatUnchanged}, liftedOk={liftedOk}");
 		return pass;
 	}
 

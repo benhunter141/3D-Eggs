@@ -45,12 +45,18 @@ public partial class FollowCamera : Camera3D
 	[Export] public float ZoomBiasMax = 24.0f;               // most the player can push OUT (positive = farther)
 	[Export] public float MinFixedDistance = 6.0f;           // hard floor in non-dynamic levels so a hard zoom-in can't pass through the player
 
+	[ExportGroup("Terrain Follow")]
+	[Export] public float FocusHeightLerp = 4.0f;             // how fast the focus HEIGHT eases toward the target's Y (lower = smoother; the camera doesn't jolt as the captain climbs/descends)
+	[Export] public float FocusHeightLift = 0.0f;             // metres added to the focus height (0 = flat levels byte-identical; Highlands lifts so the view sits above the slope, Chunk 65)
+
 	// Player's live zoom preference in metres, clamped to [ZoomBiasMin, ZoomBiasMax].
 	// Negative pulls the camera in, positive pushes it out. Persists across frames.
 	public float ZoomBias { get; private set; } = 0f;
 
 	private Vector3 _offsetDir;     // normalized Offset — the fixed view angle
 	private float _currentDistance; // smoothed camera distance along _offsetDir
+	private float _focusHeight;     // smoothed focus Y (+ lift), eased toward the target/midpoint Y — see FocusHeightLerp
+	private bool _focusHeightInit;  // false until the first frame seeds _focusHeight (so it starts ON the target, no opening glide)
 
 	public override void _Ready()
 	{
@@ -80,7 +86,17 @@ public partial class FollowCamera : Camera3D
 			StepZoom(+1f);
 
 		// Centre on the focus point: the single target, or the midpoint of both captains in co-op.
-		Vector3 focus = FocusPoint();
+		// Track X/Z snappily but DAMP the height so the view doesn't jolt as the captain climbs or
+		// descends terrain (Chunk 64). On flat levels the target Y is constant and FocusHeightLift is
+		// 0, so the eased height equals it every frame — the flat path is byte-identical.
+		Vector3 rawFocus = FocusPoint();
+		if (!_focusHeightInit)
+		{
+			_focusHeight = rawFocus.Y + FocusHeightLift;
+			_focusHeightInit = true;
+		}
+		_focusHeight = EaseFocusHeight(_focusHeight, rawFocus.Y, delta);
+		Vector3 focus = new Vector3(rawFocus.X, _focusHeight, rawFocus.Z);
 
 		// Decide how far back to sit this frame.
 		float distance;
@@ -133,6 +149,17 @@ public partial class FollowCamera : Camera3D
 	// pulls back to fit both captains even when no unit is flung wide. Single-target: just the units.
 	public float FramingSpread(Vector3 focus) =>
 		Mathf.Max(FarthestTrackedUnit(focus), HalfSeparation());
+
+	// Ease the smoothed focus height one frame from `current` toward the target's `targetY` (plus the
+	// FocusHeightLift), frame-rate-independently. Lower FocusHeightLerp = laggier/smoother climb. When
+	// `current` already equals `targetY + lift` (constant target Y on flat ground, lift 0) the lerp is a
+	// no-op and returns it unchanged — that's what keeps flat levels byte-identical. Pure function of the
+	// camera's exports, so the headless test drives it without a tree.
+	public float EaseFocusHeight(float current, float targetY, double delta)
+	{
+		float t = 1f - Mathf.Exp(-FocusHeightLerp * (float)delta);
+		return Mathf.Lerp(current, targetY + FocusHeightLift, t);
+	}
 
 	// Nudge the live player bias by `direction` steps (negative = zoom IN, positive = OUT),
 	// clamped to [ZoomBiasMin, ZoomBiasMax]. Pure state change — safe to call headless.
