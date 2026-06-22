@@ -317,6 +317,18 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       regular sines, and the mesh colours by **height AND slope** (grass→highland→rock) so it reads as
       terrain. Headless terrain tests still pass (collider matches the new field). knockback-on-slopes
       tuning + Highlands feel-check still open.
+- [~] **M15 — Co-op Card Brawl (Slay the Eggs reborn) ⭐:** a *local 2-player* card-driven survival mode.
+      Each player drives a **basic egg** (weak punch only) — P1 keyboard+mouse, P2 gamepad — and both draw
+      from ONE shared hand. During the between-rounds **pause** they spend shared energy to play cards that
+      **buff whoever played them** (`sword` = equip a weapon, `fireball` = grant a castable ability) or
+      **spawn subordinates** (`soldier`); End Turn starts a **15 s real-time survival wave**, then it pauses
+      and redeals — repeat, surviving escalating waves. Chunk 66 done: weak unarmed `Punch` loadout +
+      `StartUnarmed` + runtime `EquipWeapon` on `Player` (M9 plumbing; Punch excluded from Q-swap). Lose only when BOTH eggs fall. Reuses the M12 card
+      model + `RoundLoop`, the M12.7 co-op control schemes / shared camera / `RequireAllPlayersDead`, and the
+      M9 weapon plumbing (Chunks 66–71). New: weak-egg loadout + runtime weapon/ability grants on `Player`, a
+      player-buff card category applied to the triggering player, a two-device shared hand, and a wave/survival
+      manager. Decided: buffs apply to whoever played the card; cards play in the PAUSE only; opponent =
+      escalating survival waves.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -777,6 +789,79 @@ non-grounded unit moves exactly as before.
 
 **(Highlands-scoped by decision: do NOT roll `Grounded` out to other levels unless asked. Build order is
 60 → 61 → 62 → 63 → 64 → 65; 60 + 61 are the load-bearing pair.)**
+
+---
+
+### ▶ PLANNED — M15 Co-op Card Brawl — Slay the Eggs reborn (Chunks 66–71)
+
+**Goal:** a brand-new *local same-screen 2-player* survival mode that fuses the card battler (M12) with couch
+co-op (M12.7). Each player drives a **basic egg** that can only throw a **weak punch**; both players share ONE
+hand of cards. Between rounds the field freezes and they spend shared energy to play cards — `sword`/`fireball`
+**buff the egg of whoever played the card**, `soldier` spawns a subordinate. **End Turn** runs a **15 s
+real-time survival wave**; at timeout it pauses, redeals a fresh hand, and the next (harder) wave is queued.
+Survive the waves; you lose only when **both** eggs fall.
+
+**Design decisions (locked with the user):**
+- **Basic egg = weak punch.** Both human captains start unarmed with a weak, short-reach, no-knockback punch.
+  Cards are the ONLY way to get stronger.
+- **Card targeting = whoever played it.** Weapon/ability cards auto-apply to the egg of the device that played
+  the card (no target click). `soldier` spawns allied to that same player.
+- **Play in the PAUSE only.** Cards are NOT playable during the live 15 s wave (unlike today's `CardBattle`),
+  so nobody fumbles cards while driving an egg.
+- **Opponent = escalating survival waves.** Each round spawns a fresh, larger enemy wave. No KotH points here,
+  so energy is a flat per-round allowance (`BaseEnergy`, no territory bonus).
+- **Both-fall lose rule** reused from co-op (`RequireAllPlayersDead`).
+
+**Invariant — don't disturb existing modes.** This is a NEW scene + manager; the endzone `CardBattle`, the
+couch-coop `CoopStand`, and every other level stay byte-identical. New `Player`/`Card` behaviour is opt-in
+(weak-egg loadout only on this scene's captains; new card-effect category is additive; the existing
+Unit/Action card resolution is untouched). The M12 model classes gain additive members only.
+
+**New durable rules (promote into §5 as chunks land):**
+- **Runtime loadout on `Player`.** A `Player` can be spawned as a "basic egg" (a weak unarmed `Punch` profile)
+  and be upgraded at runtime — `EquipWeapon(WeaponType)` swaps its loadout (reusing the M9 `swap_weapon`
+  plumbing) and `GrantAbility(kind)` adds a castable ability.
+- **Player abilities.** A `Player` holds granted abilities (e.g. `Fireball` = a magic projectile on a cooldown,
+  scaling with `Intelligence`), cast via a scheme-aware `cast_ability` input. None granted by default.
+- **Player-buff cards.** Beyond Unit/Action, a card may carry a **player-upgrade** effect (`GrantWeapon` /
+  `GrantAbility`); resolving it applies to the **triggering player** (the play API now carries which player
+  played the card). `soldier` stays a Unit card but spawns onto the triggering player's team/captain.
+
+- [x] **Chunk 66 — Basic egg + runtime loadout swap on `Player`.** Added a weak unarmed `Punch` `WeaponType`
+  (last enum value; `Punch*` profile exports — dmg 6, reach 1.0 < sword 1.4, no knockback) + a `StartUnarmed`
+  export so a `Player` spawns wielding the Punch instead of `StartingWeapon`. `EquipWeapon(WeaponType)` arms the
+  egg at runtime via the M9 profile plumbing. `SwapWeapon` skips Punch (`SwappableWeaponCount`) so Q only ever
+  cycles the four real weapons — existing armed scenes byte-identical. Headless-tested (`TestBasicEgg`): the
+  unarmed punch is weak + no-knockback + short, and `EquipWeapon(Sword)` raises reach/damage and restores knockback.
+- [ ] **Chunk 67 — Player ability system + Fireball.** `Player` carries granted abilities; `GrantAbility(kind)`
+  adds one; a scheme-aware `cast_ability` input casts the active ability. `Fireball` = a magic projectile on a
+  cooldown, damage via `ScaledMagicDamage` (Int). New `cast_ability` input action (key + gamepad button).
+  Nothing granted by default. **Headless-test:** granting Fireball enables a cast that deals magic damage;
+  without it, casting is a no-op; cooldown gates repeat casts.
+- [ ] **Chunk 68 — Player-buff card category (applied to the playing egg).** Extend the pure card model: a card
+  can `GrantWeapon` or `GrantAbility` (in addition to Unit/Action); the play API gains the triggering player so
+  resolution applies to THAT egg (weapon→`EquipWeapon`, ability→`GrantAbility`), and a `soldier` Unit card
+  spawns onto that player's team/captain. `CardLibrary.BrawlDeck()` + brawl card pool (Sword, Fireball, Soldier,
+  …). **Headless-test:** each card type resolves to the right effect on the named player; the existing
+  Unit/Action resolution is unchanged.
+- [ ] **Chunk 69 — Shared-hand co-op card UI (two devices).** The pause-phase hand is operable by BOTH players:
+  P1 selects with the mouse, P2 with a gamepad cursor (highlight + confirm button); each play records which
+  player triggered it so the buff lands on the right egg. Shared energy + shared hand (either player can play
+  any affordable card). End Turn available to either device. **Headless-test where possible** (selection→play
+  routing carries the correct player id); UI feel-check.
+- [ ] **Chunk 70 — Wave/survival mode: scene + manager + co-op lose.** `scenes/Levels/CoopCardBrawl.tscn`: two
+  basic eggs (P1 `KeyboardMouse`, P2 `Gamepad` device 0), the shared two-captain camera, the `RoundLoop`
+  pause→15 s→pause-redeal cadence, and `CardLibrary.BrawlDeck()`. A `WaveManager` spawns an escalating enemy
+  wave each round; energy refills to a flat `BaseEnergy` each pause (no KotH). `GameManager` with
+  `RequireAllPlayersDead = true`; survive N waves to win (or endless). Add to `LevelSelect` with a P1/P2 controls
+  note. **Headless-test:** wave N spawns the scaled count; advancing a round queues the next wave; lose fires
+  only when both eggs are down.
+- [ ] **Chunk 71 — Balance + feel pass.** Tune punch vs card-granted weapons/abilities, soldier strength, card
+  energy costs, the flat per-round energy, and wave scaling/pacing so the 15 s rounds feel fair for two players.
+  **User feel-check** (needs a gamepad for P2).
+
+**(Build order 66 → 71; 66 + 68 are the load-bearing pair — the weak egg and the buff-the-player card category.
+Independent of M13; build whenever the user asks.)**
 
 ---
 

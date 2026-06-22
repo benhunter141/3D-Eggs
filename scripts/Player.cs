@@ -16,9 +16,13 @@ using System.Collections.Generic;
 //   • Sword — SHORT reach, strong KNOCKBACK: the classic sword that flings what it hits.
 //   • Axe   — heavy & SLOW, the biggest single hit, with a modest shove.
 //   • Mace  — the KNOCKBACK specialist: middling damage, the hardest fling of all.
+//   • Punch — the unarmed "basic egg" loadout (M15): the weakest hit, short reach, no knockback.
+//             Never part of the Q-swap cycle; only ever set via StartUnarmed / EquipWeapon so cards
+//             are the only way an egg gets stronger. Keep it LAST in the enum (SwappableWeaponCount
+//             assumes the unarmed punch is the final value, excluded from cycling).
 public partial class Player : Unit
 {
-	public enum WeaponType { Spear, Sword, Axe, Mace }
+	public enum WeaponType { Spear, Sword, Axe, Mace, Punch }
 
 	// --- Control scheme (M12.7, Chunk 44: two-player couch co-op) ---
 	// Which input device drives THIS captain. `Any` (default) is today's blended read —
@@ -86,6 +90,11 @@ public partial class Player : Unit
 	// --- Weapon loadout (Chunk 26) ---
 	[Export] public WeaponType StartingWeapon = WeaponType.Spear;  // which weapon the captain spawns holding (per-level default)
 
+	// M15 basic egg (Chunk 66): when true the captain spawns wielding the weak unarmed Punch
+	// instead of StartingWeapon — the Co-op Card Brawl eggs start helpless and get armed only by
+	// cards (EquipWeapon at runtime). Default false so every existing scene spawns as today.
+	[Export] public bool StartUnarmed = false;
+
 	// Spear profile — long reach, no knockback.
 	[Export] public float SpearDamage = 40.0f;
 	[Export] public float SpearKnockback = 0.0f;       // a pike pokes; it doesn't fling
@@ -119,6 +128,16 @@ public partial class Player : Unit
 	[Export] public float MaceSwingDuration = 0.22f;
 	[Export] public float MaceSwingCooldown = 0.42f;
 
+	// Punch profile (M15, Chunk 66) — the unarmed basic-egg loadout: the weakest hit of all,
+	// the shortest reach (under the sword), and NO knockback. Deliberately feeble so a card-granted
+	// weapon is a clear upgrade. Excluded from the Q-swap cycle (only set via StartUnarmed/EquipWeapon).
+	[Export] public float PunchDamage = 6.0f;
+	[Export] public float PunchKnockback = 0.0f;
+	[Export] public float PunchReach = 1.0f;            // shorter than the sword (1.4) — you have to get close
+	[Export] public float PunchThrustDistance = 0.4f;
+	[Export] public float PunchSwingDuration = 0.16f;
+	[Export] public float PunchSwingCooldown = 0.35f;
+
 	// --- Shared thrust feel ---
 	[Export] public float ThrustExtendFrac = 0.4f;   // fraction of the duration spent jabbing out (rest is the retract)
 	[Export] public float SwordReturnLerp = 12.0f;   // how fast the weapon eases back to rest if interrupted
@@ -146,6 +165,9 @@ public partial class Player : Unit
 	public float EffectiveReach => _reach + _thrustDistance;            // how far the tip lands at full lunge
 	public float HitboxLength => _hitboxShape?.Shape is BoxShape3D b ? b.Size.Z : 0f;
 	public static int WeaponCount => System.Enum.GetValues<WeaponType>().Length;
+	// How many weapons the Q-swap cycles through — every WeaponType EXCEPT the unarmed Punch (the
+	// basic-egg loadout, M15), which is the LAST enum value and only ever set via EquipWeapon/StartUnarmed.
+	public static int SwappableWeaponCount => WeaponCount - 1;
 
 	private Node3D _swordPivot;
 	private Area3D _hitbox;
@@ -194,6 +216,7 @@ public partial class Player : Unit
 			[WeaponType.Sword] = new WeaponProfile(SwordDamage, SwordKnockback, SwordReach, SwordThrustDistance, SwordSwingDuration, SwordSwingCooldown),
 			[WeaponType.Axe]   = new WeaponProfile(AxeDamage,   AxeKnockback,   AxeReach,   AxeThrustDistance,   AxeSwingDuration,   AxeSwingCooldown),
 			[WeaponType.Mace]  = new WeaponProfile(MaceDamage,  MaceKnockback,  MaceReach,  MaceThrustDistance,  MaceSwingDuration,  MaceSwingCooldown),
+			[WeaponType.Punch] = new WeaponProfile(PunchDamage, PunchKnockback, PunchReach, PunchThrustDistance, PunchSwingDuration, PunchSwingCooldown),
 		};
 		_weaponMeshes = new Dictionary<WeaponType, Node3D>
 		{
@@ -209,7 +232,8 @@ public partial class Player : Unit
 
 		// The weapon points straight forward (-Z) at rest; the thrust slides it out and back.
 		_swordPivot.Rotation = Vector3.Zero;
-		ApplyWeapon(StartingWeapon);   // sets reach/damage/knockback/feel + shows the right mesh
+		// A basic egg (M15) spawns with the weak Punch; everyone else with their per-level StartingWeapon.
+		ApplyWeapon(StartUnarmed ? WeaponType.Punch : StartingWeapon);   // sets reach/damage/knockback/feel + shows the right mesh
 		SetThrustOffset(0f);
 		SetHitboxActive(false);
 
@@ -222,15 +246,29 @@ public partial class Player : Unit
 	public float FormationYaw => _formationYaw;
 	public Basis FormationBasis => new Basis(Vector3.Up, _formationYaw);
 
-	// Cycle to the next weapon in enum order (bound to `swap_weapon`), wrapping around.
+	// Cycle to the next weapon in enum order (bound to `swap_weapon`), wrapping around. Skips the
+	// unarmed Punch so pressing Q only ever lands on a real weapon — existing armed captains cycle
+	// the same four weapons as before, and a card-armed egg can't accidentally swap back to its fists.
 	public void SwapWeapon()
 	{
-		ApplyWeapon((WeaponType)(((int)_weapon + 1) % WeaponCount));
+		WeaponType next = _weapon;
+		do { next = (WeaponType)(((int)next + 1) % WeaponCount); }
+		while (next == WeaponType.Punch);
+		ApplyWeapon(next);
 		GD.Print($"[Player] swapped to {_weapon} (reach {_reach:0.0} m, knockback {_knockback:0.0}, cooldown {_swingCooldown:0.00}s)");
 	}
 
 	// Jump straight to a specific weapon (per-level default / tests).
 	public void SetWeapon(WeaponType weapon) => ApplyWeapon(weapon);
+
+	// Arm the egg at runtime (M15, Chunk 66) — a card grants a weapon and the basic egg picks it up,
+	// reusing the same profile plumbing as the per-level loadout/swap. Public so cards (and the headless
+	// test) can upgrade an egg straight from its weak Punch to a real weapon's reach/damage/knockback.
+	public void EquipWeapon(WeaponType weapon)
+	{
+		ApplyWeapon(weapon);
+		GD.Print($"[Player] {Name} equipped {_weapon} (reach {_reach:0.0} m, dmg {_damage:0.0}, knockback {_knockback:0.0})");
+	}
 
 	// --- Mount (Chunk 28) ---
 

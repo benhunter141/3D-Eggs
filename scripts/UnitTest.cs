@@ -40,6 +40,7 @@ public partial class UnitTest : Node3D
 		bool bumper = await TestBumperKick();
 		bool weaponSwap = await TestWeaponSwap();
 		bool archetypes = await TestWeaponArchetypes();
+		bool basicEgg = await TestBasicEgg();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
 		bool capturePoint = await TestCapturePoint();
@@ -65,7 +66,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -858,7 +859,7 @@ public partial class UnitTest : Node3D
 		// The spear must genuinely out-range the sword, and cycling the rest of the way around
 		// (one swap per remaining weapon) wraps back to the spear we started on.
 		bool spearOutreaches = spearReach > swordReach;
-		for (int i = 0; i < Player.WeaponCount - 1; i++) cap.SwapWeapon();
+		for (int i = 0; i < Player.SwappableWeaponCount - 1; i++) cap.SwapWeapon();
 		bool swappedBack = cap.CurrentWeapon == Player.WeaponType.Spear;
 		GD.Print($"spear reach {spearReach:0.00} > sword reach {swordReach:0.00} = {spearOutreaches}; cycled back to spear={swappedBack}");
 
@@ -950,6 +951,52 @@ public partial class UnitTest : Node3D
 			? "PASS: every archetype resolves to its role (axe=heaviest+slowest, mace=hardest fling, spear=longest+no knockback), mesh + hitbox per weapon"
 			: $"FAIL: axeHardestHit={axeHardestHit}, axeSlowest={axeSlowest}, maceHardestFling={maceHardestFling}, " +
 			  $"spearLongestReach={spearLongestReach}, spearNoKnock={spearNoKnock}, meshIsolated={allMeshesIsolated}, hitboxMatch={allHitboxesMatch}");
+		return pass;
+	}
+
+	// Chunk 66 (M15): the basic egg loadout. A captain spawned with StartUnarmed wields the weak Punch —
+	// low damage, NO knockback, reach UNDER the sword — and EquipWeapon arms it at runtime: switching to
+	// the sword raises reach + damage and restores knockback, proving the egg gets stronger only via cards.
+	private async Task<bool> TestBasicEgg()
+	{
+		GD.Print("=== UnitTest: basic egg loadout + runtime EquipWeapon ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var egg = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		egg.StartUnarmed = true;   // spawn as a basic egg, not the captain's normal weapon
+		AddChild(egg);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Unarmed: the Punch is up, weak, no knockback, shorter than the sword.
+		bool isPunch = egg.CurrentWeapon == Player.WeaponType.Punch;
+		float punchDmg = egg.CurrentDamage;
+		bool punchNoKnock = Mathf.IsZeroApprox(egg.CurrentWeaponKnockback);
+		bool punchShort = egg.CurrentReach < egg.SwordReach;
+		bool punchHitbox = Mathf.IsEqualApprox(egg.HitboxLength, egg.PunchReach, 0.01f);
+		bool punchWeak = punchDmg < egg.SwordDamage;
+		GD.Print($"unarmed: weapon={egg.CurrentWeapon}, dmg={punchDmg:0.0} (sword {egg.SwordDamage}), " +
+			$"knockback={egg.CurrentWeaponKnockback}, reach={egg.CurrentReach:0.0} (sword {egg.SwordReach}), hitboxLen={egg.HitboxLength:0.00}");
+
+		// Card arms the egg: EquipWeapon(Sword) -> more reach, more damage, real knockback.
+		egg.EquipWeapon(Player.WeaponType.Sword);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool nowSword = egg.CurrentWeapon == Player.WeaponType.Sword;
+		bool armedKnocks = egg.CurrentWeaponKnockback > 0f;
+		bool armedReachUp = egg.CurrentReach > egg.PunchReach;
+		bool armedDmgUp = egg.CurrentDamage > punchDmg;
+		bool swordHitbox = Mathf.IsEqualApprox(egg.HitboxLength, egg.SwordReach, 0.01f);
+		GD.Print($"armed: weapon={egg.CurrentWeapon}, dmg={egg.CurrentDamage:0.0}, " +
+			$"knockback={egg.CurrentWeaponKnockback}, reach={egg.CurrentReach:0.0}, hitboxLen={egg.HitboxLength:0.00}");
+
+		bool pass = isPunch && punchWeak && punchNoKnock && punchShort && punchHitbox
+			&& nowSword && armedKnocks && armedReachUp && armedDmgUp && swordHitbox;
+		GD.Print(pass
+			? "PASS: basic egg punches weakly with no knockback; EquipWeapon(Sword) arms it (reach + damage + knockback up)"
+			: $"FAIL: punch(is={isPunch},weak={punchWeak},noKnock={punchNoKnock},short={punchShort},hitbox={punchHitbox}) " +
+			  $"armed(sword={nowSword},knocks={armedKnocks},reachUp={armedReachUp},dmgUp={armedDmgUp},hitbox={swordHitbox})");
 		return pass;
 	}
 
