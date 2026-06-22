@@ -105,6 +105,15 @@ theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/Highlands.tscn"
 
+[node name="BrawlButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
+custom_minimum_size = Vector2(440, 58)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "6.  Co-op Card Brawl  (2P)"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")
+ScenePath = "res://scenes/Levels/CoopCardBrawl.tscn"
+
 [node name="CrackTestButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2
@@ -129,10 +138,11 @@ theme_override_font_sizes/font_size = 18
 layout_mode = 2
 text = "WASD / Arrows — move captain      Mouse — aim
 Left-Click — attack      Right-Click / Space — brace wall
-Q — swap weapon (spear / sword / axe / mace)      E — mount / dismount
+Q — swap weapon (spear / sword / axe / mace)      E — mount / dismount      C — cast ability
 F / H / G — squad: follow / hold / attack-move
 Mouse Wheel  or  + / −  — zoom      R — restart battle      Esc — pause / quit to menu
-Couch Co-op:  P1 = keyboard + mouse      P2 = gamepad (left stick move, right stick aim)"
+Couch Co-op:  P1 = keyboard + mouse      P2 = gamepad (left stick move, right stick aim, A cast)
+Card Brawl (2P):  in the pause, P1 clicks a card, P2 uses d-pad + A; either End-Turns to start the wave"
 horizontal_alignment = 1
 theme_override_colors/font_color = Color(0.62, 0.64, 0.7, 1)
 theme_override_font_sizes/font_size = 15

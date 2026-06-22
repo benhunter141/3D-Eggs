@@ -42,6 +42,9 @@ public partial class UnitTest : Node3D
 		bool archetypes = await TestWeaponArchetypes();
 		bool basicEgg = await TestBasicEgg();
 		bool fireball = await TestFireballAbility();
+		bool brawlBuffs = await TestBrawlBuffCards();
+		bool brawlHand = TestBrawlHandRouting();
+		bool brawlWaves = await TestBrawlWaves();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
 		bool capturePoint = await TestCapturePoint();
@@ -67,7 +70,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && brawlBuffs && brawlHand && brawlWaves && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1054,6 +1057,182 @@ public partial class UnitTest : Node3D
 		return pass;
 	}
 
+	// Chunk 68 (M15): player-buff card category. A PlayerBuff card targets SELF (no aim) and is routed by
+	// CardPlay.Play's 5-arg overload to the egg that PLAYED it. Three checks: (a) routing lands the card on
+	// the named player (and a missing player rejects it), (b) existing Unit/Action play is unchanged, and
+	// (c) a real egg's ApplyCard arms it / grants a spell / spawns a soldier.
+	private async Task<bool> TestBrawlBuffCards()
+	{
+		GD.Print("=== UnitTest: player-buff cards (M15, Chunk 68) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Card target kinds: every brawl card resolves against SELF.
+		var swordCard = new Card("Sword", Card.CardKind.PlayerBuff, 2, "", buff: Card.BuffKind.Weapon, buffWeapon: Player.WeaponType.Sword);
+		var fireCard = new Card("Fireball", Card.CardKind.PlayerBuff, 2, "", buff: Card.BuffKind.Ability, buffAbility: Player.AbilityType.Fireball);
+		var soldierCard = new Card("Soldier", Card.CardKind.PlayerBuff, 1, "", spawnPath: "res://scenes/Ally.tscn", buff: Card.BuffKind.Soldier);
+		bool selfTargeted = swordCard.Target == Card.TargetKind.Self
+			&& fireCard.Target == Card.TargetKind.Self && soldierCard.Target == Card.TargetKind.Self;
+
+		// (a) Routing: the card lands on the PASSED player only; a missing player rejects it.
+		var fakeP1 = new FakePlayer();
+		var fakeP2 = new FakePlayer();
+		bool routedP1 = CardPlay.Play(swordCard, null, Vector3.Zero, null, fakeP1)
+			&& fakeP1.Applied.Count == 1 && fakeP1.Applied[0] == swordCard && fakeP2.Applied.Count == 0;
+		bool routedP2 = CardPlay.Play(fireCard, null, Vector3.Zero, null, fakeP2)
+			&& fakeP2.Applied.Count == 1 && fakeP2.Applied[0] == fireCard && fakeP1.Applied.Count == 1;
+		bool noPlayerRejected = !CardPlay.Play(soldierCard, null, Vector3.Zero, null, null);
+
+		// (b) Existing Unit/Action play is unchanged, even with a player supplied.
+		var field = new FakeField();
+		var friendly = new FakeUnit { IsFriendly = true };
+		var unitCard = new Card("Recruit", Card.CardKind.Unit, 1, "", spawnPath: "res://scenes/Ally.tscn");
+		var actionCard = new Card("Charge", Card.CardKind.Action, 1, "", action: Card.ActionKind.Charge);
+		bool unitStillSpawns = CardPlay.Play(unitCard, field, new Vector3(1, 0, 2), null, fakeP1)
+			&& field.Spawns.Count == 1 && fakeP1.Applied.Count == 1;   // player NOT touched by a Unit card
+		bool actionStillActs = CardPlay.Play(actionCard, field, Vector3.Zero, friendly, fakeP1)
+			&& friendly.Performed.Count == 1 && fakeP1.Applied.Count == 1;
+
+		// (c) A real egg applies the buffs: arm it, grant a spell, spawn a soldier on its team.
+		var egg = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		egg.StartUnarmed = true;
+		AddChild(egg);
+		egg.GlobalPosition = Vector3.Zero;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool startedUnarmed = egg.CurrentWeapon == Player.WeaponType.Punch && !egg.HasAbility;
+		egg.ApplyCard(swordCard);
+		bool armed = egg.CurrentWeapon == Player.WeaponType.Sword;
+		egg.ApplyCard(fireCard);
+		bool granted = egg.HasAbility && egg.CurrentAbility == Player.AbilityType.Fireball;
+		egg.ApplyCard(soldierCard);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		int soldiers = 0;
+		foreach (Node n in GetChildren())
+			if (n is Ally a && a.Team == Unit.TeamId.Player) soldiers++;
+		bool spawnedSoldier = soldiers == 1;
+		GD.Print($"real egg: unarmed={startedUnarmed}, armed={armed}, granted={granted}, soldiers={soldiers}");
+
+		bool pass = selfTargeted && routedP1 && routedP2 && noPlayerRejected
+			&& unitStillSpawns && actionStillActs && startedUnarmed && armed && granted && spawnedSoldier;
+		GD.Print(pass
+			? "PASS: buff cards target self, route to the triggering egg, leave Unit/Action play intact, and a real egg applies them"
+			: $"FAIL: self={selfTargeted}, routedP1={routedP1}, routedP2={routedP2}, noPlayer={noPlayerRejected}, " +
+			  $"unit={unitStillSpawns}, action={actionStillActs}, unarmed={startedUnarmed}, armed={armed}, granted={granted}, soldier={spawnedSoldier}");
+		return pass;
+	}
+
+	// Chunk 69 (M15): shared-hand routing. BrawlHand plays a hand card on the indexed player (the buff
+	// lands on THAT egg), gating on shared energy and moving the card to discard on success. Pure model
+	// + fake players, so the selection→play routing is verified without faking devices.
+	private bool TestBrawlHandRouting()
+	{
+		GD.Print("=== UnitTest: shared-hand routing (M15, Chunk 69) ===");
+
+		var deck = new Deck(seed: 1);
+		var energy = new EnergyPool(10, 0);
+		var hand = new BrawlHand(deck, energy);
+		var p1 = new FakePlayer();
+		var p2 = new FakePlayer();
+		var players = new System.Collections.Generic.List<ICardPlayer> { p1, p2 };
+
+		var sword = new Card("Sword", Card.CardKind.PlayerBuff, 2, "", buff: Card.BuffKind.Weapon, buffWeapon: Player.WeaponType.Sword);
+		var soldier = new Card("Soldier", Card.CardKind.PlayerBuff, 1, "", spawnPath: "res://scenes/Ally.tscn", buff: Card.BuffKind.Soldier);
+		deck.Hand.Add(sword);
+		deck.Hand.Add(soldier);
+
+		// Play hand[0] (sword) as P1 — lands on P1, discards, spends 2.
+		bool p1Play = hand.Play(0, 0, players)
+			&& p1.Applied.Count == 1 && p1.Applied[0] == sword && p2.Applied.Count == 0
+			&& deck.Hand.Count == 1 && deck.DiscardPile.Count == 1 && energy.Energy == 8;
+
+		// Play hand[0] (now soldier) as P2 — lands on P2.
+		bool p2Play = hand.Play(0, 1, players)
+			&& p2.Applied.Count == 1 && p2.Applied[0] == soldier && p1.Applied.Count == 1
+			&& deck.Hand.Count == 0 && energy.Energy == 7;
+
+		// Out-of-range index / bad player index reject.
+		bool badIndex = !hand.Play(5, 0, players) && !hand.Play(0, 9, players);
+
+		// Energy gate: a fresh empty pool can't afford a costly card.
+		var poor = new BrawlHand(new Deck(2), new EnergyPool(0, 0));
+		poor.Deck.Hand.Add(sword.Clone());
+		bool gated = !poor.Play(0, 0, players) && poor.Deck.Hand.Count == 1;
+
+		GD.Print($"p1Play={p1Play}, p2Play={p2Play}, badIndex={badIndex}, gated={gated}");
+
+		bool pass = p1Play && p2Play && badIndex && gated;
+		GD.Print(pass
+			? "PASS: shared hand routes each play to the correct egg, gates on energy, moves cards to discard"
+			: "FAIL: shared-hand routing wrong");
+		return pass;
+	}
+
+	// Chunk 70 (M15): survival waves + the no-win survival rule. The wave count scales with the wave
+	// number, SpawnWave drops that many Enemy-team units, and a DisableWin GameManager never flashes
+	// VICTORY on an empty field while still losing once BOTH eggs fall.
+	private async Task<bool> TestBrawlWaves()
+	{
+		GD.Print("=== UnitTest: brawl waves + survival rule (M15, Chunk 70) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var wm = new WaveManager { BaseCount = 3, PerWave = 2 };
+		AddChild(wm);
+		bool scales = wm.CountForWave(1) == 3 && wm.CountForWave(3) == 7 && wm.CountForWave(3) > wm.CountForWave(1);
+
+		var parent = new Node3D();
+		AddChild(parent);
+		int spawned = wm.SpawnWave(2, parent, Vector3.Zero);   // wave 2 -> 5 enemies
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		int enemyChildren = 0;
+		foreach (Node n in parent.GetChildren())
+			if (n is Unit u && u.Team == Unit.TeamId.Enemy) enemyChildren++;
+		bool spawnedWave = spawned == 5 && enemyChildren == 5;
+		GD.Print($"scales={scales}, spawnWave2 returned {spawned}, enemy children={enemyChildren}");
+
+		// DisableWin: even with enemies seen then cleared, no VICTORY; both eggs down = DEFEAT.
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var victory = new Label { Visible = false }; victory.AddToGroup("victory"); AddChild(victory);
+		var gameOver = new Label { Visible = false }; gameOver.AddToGroup("game_over"); AddChild(gameOver);
+
+		var capScene = GD.Load<PackedScene>("res://scenes/Captain.tscn");
+		var cap1 = capScene.Instantiate<Player>(); cap1.ShowGameOverOnDeath = false; AddChild(cap1); cap1.GlobalPosition = new Vector3(-3, 1, 0);
+		var cap2 = capScene.Instantiate<Player>(); cap2.ShowGameOverOnDeath = false; AddChild(cap2); cap2.GlobalPosition = new Vector3(3, 1, 0);
+
+		var foe = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(foe); foe.GlobalPosition = new Vector3(0, 1, 12);
+
+		var gm = new GameManager { RequireAllPlayersDead = true, DisableWin = true };
+		AddChild(gm);
+		for (int i = 0; i < 3; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Clear the lone enemy: field is now empty, but DisableWin must keep VICTORY hidden.
+		foe.QueueFree();
+		for (int i = 0; i < 4; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool noFalseWin = !victory.Visible && !gameOver.Visible;
+
+		// Both eggs fall -> DEFEAT shown.
+		cap1.TakeDamage(9999f);
+		cap2.TakeDamage(9999f);
+		for (int i = 0; i < 3; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool lostWhenBothDown = gameOver.Visible && !victory.Visible;
+		GD.Print($"noFalseWin={noFalseWin}, lostWhenBothDown={lostWhenBothDown}");
+
+		bool pass = scales && spawnedWave && noFalseWin && lostWhenBothDown;
+		GD.Print(pass
+			? "PASS: waves scale + spawn Enemy units; survival never wins on an empty field but loses when both eggs fall"
+			: $"FAIL: scales={scales}, spawnedWave={spawnedWave}, noFalseWin={noFalseWin}, lostWhenBothDown={lostWhenBothDown}");
+		return pass;
+	}
+
 	// Chunk 28 (M10): mounting. The captain climbs onto a nearby Donkey — its top Speed rises to the
 	// mount's MountSpeed, it registers as the mount's rider, and the mount's collision switches off
 	// while carried. Dismounting restores the foot speed and ground height and frees the mount again.
@@ -1312,6 +1491,14 @@ public partial class UnitTest : Node3D
 		public bool IsFriendly { get; set; }
 		public readonly System.Collections.Generic.List<Card> Performed = new();
 		public void PerformAction(Card action) => Performed.Add(action);
+	}
+
+	// Fake egg (M15): records the PlayerBuff cards routed to it, so brawl play routing is testable
+	// without instancing a scene.
+	private class FakePlayer : ICardPlayer
+	{
+		public readonly System.Collections.Generic.List<Card> Applied = new();
+		public void ApplyCard(Card card) => Applied.Add(card);
 	}
 
 	// Chunk 33 (M12): card PLAY targeting routes through CardPlay — a UNIT card spawns at a LOCATION,

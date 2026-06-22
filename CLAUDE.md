@@ -321,12 +321,17 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       done: `Player` ability system — `AbilityType` (None default | Fireball), `GrantAbility(kind)` +
       scheme-aware `cast_ability` (C / gamepad A), and `Fireball` (a straight/ballistic magic projectile on a
       cooldown whose damage is baked in via `ScaledMagicDamage`/Int at cast). None granted by default, so every
-      other captain is byte-identical. Lose only when BOTH eggs fall. Reuses the M12 card
-      model + `RoundLoop`, the M12.7 co-op control schemes / shared camera / `RequireAllPlayersDead`, and the
-      M9 weapon plumbing (Chunks 66–71). New: weak-egg loadout + runtime weapon/ability grants on `Player`, a
-      player-buff card category applied to the triggering player, a two-device shared hand, and a wave/survival
-      manager. Decided: buffs apply to whoever played the card; cards play in the PAUSE only; opponent =
-      escalating survival waves.
+      other captain is byte-identical. Chunks 68–70 done: `CardKind.PlayerBuff` (target = Self) + `BuffKind`
+      (Weapon/Ability/Soldier) + `CardPlay.Play`'s 5-arg overload route a card to the triggering `ICardPlayer`
+      (`Player.ApplyCard` → EquipWeapon / GrantAbility / SpawnSoldier); `CardLibrary.BrawlDeck()`/`BrawlPool()`;
+      the pure `BrawlHand` routing core (shared deck + energy, per-play player index) under the `CardBrawl.cs`
+      shell (code-built shared-hand UI, P1 mouse + P2 gamepad cursor); `WaveManager` (escalating ring per round,
+      `CountForWave`); `GameManager.DisableWin` (survival has no win); `scenes/Levels/CoopCardBrawl.tscn` (two
+      basic eggs in a Pausable `Units` node, shared camera, `RequireAllPlayersDead` + `DisableWin`), battle 6 on
+      LevelSelect. All headless-tested. Lose only when BOTH eggs fall. Reuses the M12 card model + `RoundLoop`,
+      the M12.7 co-op control schemes / shared camera / `RequireAllPlayersDead`, and the M9 weapon plumbing
+      (Chunks 66–71). Decided: buffs apply to whoever played the card; cards play in the PAUSE only; opponent =
+      escalating survival waves. **Chunk 71 balance feel-check pending (needs a gamepad for P2).**
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -402,20 +407,21 @@ opponent = escalating waves; flat per-round energy (`BaseEnergy`, no KotH bonus)
 - [x] **Chunk 67 — Player ability system + Fireball.** `GrantAbility(kind)` + scheme-aware `cast_ability`
   (C / gamepad A); `AbilityType` (None default | Fireball); `Fireball` = magic projectile on a cooldown,
   damage baked in via `ScaledMagicDamage` (Int) at cast. None granted by default. Headless-tested.
-- [ ] **Chunk 68 — Player-buff card category.** Pure card model gains `GrantWeapon`/`GrantAbility` cards; the
-  play API carries the triggering player so the buff lands on THAT egg (and `soldier` spawns onto that
-  player's team). `CardLibrary.BrawlDeck()` + brawl pool (Sword, Fireball, Soldier, …). **Headless-test:**
-  each card type resolves on the named player; existing Unit/Action play unchanged.
-- [ ] **Chunk 69 — Shared-hand co-op card UI (two devices).** Pause hand operable by both: P1 mouse, P2
-  gamepad cursor (highlight + confirm); each play records the triggering player. Shared energy + hand; End
-  Turn from either device. **Headless-test:** selection→play routing carries the correct player id.
-- [ ] **Chunk 70 — Wave/survival scene + manager + co-op lose.** `scenes/Levels/CoopCardBrawl.tscn`: two
-  basic eggs (P1 `KeyboardMouse`, P2 `Gamepad` device 0), shared camera, `RoundLoop` pause→15 s→redeal,
-  `BrawlDeck()`. `WaveManager` spawns an escalating wave each round; energy refills to flat `BaseEnergy`;
-  `GameManager.RequireAllPlayersDead = true`. Add to `LevelSelect` with a P1/P2 note. **Headless-test:**
-  wave N spawns the scaled count; advancing queues the next; lose only when both eggs are down.
-- [ ] **Chunk 71 — Balance + feel pass.** Tune punch vs granted weapons/abilities, soldier strength, energy
-  costs, wave scaling/pacing so the 15 s rounds feel fair. **User feel-check** (needs a gamepad for P2).
+- [x] **Chunk 68 — Player-buff card category.** Card model gains `CardKind.PlayerBuff` (target = Self) +
+  `BuffKind` (Weapon / Ability / Soldier); `CardPlay.Play` has a 5-arg overload carrying the triggering
+  `ICardPlayer` so the buff lands on THAT egg (`Player.ApplyCard`: EquipWeapon / GrantAbility / SpawnSoldier).
+  `CardLibrary.BrawlDeck()` + `BrawlPool()` (Sword/Spear/Mace/Axe, Fireball, Soldier). Headless-tested.
+- [x] **Chunk 69 — Shared-hand co-op card UI (two devices).** Pure `BrawlHand` routing core (deck + energy +
+  per-play player index) is headless-tested; `CardBrawl.cs` is the shell — code-built shared-hand UI, P1
+  mouse-click + P2 gamepad cursor (d-pad/stick + A), each play tagged with the triggering egg. Headless-tested.
+- [x] **Chunk 70 — Wave/survival scene + manager + co-op lose.** `scenes/Levels/CoopCardBrawl.tscn`: two
+  basic eggs (P1 `KeyboardMouse`, P2 `Gamepad` device 0) in a Pausable `Units` node, shared `FollowCamera`,
+  `RoundLoop` pause→15 s→redeal, `BrawlDeck()`, flat `BaseEnergy`. `WaveManager` spawns an escalating ring
+  each round (`CountForWave`); `GameManager.RequireAllPlayersDead = true` + new `DisableWin` (survival has no
+  win). Added to `LevelSelect` as battle 6. Headless-tested.
+- [~] **Chunk 71 — Balance + feel pass.** Starting balance set: Punch 6 dmg (≈17 hits/skeleton vs sword's 3),
+  `BaseEnergy` 5 (arms both eggs + a soldier on wave 1), waves 3 → +2/round on a 17 m ring, 15 s rounds.
+  **User feel-check still pending** (needs a gamepad for P2).
 
 **Build order 66 → 71; 66 + 68 are the load-bearing pair (weak egg + buff-the-player card category).**
 

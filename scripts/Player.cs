@@ -20,7 +20,7 @@ using System.Collections.Generic;
 //             Never part of the Q-swap cycle; only ever set via StartUnarmed / EquipWeapon so cards
 //             are the only way an egg gets stronger. Keep it LAST in the enum (SwappableWeaponCount
 //             assumes the unarmed punch is the final value, excluded from cycling).
-public partial class Player : Unit
+public partial class Player : Unit, ICardPlayer
 {
 	public enum WeaponType { Spear, Sword, Axe, Mace, Punch }
 
@@ -353,6 +353,48 @@ public partial class Player : Unit
 		fb.Launch(dir, Team);
 
 		GD.Print($"[Player] {Name} cast Fireball for {fb.Damage:0.0} (Int x{IntelligenceMultiplier:0.00})");
+	}
+
+	// --- Co-op Card Brawl: player-buff cards (M15, Chunk 68) ---
+
+	// Fallback subordinate scene for a Soldier card that carries no SpawnPath.
+	[Export] public PackedScene SoldierScene;
+
+	// ICardPlayer: resolve a PlayerBuff card on THIS egg (the player who played it). Weapon arms the egg
+	// (runtime EquipWeapon, Chunk 66), Ability grants a castable spell (GrantAbility, Chunk 67), and
+	// Soldier spawns a subordinate that fights on our team. The card model routes here via CardPlay.Play.
+	public void ApplyCard(Card card)
+	{
+		if (card == null)
+			return;
+		switch (card.Buff)
+		{
+			case Card.BuffKind.Weapon:  EquipWeapon(card.BuffWeapon); break;
+			case Card.BuffKind.Ability: GrantAbility(card.BuffAbility); break;
+			case Card.BuffKind.Soldier: SpawnSoldier(card); break;
+		}
+	}
+
+	// Spawn a subordinate just ahead of the egg, on our team, so it fights the survival wave beside us.
+	// Dropped into our parent (the level's Units container) so it lives independently of us.
+	private void SpawnSoldier(Card card)
+	{
+		PackedScene scene = !string.IsNullOrEmpty(card.SpawnPath)
+			? GD.Load<PackedScene>(card.SpawnPath)
+			: (SoldierScene ??= GD.Load<PackedScene>("res://scenes/Ally.tscn"));
+		if (scene == null || scene.Instantiate() is not Unit soldier)
+		{
+			GD.PrintErr($"[Player] {Name} couldn't spawn a soldier from {card.SpawnPath}");
+			return;
+		}
+		soldier.Team = Team;   // fights on the egg's side (an Ally re-asserts Player team in _Ready)
+		GetParent().AddChild(soldier);
+
+		Vector3 fwd = -GlobalTransform.Basis.Z;
+		fwd.Y = 0f;
+		fwd = fwd.LengthSquared() > 0.0001f ? fwd.Normalized() : Vector3.Forward;
+		soldier.GlobalPosition = GlobalPosition + fwd * 2.0f;
+		GD.Print($"[Player] {Name} spawned a soldier ({soldier.Name})");
 	}
 
 	// --- Mount (Chunk 28) ---

@@ -17,6 +17,11 @@ public partial class GameManager : Node
 	// group is dead/gone — one partner can fight on while the other lies frozen. WIN is unchanged.
 	[Export] public bool RequireAllPlayersDead = false;
 
+	// Survival modes (M15 Co-op Card Brawl, Chunk 70) have NO win condition — the enemy is an endless
+	// stream of waves, and between waves the enemy count legitimately hits zero. With this set, WIN never
+	// fires (a momentarily empty field can't flash VICTORY); only the lose rule decides the match.
+	[Export] public bool DisableWin = false;
+
 	private bool _ended;       // match decided — stop judging, just listen for restart
 	private bool _sawEnemies;  // don't "win" on frame 0 before any enemy exists
 	private bool _sawPlayers;  // (co-op) don't "lose" on frame 0 before captains are in the tree
@@ -38,6 +43,10 @@ public partial class GameManager : Node
 			Lose();
 			return;
 		}
+
+		// Survival mode: there is no winning, only surviving — skip the WIN check entirely.
+		if (DisableWin)
+			return;
 
 		// Win: all enemy-team units cleared. Gate on having seen at least one so we
 		// don't declare victory on the first frame before the scene is populated.
