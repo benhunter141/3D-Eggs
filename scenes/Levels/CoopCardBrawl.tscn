@@ -104,13 +104,13 @@ shape = SubResource("BoxShape_fenceEW")
 process_mode = 1
 
 [node name="Captain1" parent="Units" instance=ExtResource("2_captain")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1, 4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1, 15)
 Control = 1
 ShowGameOverOnDeath = false
 StartUnarmed = true
 
 [node name="Captain2" parent="Units" instance=ExtResource("2_captain")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, 4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, 15)
 Control = 2
 DeviceId = 0
 ShowGameOverOnDeath = false
@@ -134,7 +134,8 @@ ZoomBiasMax = 12.0
 script = ExtResource("4_waves")
 BaseCount = 3
 PerWave = 2
-SpawnRadius = 17.0
+SpawnZ = -16.0
+SpawnSpread = 34.0
 
 [node name="GameManager" type="Node" parent="."]
 script = ExtResource("5_gm")

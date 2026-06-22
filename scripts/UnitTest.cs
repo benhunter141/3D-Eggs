@@ -1261,7 +1261,7 @@ public partial class UnitTest : Node3D
 
 		// Freeze FIRST (as OnPhaseChanged does), THEN stage the wave — the foes must be inert from frame 0.
 		GetTree().Paused = true;
-		var wm = new WaveManager { BaseCount = 1, PerWave = 0, SpawnRadius = 8.0f, SpawnHeight = 1.0f };
+		var wm = new WaveManager { BaseCount = 1, PerWave = 0, SpawnZ = -8.0f, SpawnHeight = 1.0f };
 		AddChild(wm);
 		int spawned = wm.SpawnWave(1, units, Vector3.Zero);
 
