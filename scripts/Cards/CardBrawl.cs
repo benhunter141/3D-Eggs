@@ -72,6 +72,11 @@ public partial class CardBrawl : Node3D
 	private HBoxContainer _handBox;
 	private Button _endTurnButton;
 	private readonly List<Button> _handButtons = new();
+	private HBoxContainer _abilityBarP1, _abilityBarP2;   // each hero's granted-ability bar (hotkey + cooldown)
+
+	// Ability-slot hotkey glyphs per player (P1 keyboard number keys; P2 gamepad buttons — see Player).
+	private static readonly string[] P1Keys = { "1", "2", "3", "4" };
+	private static readonly string[] P2Keys = { "A", "Y", "R1", "↑" };
 
 	// P2 gamepad edge-detect state (device 0).
 	private int _p2Cursor;
@@ -128,6 +133,8 @@ public partial class CardBrawl : Node3D
 
 	public override void _Process(double delta)
 	{
+		UpdateAbilityBars();   // keep both heroes' ability bars (hotkey + cooldown) live in every phase
+
 		if (_countingDown)
 		{
 			_countdownLeft -= (float)delta;
@@ -421,9 +428,15 @@ public partial class CardBrawl : Node3D
 	}
 
 	// A wave survived: discard the spent hand, refill both players' energy, deal a fresh hand. Selections
-	// were already locked at StartWave, so clear the per-pause targeting state for the new hand.
+	// were already locked at StartWave, so clear the per-pause targeting state for the new hand. Abilities
+	// are granted PER TURN — wipe each controlled egg's bar so a spell must be replayed for the next wave
+	// (weapons + soldiers persist).
 	private void OnRoundTimeout()
 	{
+		for (int p = 0; p < 2; p++)
+			foreach (Player egg in ControlledEggs(p))
+				egg.ClearAbilities();
+
 		_deck.DiscardHand();
 		RefillEnergy();
 		_deck.Draw(HandSize);
@@ -519,6 +532,78 @@ public partial class CardBrawl : Node3D
 		_endTurnButton.AddThemeFontSizeOverride("font_size", 20);
 		_endTurnButton.Pressed += OnEndTurnButtonPressed;
 		_root.AddChild(_endTurnButton);
+
+		// Ability bars sit in the bottom corners (P1 left, P2 right), visible during the wave so each player
+		// can see their hotkeys + cooldowns while casting. Built empty; UpdateAbilityBars fills them per frame.
+		_abilityBarP1 = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+		_abilityBarP1.SetAnchorsPreset(Control.LayoutPreset.BottomLeft);
+		_abilityBarP1.OffsetLeft = 24; _abilityBarP1.OffsetRight = 360;
+		_abilityBarP1.OffsetTop = -120; _abilityBarP1.OffsetBottom = -72;
+		_abilityBarP1.AddThemeConstantOverride("separation", 6);
+		_root.AddChild(_abilityBarP1);
+
+		_abilityBarP2 = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+		_abilityBarP2.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
+		_abilityBarP2.OffsetLeft = -360; _abilityBarP2.OffsetRight = -24;
+		_abilityBarP2.OffsetTop = -120; _abilityBarP2.OffsetBottom = -72;
+		_abilityBarP2.Alignment = BoxContainer.AlignmentMode.End;
+		_abilityBarP2.AddThemeConstantOverride("separation", 6);
+		_root.AddChild(_abilityBarP2);
+	}
+
+	// Sync both ability bars to the heroes' current bars each frame (cheap — at most 4 slots each).
+	private void UpdateAbilityBars()
+	{
+		SyncAbilityBar(_abilityBarP1, 0);
+		SyncAbilityBar(_abilityBarP2, 1);
+	}
+
+	private void SyncAbilityBar(HBoxContainer bar, int player)
+	{
+		if (bar == null)
+			return;
+		// Rebuild from scratch (immediate Free, so no mid-frame duplicates) — the counts are tiny.
+		foreach (Node c in bar.GetChildren()) { bar.RemoveChild(c); c.Free(); }
+
+		Player egg = _players[player];
+		if (egg == null || !IsInstanceValid(egg))
+			return;
+		Color tint = player == 0 ? P1Color : P2Color;
+		string[] keys = player == 0 ? P1Keys : P2Keys;
+		for (int i = 0; i < egg.AbilityCount; i++)
+		{
+			string hot = i < keys.Length ? keys[i] : "•";
+			bar.AddChild(MakeAbilitySlot(hot, egg.AbilityTypeAt(i).ToString(),
+				egg.AbilityReadyAt(i), egg.AbilityCooldownLeft(i), tint));
+		}
+	}
+
+	// One ability-bar tile: "[1] Fireball" over READY / "2.3s", border tinted by player and dimmed on cooldown.
+	private static Control MakeAbilitySlot(string hotkey, string name, bool ready, float cdLeft, Color tint)
+	{
+		var panel = new PanelContainer { CustomMinimumSize = new Vector2(74, 44), MouseFilter = Control.MouseFilterEnum.Ignore };
+		var sb = new StyleBoxFlat { BgColor = new Color(0.1f, 0.1f, 0.14f, ready ? 0.95f : 0.6f) };
+		sb.SetBorderWidthAll(2);
+		sb.BorderColor = ready ? tint : new Color(tint.R, tint.G, tint.B, 0.4f);
+		sb.SetCornerRadiusAll(5);
+		sb.SetContentMarginAll(3);
+		panel.AddThemeStyleboxOverride("panel", sb);
+
+		var v = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+		v.AddThemeConstantOverride("separation", 0);
+		panel.AddChild(v);
+
+		var top = new Label { Text = $"[{hotkey}] {name}", MouseFilter = Control.MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center };
+		top.AddThemeFontSizeOverride("font_size", 11);
+		top.AddThemeColorOverride("font_color", ready ? new Color(0.95f, 0.95f, 0.98f) : new Color(0.62f, 0.62f, 0.68f));
+		v.AddChild(top);
+
+		var bottom = new Label { MouseFilter = Control.MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center };
+		bottom.AddThemeFontSizeOverride("font_size", 12);
+		if (ready) { bottom.Text = "READY"; bottom.AddThemeColorOverride("font_color", tint); }
+		else { bottom.Text = $"{cdLeft:0.0}s"; bottom.AddThemeColorOverride("font_color", new Color(0.88f, 0.62f, 0.4f)); }
+		v.AddChild(bottom);
+		return panel;
 	}
 
 	private static Label MakeLabel(Control parent, Control.LayoutPreset preset, float top, float bottom,

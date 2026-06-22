@@ -75,14 +75,18 @@ public static class CardLibrary
 		new Card("Soldier", Card.CardKind.PlayerBuff, cost, "Spawn a soldier to fight beside you.",
 			spawnPath: "res://scenes/Ally.tscn", buff: Card.BuffKind.Soldier);
 
-	// The shared opening deck for the Co-op Card Brawl.
+	// The shared opening deck for the Co-op Card Brawl. Abilities are granted PER TURN (they wipe at the end
+	// of each wave), so an ability card is a recurring choice — replay it to re-arm the spell next round.
 	public static List<Card> BrawlDeck() => new()
 	{
 		SoldierCard(), SoldierCard(), SoldierCard(), SoldierCard(), SoldierCard(),
 		WeaponCard("Sword", 2, Player.WeaponType.Sword, "Arm your egg with a sword (strong knockback)."),
 		WeaponCard("Spear", 2, Player.WeaponType.Spear, "Arm your egg with a long-reach spear."),
 		WeaponCard("Mace",  2, Player.WeaponType.Mace,  "Arm your egg with a mace (hardest fling)."),
-		AbilityCard("Fireball", 2, Player.AbilityType.Fireball, "Grant your egg the Fireball spell (C / A)."),
+		AbilityCard("Fireball", 2, Player.AbilityType.Fireball, "Ability (this turn): aim + hurl a magic bolt. Hotkey 1–4 / gamepad."),
+		AbilityCard("Enrage",   2, Player.AbilityType.Enrage,   "Ability (this turn): instantly double your attack power for a few seconds."),
+		AbilityCard("Heal",     2, Player.AbilityType.Heal,     "Ability (this turn): instantly restore a chunk of your HP."),
+		AbilityCard("Dash",     1, Player.AbilityType.Dash,     "Ability (this turn): aim + blink toward a spot. Hotkey 1–4 / gamepad."),
 	};
 
 	// Cards the Brawl could offer as upgrades (kept distinct). Not yet wired to a reward screen —
@@ -93,7 +97,10 @@ public static class CardLibrary
 		WeaponCard("Sword", 2, Player.WeaponType.Sword, "Arm your egg with a sword (strong knockback)."),
 		WeaponCard("Axe",   3, Player.WeaponType.Axe,   "Arm your egg with an axe (biggest single hit)."),
 		WeaponCard("Mace",  2, Player.WeaponType.Mace,  "Arm your egg with a mace (hardest fling)."),
-		AbilityCard("Fireball", 2, Player.AbilityType.Fireball, "Grant your egg the Fireball spell (C / A)."),
+		AbilityCard("Fireball", 2, Player.AbilityType.Fireball, "Ability (this turn): aim + hurl a magic bolt. Hotkey 1–4 / gamepad."),
+		AbilityCard("Enrage",   2, Player.AbilityType.Enrage,   "Ability (this turn): instantly double your attack power for a few seconds."),
+		AbilityCard("Heal",     2, Player.AbilityType.Heal,     "Ability (this turn): instantly restore a chunk of your HP."),
+		AbilityCard("Dash",     1, Player.AbilityType.Dash,     "Ability (this turn): aim + blink toward a spot. Hotkey 1–4 / gamepad."),
 	};
 
 	// Relic pool (M12, Chunk 39) — permanent, run-long passives. A boss room grants one of these at

@@ -24,11 +24,17 @@ public partial class Player : Unit, ICardPlayer
 {
 	public enum WeaponType { Spear, Sword, Axe, Mace, Punch }
 
-	// Castable abilities the egg can be GRANTED at runtime (M15, Chunk 67). `None` (the default) =
-	// no ability, so every existing captain spawns exactly as before — only a card-granted egg in the
-	// Co-op Card Brawl ever carries one. `Fireball` lobs a magic projectile scaled by INTELLIGENCE on a
-	// cooldown. Add an ability by extending this enum + a case in CastAbility.
-	public enum AbilityType { None, Fireball }
+	// Castable abilities the egg can be GRANTED at runtime (M15). `None` (the default) = nothing, so
+	// every existing captain spawns exactly as before — only a card-granted egg in the Co-op Card Brawl
+	// ever carries any. An egg holds a BAR of these (granted by cards, replayable each turn); each maps to
+	// a hotkey (P1: keys 1–4; P2: gamepad buttons) and a per-ability cooldown. Two flavours:
+	//   • TARGETED (Fireball, Dash) — P1 presses the hotkey to AIM (a ground reticle follows the mouse),
+	//     then left-clicks a spot to cast there (right-click cancels). P2 (no mouse) casts toward its aim.
+	//   • INSTANT  (Enrage, Heal)   — fires immediately on the hotkey (cast on self, no aim).
+	// Fireball = INT-scaled magic bolt; Enrage = briefly doubles attack power; Heal = restore HP; Dash =
+	// blink toward the target point. Add an ability by extending this enum + AbilityIsTargeted + a case
+	// in CastSlot (and a cooldown export).
+	public enum AbilityType { None, Fireball, Enrage, Heal, Dash }
 
 	// --- Control scheme (M12.7, Chunk 44: two-player couch co-op) ---
 	// Which input device drives THIS captain. `Any` (default) is today's blended read —
@@ -68,15 +74,20 @@ public partial class Player : Unit, ICardPlayer
 	private const JoyButton CmdHoldButton   = JoyButton.DpadLeft;     // 13
 	private const JoyButton CmdAttackButton = JoyButton.DpadRight;    // 14
 
-	// Cast-ability button (M15, Chunk 67) — mirrors the cast_ability action so the explicit Gamepad
-	// scheme matches Any. Button A (0) is otherwise unused by the captain's bindings.
-	private const JoyButton CastButton = JoyButton.A;                // 0
+	// Ability-bar hotkeys (M15 redesign). P1 (keyboard) fires bar slots 0–3 with the number keys 1–4;
+	// P2 (gamepad) fires the same slots with these buttons (A / Y / R1 / D-pad-up — all otherwise free for
+	// the captain during a live wave; the brawl ignores the pad while the world is frozen). Slot i's hotkey
+	// is AbilityKeys[i] / GamepadAbilityButtons[i].
+	private static readonly Key[] AbilityKeys = { Key.Key1, Key.Key2, Key.Key3, Key.Key4 };
+	private static readonly JoyButton[] GamepadAbilityButtons =
+		{ JoyButton.A, JoyButton.Y, JoyButton.RightShoulder, JoyButton.DpadUp };
 
 	// Prev-frame pressed state for the device-scoped schemes, so a raw "is pressed" bool becomes
 	// a one-frame "just pressed" (the action system gives this for free, but only un-scoped).
 	private bool _attackHeldPrev, _swapHeldPrev, _mountHeldPrev;
 	private bool _cmdFollowPrev, _cmdHoldPrev, _cmdAttackPrev;
-	private bool _castHeldPrev;
+	private readonly bool[] _abilityHeldPrev = new bool[4];   // one per bar slot hotkey
+	private bool _aimCancelPrev;                               // P1 right-click (cancel-aim) edge
 
 	// One weapon's resolved numbers. The Inspector exports below feed these in _Ready so each
 	// weapon stays tunable while the swing code reads a single uniform set.
@@ -110,23 +121,55 @@ public partial class Player : Unit, ICardPlayer
 	// cards (EquipWeapon at runtime). Default false so every existing scene spawns as today.
 	[Export] public bool StartUnarmed = false;
 
-	// --- Castable ability (M15, Chunk 67) ---
-	// The egg can be GRANTED a castable ability at runtime (a `fireball` card). None by default, so
-	// every existing captain is untouched; cards are the only way an egg gains one. cast_ability (C /
-	// gamepad A) fires the granted ability, gated by a per-ability cooldown. Fireball is a MAGIC hit —
-	// its damage scales with INTELLIGENCE (ScaledMagicDamage), the lane Int feeds.
+	// --- Castable abilities (M15 redesign) ---
+	// The egg can be GRANTED castable abilities at runtime (ability cards). None by default, so every
+	// existing captain is untouched; cards are the only way an egg gains any. Abilities live in a BAR
+	// (slots 0–3) fired by the number keys / gamepad buttons above, each gated by its own cooldown. In
+	// the brawl they're wiped each turn (ClearAbilities) so a card grants its spell for that wave only.
 	[Export] public AbilityType StartingAbility = AbilityType.None; // ability the egg spawns with (per-scene default)
+
+	// Fireball — INT-scaled magic bolt, aimed at the target point (or facing for a gamepad/AI cast).
 	[Export] public float FireballDamage = 16.0f;   // BASE magic damage (pre-Int-scale) of a cast fireball
 	[Export] public float FireballCooldown = 1.2f;  // seconds between fireball casts
 	[Export] public PackedScene FireballScene;       // projectile to spawn; falls back to res://scenes/Fireball.tscn
 
-	private AbilityType _ability = AbilityType.None;
-	private float _abilityCooldownTimer;             // counts down; > 0 blocks the next cast
+	// Enrage — instant self-buff: multiply attack power for a short window.
+	[Export] public float EnrageFactor = 2.0f;       // attack-damage multiplier while enraged ("double atk power")
+	[Export] public float EnrageDuration = 5.0f;     // seconds the buff lasts
+	[Export] public float EnrageCooldown = 8.0f;
 
-	// Read-only views (HUD + headless tests).
-	public AbilityType CurrentAbility => _ability;
-	public bool HasAbility => _ability != AbilityType.None;
-	public bool AbilityReady => _ability != AbilityType.None && _abilityCooldownTimer <= 0f;
+	// Heal — instant self-restore.
+	[Export] public float HealAmount = 50.0f;        // HP restored per cast
+	[Export] public float HealCooldown = 10.0f;
+
+	// Dash — blink toward the target point (or facing for a gamepad/AI cast), capped at DashRange.
+	[Export] public float DashRange = 8.0f;          // max blink distance (m)
+	[Export] public float DashCooldown = 4.0f;
+
+	// One bar slot: an ability + its live cooldown timer.
+	private class AbilitySlot { public AbilityType Type; public float Cooldown; public float Timer; public bool Ready => Timer <= 0f; }
+	private readonly List<AbilitySlot> _abilities = new();
+
+	private float _enrageTimer;        // > 0 while the Enrage buff is active
+	private int _aimingSlot = -1;      // ability slot P1 is currently aiming a targeted cast for, else -1
+	private bool _castConfirmedThisFrame;   // a targeted cast fired this frame — suppress the swing on that click
+	private Node3D _reticle;           // P1's ground aim ring, built lazily on first aim
+
+	public bool IsEnraged => _enrageTimer > 0f;
+
+	// Read-only views (HUD + headless tests). CurrentAbility/HasAbility/AbilityReady stay first-slot views
+	// for back-compat with the Chunk-67/68 tests; the bar accessors below drive the HUD per slot.
+	public AbilityType CurrentAbility => _abilities.Count > 0 ? _abilities[0].Type : AbilityType.None;
+	public bool HasAbility => _abilities.Count > 0;
+	public bool AbilityReady => _abilities.Count > 0 && _abilities[0].Ready;
+	public int AbilityCount => _abilities.Count;
+	public AbilityType AbilityTypeAt(int i) => i >= 0 && i < _abilities.Count ? _abilities[i].Type : AbilityType.None;
+	public bool AbilityReadyAt(int i) => i >= 0 && i < _abilities.Count && _abilities[i].Ready;
+	public float AbilityCooldownLeft(int i) => i >= 0 && i < _abilities.Count ? _abilities[i].Timer : 0f;
+	public bool IsAiming => _aimingSlot >= 0;
+
+	// Which abilities need a target point (P1 aims; P2/AI cast toward facing). The rest are instant self-casts.
+	public static bool AbilityIsTargeted(AbilityType a) => a == AbilityType.Fireball || a == AbilityType.Dash;
 
 	// Spear profile — long reach, no knockback.
 	[Export] public float SpearDamage = 40.0f;
@@ -191,7 +234,8 @@ public partial class Player : Unit, ICardPlayer
 	// Read-only views (used by the headless weapon tests).
 	public WeaponType CurrentWeapon => _weapon;
 	public float CurrentDamage => _damage;                               // weapon BASE damage (pre-stat)
-	public float CurrentAttackDamage => ScaledWeaponDamage(_damage);     // what a hit actually deals (Strength-scaled)
+	public float CurrentAttackDamage => ScaledWeaponDamage(_damage);     // Strength-scaled weapon damage (no enrage)
+	public float EffectiveAttackDamage => ScaledWeaponDamage(_damage) * (_enrageTimer > 0f ? EnrageFactor : 1f); // what a hit deals NOW (incl. Enrage)
 	public float CurrentWeaponKnockback => _knockback;   // NOTE: Unit.CurrentKnockback is the live shove Vector3
 	public float CurrentReach => _reach;
 	public float CurrentSwingCooldown => _swingCooldown;                // higher = slower (the axe's tax)
@@ -273,7 +317,8 @@ public partial class Player : Unit, ICardPlayer
 		SetThrustOffset(0f);
 		SetHitboxActive(false);
 
-		_ability = StartingAbility;   // usually None; a brawl scene / card grants one (Chunk 67)
+		if (StartingAbility != AbilityType.None)
+			GrantAbility(StartingAbility);   // usually None; a brawl scene / card grants abilities (M15)
 
 		_formationYaw = Rotation.Y;   // squad starts wheeled to wherever we spawn facing
 	}
@@ -308,39 +353,74 @@ public partial class Player : Unit, ICardPlayer
 		GD.Print($"[Player] {Name} equipped {_weapon} (reach {_reach:0.0} m, dmg {_damage:0.0}, knockback {_knockback:0.0})");
 	}
 
-	// --- Castable ability (Chunk 67) ---
+	// --- Castable abilities (M15 redesign) ---
 
-	// Grant the egg a castable ability at runtime (a `fireball` card). Public so cards (and the headless
-	// test) can hand an ability to a specific egg. AbilityType.None clears it. Ready to cast immediately.
+	// The full per-ability cooldown (drives both the cast gate and the HUD readout).
+	private float CooldownFor(AbilityType a) => a switch
+	{
+		AbilityType.Fireball => FireballCooldown,
+		AbilityType.Enrage   => EnrageCooldown,
+		AbilityType.Heal     => HealCooldown,
+		AbilityType.Dash     => DashCooldown,
+		_                    => 0f,
+	};
+
+	// Grant the egg an ability (an ability card). Public so cards (and the headless test) can hand one to a
+	// specific egg. Adds a bar slot, ready to cast; re-granting an ability it already has just refreshes it
+	// (resets the cooldown). AbilityType.None is a no-op. The bar caps at the number of hotkeys.
 	public void GrantAbility(AbilityType kind)
 	{
-		_ability = kind;
-		_abilityCooldownTimer = 0f;
-		GD.Print($"[Player] {Name} granted ability {_ability}");
+		if (kind == AbilityType.None)
+			return;
+		foreach (AbilitySlot s in _abilities)
+			if (s.Type == kind) { s.Timer = 0f; GD.Print($"[Player] {Name} refreshed ability {kind}"); return; }
+		if (_abilities.Count >= AbilityKeys.Length)
+			return;
+		_abilities.Add(new AbilitySlot { Type = kind, Cooldown = CooldownFor(kind), Timer = 0f });
+		GD.Print($"[Player] {Name} granted ability {kind} (slot {_abilities.Count})");
 	}
 
-	// Fire the currently-granted ability if it's off cooldown and we're alive. Returns true if a cast
-	// actually went out (so the headless test can assert ungranted = no-op and the cooldown gates repeats).
-	// Public so a UI / test can drive it without faking input.
-	public bool CastAbility()
+	// Wipe the bar (the brawl calls this each turn so abilities last only for the wave they were played
+	// for). Also drops any in-progress aim. Public so the round loop / a test can reset an egg.
+	public void ClearAbilities()
 	{
-		if (_ability == AbilityType.None || IsDead || _abilityCooldownTimer > 0f)
+		_abilities.Clear();
+		_enrageTimer = 0f;
+		CancelAiming();
+	}
+
+	// Cast bar slot `slot` at an optional target point (null = toward facing, used by gamepad/AI/instant).
+	// Gated on being alive + the slot's cooldown. Returns true if a cast actually went out. Public so the
+	// UI / headless test can drive a cast without faking input.
+	public bool CastSlot(int slot, Vector3? targetPoint)
+	{
+		if (slot < 0 || slot >= _abilities.Count || IsDead)
+			return false;
+		AbilitySlot s = _abilities[slot];
+		if (!s.Ready)
 			return false;
 
-		switch (_ability)
+		switch (s.Type)
 		{
-			case AbilityType.Fireball:
-				CastFireball();
-				_abilityCooldownTimer = FireballCooldown;
-				return true;
+			case AbilityType.Fireball: CastFireball(targetPoint); break;
+			case AbilityType.Enrage:   _enrageTimer = EnrageDuration;
+			                           GD.Print($"[Player] {Name} ENRAGED (x{EnrageFactor:0.0} atk for {EnrageDuration:0.0}s)"); break;
+			case AbilityType.Heal:     Heal(HealAmount);
+			                           GD.Print($"[Player] {Name} healed {HealAmount:0.0} -> {Health:0.0}/{MaxHealth:0.0}"); break;
+			case AbilityType.Dash:     CastDash(targetPoint); break;
+			default: return false;
 		}
-		return false;
+		s.Timer = s.Cooldown;
+		return true;
 	}
 
-	// Lob a Fireball straight along our facing (-Z, where the captain is aiming). Its damage is baked in
-	// at cast time as a MAGIC hit scaled by our Intelligence, so a smarter egg's bolts hit harder; the
-	// projectile itself carries no stats. Spawned on our parent so it outlives us, tagged with our team.
-	private void CastFireball()
+	// Back-compat (Chunk 67 test): cast the first bar slot toward facing.
+	public bool CastAbility() => CastSlot(0, null);
+
+	// Lob a Fireball — toward `targetPoint` if given (P1's clicked spot), else along our facing (-Z, where a
+	// gamepad/AI egg is aiming). Damage is baked in at cast time as a MAGIC hit scaled by our Intelligence,
+	// so a smarter egg's bolts hit harder. Spawned on our parent so it outlives us, tagged with our team.
+	private void CastFireball(Vector3? targetPoint)
 	{
 		FireballScene ??= GD.Load<PackedScene>("res://scenes/Fireball.tscn");
 		if (FireballScene == null)
@@ -349,9 +429,7 @@ public partial class Player : Unit, ICardPlayer
 			return;
 		}
 
-		Vector3 dir = -GlobalTransform.Basis.Z;
-		dir.Y = 0f;
-		dir = dir.LengthSquared() > 0.0001f ? dir.Normalized() : Vector3.Forward;
+		Vector3 dir = AimDirection(targetPoint);
 
 		var fb = FireballScene.Instantiate<Fireball>();
 		fb.Damage = ScaledMagicDamage(FireballDamage);   // Intelligence scales magic (Chunk 36 lane)
@@ -360,6 +438,203 @@ public partial class Player : Unit, ICardPlayer
 		fb.Launch(dir, Team);
 
 		GD.Print($"[Player] {Name} cast Fireball for {fb.Damage:0.0} (Int x{IntelligenceMultiplier:0.00})");
+	}
+
+	// Blink toward `targetPoint` (capped at DashRange), or DashRange along our facing if none. Instant
+	// reposition on the flat plane; snaps onto terrain on a grounded level.
+	private void CastDash(Vector3? targetPoint)
+	{
+		Vector3 dir = AimDirection(targetPoint);
+		float dist = DashRange;
+		if (targetPoint.HasValue)
+		{
+			Vector3 to = targetPoint.Value - GlobalPosition; to.Y = 0f;
+			dist = Mathf.Min(DashRange, to.Length());
+		}
+		Vector3 dest = GlobalPosition + dir * dist;
+		dest.Y = Grounded ? SampleGroundHeight(dest.X, dest.Z, GlobalPosition.Y) + GroundedSpawnLift : GlobalPosition.Y;
+		GlobalPosition = dest;
+		GD.Print($"[Player] {Name} dashed {dist:0.0} m");
+	}
+
+	// Flat unit direction toward `targetPoint`, or our facing (-Z) when none is given / it's right on us.
+	private Vector3 AimDirection(Vector3? targetPoint)
+	{
+		Vector3 dir;
+		if (targetPoint.HasValue)
+		{
+			dir = targetPoint.Value - GlobalPosition; dir.Y = 0f;
+			if (dir.LengthSquared() > 0.0001f)
+				return dir.Normalized();
+		}
+		dir = -GlobalTransform.Basis.Z; dir.Y = 0f;
+		return dir.LengthSquared() > 0.0001f ? dir.Normalized() : Vector3.Forward;
+	}
+
+	// --- Ability bar input (M15 redesign) ---
+
+	// Per-frame ability driving: tick cooldowns + the Enrage buff, then read the bar's hotkeys for this
+	// scheme. P1 (keyboard) presses 1–4: an INSTANT ability fires at once, a TARGETED one toggles aim mode
+	// (a ground reticle follows the mouse; left-click casts at the spot, right-click cancels). P2 (gamepad)
+	// fires its buttons straight away, targeted casts going toward its aim. An AI subordinate auto-casts its
+	// first ready ability at its quarry.
+	private void UpdateAbilityInput(float dt)
+	{
+		for (int i = 0; i < _abilities.Count; i++)
+			if (_abilities[i].Timer > 0f)
+				_abilities[i].Timer = Mathf.Max(0f, _abilities[i].Timer - dt);
+		if (_enrageTimer > 0f)
+			_enrageTimer -= dt;
+
+		if (_abilities.Count == 0)
+		{
+			CancelAiming();
+			return;
+		}
+
+		if (Control == ControlScheme.Ai)
+		{
+			if (_aiTarget != null && IsInstanceValid(_aiTarget))
+				for (int i = 0; i < _abilities.Count; i++)
+					if (_abilities[i].Ready) { CastSlot(i, _aiTarget.GlobalPosition); break; }
+			return;
+		}
+
+		if (Control == ControlScheme.Gamepad)
+		{
+			int n = Mathf.Min(_abilities.Count, GamepadAbilityButtons.Length);
+			for (int i = 0; i < n; i++)
+				if (JustPressed(Input.IsJoyButtonPressed(DeviceId, GamepadAbilityButtons[i]), ref _abilityHeldPrev[i]))
+					CastSlot(i, null);   // no mouse → cast toward our aim/facing
+			return;
+		}
+
+		// KeyboardMouse / Any: number keys 1–4 select the slot; targeted ones then aim with the mouse.
+		int slots = Mathf.Min(_abilities.Count, AbilityKeys.Length);
+		for (int i = 0; i < slots; i++)
+			if (JustPressed(Input.IsPhysicalKeyPressed(AbilityKeys[i]), ref _abilityHeldPrev[i]))
+				OnAbilityHotkey(i);
+
+		if (_aimingSlot >= 0)
+			UpdateAiming();
+	}
+
+	// P1 pressed bar slot `i`: instant abilities fire now; targeted ones toggle the aim reticle.
+	private void OnAbilityHotkey(int i)
+	{
+		if (i < 0 || i >= _abilities.Count)
+			return;
+		if (AbilityIsTargeted(_abilities[i].Type))
+		{
+			if (_aimingSlot == i) CancelAiming();   // press again to put the spell away
+			else { _aimingSlot = i; ShowReticle(true); }
+		}
+		else
+		{
+			CancelAiming();
+			CastSlot(i, null);
+		}
+	}
+
+	// While P1 is aiming a targeted ability: float the reticle under the cursor, cast on left-click (the
+	// click is consumed here so it never also swings), cancel on right-click.
+	private void UpdateAiming()
+	{
+		if (_aimingSlot < 0 || _aimingSlot >= _abilities.Count)
+		{
+			CancelAiming();
+			return;
+		}
+
+		bool gotPoint = GroundPointUnderMouse(out Vector3 point);
+		if (gotPoint)
+			MoveReticle(point);
+
+		bool rmb = Input.IsMouseButtonPressed(MouseButton.Right);
+		bool rmbEdge = rmb && !_aimCancelPrev;
+		_aimCancelPrev = rmb;
+		if (rmbEdge)
+		{
+			CancelAiming();
+			return;
+		}
+
+		if (gotPoint && AttackJustPressed())   // consumes the LMB edge so UpdateSwing won't swing
+		{
+			int slot = _aimingSlot;
+			CancelAiming();
+			if (CastSlot(slot, point))
+				_castConfirmedThisFrame = true;
+		}
+	}
+
+	private void CancelAiming()
+	{
+		_aimingSlot = -1;
+		ShowReticle(false);
+	}
+
+	// Ground point (y=0 plane) under the mouse cursor via a camera ray — the targeted-cast aim point.
+	private bool GroundPointUnderMouse(out Vector3 point)
+	{
+		point = Vector3.Zero;
+		Camera3D cam = GetViewport().GetCamera3D();
+		if (cam == null)
+			return false;
+		Vector2 m = GetViewport().GetMousePosition();
+		Vector3 from = cam.ProjectRayOrigin(m);
+		Vector3 dir = cam.ProjectRayNormal(m);
+		if (Mathf.IsZeroApprox(dir.Y))
+			return false;
+		float t = (0f - from.Y) / dir.Y;
+		if (t < 0f)
+			return false;
+		point = from + dir * t;
+		point.Y = 0f;
+		return true;
+	}
+
+	// A flat ground ring that marks where a targeted cast will land, built once on first aim and parented to
+	// the level so it sits in the world (not under the egg). Tinted by the aimed ability.
+	private void EnsureReticle()
+	{
+		if (_reticle != null && IsInstanceValid(_reticle))
+			return;
+		var ring = new MeshInstance3D
+		{
+			Mesh = new TorusMesh { InnerRadius = 0.7f, OuterRadius = 1.0f, RingSegments = 24, Rings = 8 },
+			CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+			Visible = false,
+		};
+		ring.MaterialOverride = new StandardMaterial3D
+		{
+			ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+			AlbedoColor = new Color(1f, 0.55f, 0.2f),
+		};
+		_reticle = ring;
+		GetParent().AddChild(_reticle);
+	}
+
+	private void ShowReticle(bool on)
+	{
+		if (on)
+		{
+			EnsureReticle();
+			// Tint by the aimed ability (fireball orange, dash cyan).
+			if (_reticle is MeshInstance3D mi && mi.MaterialOverride is StandardMaterial3D mat && _aimingSlot >= 0)
+				mat.AlbedoColor = _abilities[_aimingSlot].Type == AbilityType.Dash
+					? new Color(0.4f, 0.85f, 1f) : new Color(1f, 0.55f, 0.2f);
+		}
+		if (_reticle != null && IsInstanceValid(_reticle))
+			_reticle.Visible = on;
+	}
+
+	private void MoveReticle(Vector3 point)
+	{
+		if (_reticle == null || !IsInstanceValid(_reticle))
+			return;
+		point.Y = 0.05f;   // hair above the ground to avoid z-fighting
+		_reticle.GlobalPosition = point;
 	}
 
 	// --- Co-op Card Brawl: player-buff cards (M15, Chunk 68) ---
@@ -548,6 +823,7 @@ public partial class Player : Unit, ICardPlayer
 	{
 		float dt = (float)delta;
 		DecayKnockback(dt);
+		_castConfirmedThisFrame = false;
 
 		if (IsDead)
 		{
@@ -607,11 +883,8 @@ public partial class Player : Unit, ICardPlayer
 		if (CommandHoldPressed())   IssueSquadCommand(Ally.CommandMode.Hold);
 		if (CommandAttackPressed()) IssueSquadCommand(Ally.CommandMode.AttackMove);
 
-		// Cast the granted ability (M15) — fireball etc., gated by its cooldown. No-op when ungranted.
-		if (_abilityCooldownTimer > 0f)
-			_abilityCooldownTimer -= dt;
-		if (_ability != AbilityType.None && CastJustPressed())
-			CastAbility();
+		// Drive the ability bar (M15): tick cooldowns, fire hotkeys, run P1's targeted-aim state.
+		UpdateAbilityInput(dt);
 
 		UpdateSwing(dt);
 	}
@@ -627,7 +900,9 @@ public partial class Player : Unit, ICardPlayer
 		// Read the attack edge every frame so the device-scoped schemes tick their prev-state
 		// even mid-swing/cooldown (else a held button could mis-fire on the frame cooldown ends).
 		bool attackPressed = AttackJustPressed();
-		if (!_swinging && _cooldownTimer <= 0f && attackPressed)
+		// A click while aiming a targeted ability is the cast-confirm, not a swing (UpdateAbilityInput
+		// runs first and consumes that click); suppress the swing on that frame.
+		if (!_swinging && _cooldownTimer <= 0f && attackPressed && _aimingSlot < 0 && !_castConfirmedThisFrame)
 			StartSwing();
 
 
@@ -660,7 +935,8 @@ public partial class Player : Unit, ICardPlayer
 			if (body is Unit unit && unit.Team != Team)
 			{
 				Vector3 hitDir = unit.GlobalPosition - GlobalPosition;
-				float dmg = ScaledWeaponDamage(_damage);       // Strength scales weapon attack power (Chunk 36)
+				// Strength scales weapon attack power (Chunk 36); Enrage briefly doubles it on top (M15).
+				float dmg = EffectiveAttackDamage;
 				unit.TakeDamage(dmg, hitDir, _knockback);      // sword shoves; spear deals no knockback
 				GD.Print($"[{_weapon}] {Name} thrust {unit.Name} for {dmg:0.0} (knockback {_knockback})");
 			}
@@ -706,6 +982,9 @@ public partial class Player : Unit, ICardPlayer
 	{
 		Velocity = Vector3.Zero;
 		SetHitboxActive(false);
+		CancelAiming();
+		if (_reticle != null && IsInstanceValid(_reticle))
+			_reticle.QueueFree();
 		// A subordinate egg (M15) isn't a captain — it just falls and is removed (no game-over reveal).
 		if (Control == ControlScheme.Ai)
 		{
@@ -903,16 +1182,6 @@ public partial class Player : Unit, ICardPlayer
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.G), ref _cmdAttackPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CmdAttackButton), ref _cmdAttackPrev),
 		_                           => Input.IsActionJustPressed("command_attack"),
-	};
-
-	// Cast-ability edge (M15, Chunk 67): C (keyboard) or gamepad A. A subordinate auto-casts a granted
-	// ability whenever it has a quarry (its cooldown gates the cadence).
-	public bool CastJustPressed() => Control switch
-	{
-		ControlScheme.Ai            => _aiTarget != null,
-		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.C), ref _castHeldPrev),
-		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CastButton), ref _castHeldPrev),
-		_                           => Input.IsActionJustPressed("cast_ability"),
 	};
 
 	// WASD / arrows as a normalized-ish move vector (KeyboardMouse scheme — keyboard only, so a

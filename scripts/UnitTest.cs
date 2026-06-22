@@ -42,6 +42,7 @@ public partial class UnitTest : Node3D
 		bool archetypes = await TestWeaponArchetypes();
 		bool basicEgg = await TestBasicEgg();
 		bool fireball = await TestFireballAbility();
+		bool abilityBar = await TestAbilityBar();
 		bool brawlBuffs = await TestBrawlBuffCards();
 		bool brawlHand = TestBrawlHandRouting();
 		bool brawlWaves = await TestBrawlWaves();
@@ -72,7 +73,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && brawlBuffs && brawlHand && brawlWaves && brawlPreview && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1056,6 +1057,95 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: ungranted egg can't cast; granted Fireball deals Int-scaled magic damage; cooldown gates repeats"
 			: $"FAIL: ungrantedNoCast={ungrantedNoCast}, granted={granted}, cast1={cast1}, cooldownGates={cooldownGates}, magicOk={hitForMagic}");
+		return pass;
+	}
+
+	// M15 redesign: the ability BAR. An egg can hold several granted abilities (one slot each, hotkeyed);
+	// re-granting refreshes (no duplicate). TARGETED abilities (Fireball/Dash) take a point; INSTANT ones
+	// (Enrage/Heal) fire on self. Checks: bar builds + de-dups, the targeted flags, Enrage doubles attack
+	// power (and its cooldown gates a repeat), Heal restores HP, Dash blinks toward a point, a Fireball aimed
+	// to the SIDE flies there (not down our facing), and ClearAbilities wipes the bar + the enrage buff.
+	private async Task<bool> TestAbilityBar()
+	{
+		GD.Print("=== UnitTest: ability bar (multi-slot, targeted/instant, per-turn) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var egg = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		egg.StartUnarmed = true;        // weak Punch, so Enrage's doubling is easy to read
+		AddChild(egg);
+		egg.GlobalPosition = Vector3.Zero;
+		egg.Rotation = Vector3.Zero;    // facing -Z
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Build a full bar; re-granting Fireball must REFRESH the existing slot, not add a 5th.
+		egg.GrantAbility(Player.AbilityType.Fireball);
+		egg.GrantAbility(Player.AbilityType.Enrage);
+		egg.GrantAbility(Player.AbilityType.Heal);
+		egg.GrantAbility(Player.AbilityType.Dash);
+		egg.GrantAbility(Player.AbilityType.Fireball);
+		bool barBuilt = egg.AbilityCount == 4 && egg.HasAbility;
+
+		bool targetedFlags = Player.AbilityIsTargeted(Player.AbilityType.Fireball)
+			&& Player.AbilityIsTargeted(Player.AbilityType.Dash)
+			&& !Player.AbilityIsTargeted(Player.AbilityType.Enrage)
+			&& !Player.AbilityIsTargeted(Player.AbilityType.Heal);
+
+		int Slot(Player.AbilityType t)
+		{
+			for (int i = 0; i < egg.AbilityCount; i++)
+				if (egg.AbilityTypeAt(i) == t) return i;
+			return -1;
+		}
+
+		// Enrage: instant self-buff that doubles attack power; an immediate recast is gated by its cooldown.
+		float baseHit = egg.CurrentAttackDamage;                 // Strength-scaled weapon damage (no enrage)
+		bool enraged = egg.CastSlot(Slot(Player.AbilityType.Enrage), null) && egg.IsEnraged;
+		bool enrageGated = !egg.CastSlot(Slot(Player.AbilityType.Enrage), null);
+		bool enrageDoubles = Mathf.IsEqualApprox(egg.EffectiveAttackDamage, baseHit * egg.EnrageFactor, 0.5f);
+
+		// Heal: restore HP after taking damage.
+		egg.TakeDamage(40f);
+		float beforeHeal = egg.Health;
+		egg.CastSlot(Slot(Player.AbilityType.Heal), null);
+		bool healed = egg.Health > beforeHeal && egg.Health <= egg.MaxHealth
+			&& Mathf.IsEqualApprox(egg.Health, Mathf.Min(egg.MaxHealth, beforeHeal + egg.HealAmount), 0.5f);
+
+		// Dash: blink toward a point, capped at DashRange (here 3 m < range).
+		egg.GlobalPosition = Vector3.Zero;
+		egg.CastSlot(Slot(Player.AbilityType.Dash), new Vector3(3f, 0f, 0f));
+		float dashDist = egg.GlobalPosition.DistanceTo(Vector3.Zero);
+		bool dashed = Mathf.IsEqualApprox(dashDist, 3f, 0.25f);
+
+		// Fireball is TARGETED: aimed at a foe OFF to the side (+X), the bolt must fly there — proof it uses
+		// the target point, not our (-Z) facing, which would miss entirely.
+		egg.GlobalPosition = Vector3.Zero;
+		var foe = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 300f };
+		AddChild(foe);
+		foe.GlobalPosition = new Vector3(6f, 0f, 0f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		float foeBefore = foe.Health;
+		bool castFire = egg.CastSlot(Slot(Player.AbilityType.Fireball), foe.GlobalPosition);
+		for (int i = 0; i < 60; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		bool hitSideways = foe.Health < foeBefore;
+
+		// Per-turn reset wipes the bar and the enrage buff.
+		egg.ClearAbilities();
+		bool cleared = egg.AbilityCount == 0 && !egg.HasAbility && !egg.IsEnraged;
+
+		GD.Print($"barBuilt={barBuilt}, targetedFlags={targetedFlags}, enraged={enraged}, enrageGated={enrageGated}, " +
+			$"enrageDoubles={enrageDoubles} (base {baseHit:0.0} x{egg.EnrageFactor:0.0}={egg.EffectiveAttackDamage:0.0}), " +
+			$"healed={healed}, dashed={dashed} ({dashDist:0.00} m), castFire={castFire}, hitSideways={hitSideways}, cleared={cleared}");
+
+		bool pass = barBuilt && targetedFlags && enraged && enrageGated && enrageDoubles
+			&& healed && dashed && castFire && hitSideways && cleared;
+		GD.Print(pass
+			? "PASS: ability bar holds multiple hotkeyed abilities; instant + targeted casts work; abilities clear per turn"
+			: $"FAIL: barBuilt={barBuilt}, targetedFlags={targetedFlags}, enraged={enraged}, enrageGated={enrageGated}, " +
+			  $"enrageDoubles={enrageDoubles}, healed={healed}, dashed={dashed}, castFire={castFire}, hitSideways={hitSideways}, cleared={cleared}");
 		return pass;
 	}
 

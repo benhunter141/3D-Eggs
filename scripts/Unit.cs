@@ -413,6 +413,17 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		}
 	}
 
+	// Restore up to `amount` HP, capped at MaxHealth (the Heal ability, M15). The dead stay dead. Pops a
+	// soft flash + refreshes the crack overlay so the mend reads on screen.
+	public void Heal(float amount)
+	{
+		if (IsDead || amount <= 0f)
+			return;
+		Health = Mathf.Min(MaxHealth, Health + amount);
+		UpdateCrackDamage();   // shell knits back as HP rises
+		Flash(0.5f);
+	}
+
 	// --- ICardUnit (M12, Chunk 33): the card battler treats a Unit as a targetable fighter ---
 
 	// An Action card may target this unit only while it's ours and still alive.

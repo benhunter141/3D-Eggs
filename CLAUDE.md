@@ -451,6 +451,25 @@ opponent = escalating waves; flat per-round energy (`BaseEnergy`, no KotH bonus)
 **Build order 66 → 73; 66 + 68 are the load-bearing pair (weak egg + buff-the-player card category).
 72 reshapes the loop (foes-first), 73 is the card-UI polish.**
 
+- [x] **Chunk 74 — DOTA/LoL-style ability bar (targeted + instant casts).** Reshaped the single `Player`
+  ability into a multi-slot BAR: `AbilityType` now `{None, Fireball, Enrage, Heal, Dash}`, and an egg holds a
+  list of `AbilitySlot`s (one per granted ability, each its own cooldown), capped at 4 hotkeys. Hotkeys: P1
+  keyboard keys **1–4**, P2 gamepad **A / Y / R1 / D-pad-up** (all free for the captain during a live wave;
+  the brawl ignores the pad while frozen). `AbilityIsTargeted` splits them: **TARGETED** (Fireball/Dash) →
+  P1 presses the hotkey to AIM (a flat ground `TorusMesh` reticle, built lazily in the egg's parent, follows
+  the mouse on the y=0 plane), then LEFT-CLICK casts at that point (the click is consumed in `UpdateAiming`
+  so it never also swings — `_castConfirmedThisFrame` + the `_aimingSlot` guard in `UpdateSwing`), RIGHT-CLICK
+  cancels; P2/AI have no mouse so they cast toward facing (`AimDirection`). **INSTANT** (Enrage/Heal) fire on
+  the hotkey, on self. Effects: Fireball = the Chunk-67 INT-scaled bolt, now aimed at the target point;
+  **Enrage** = `_enrageTimer`/`EnrageFactor` (×2 for `EnrageDuration`) folded into `EffectiveAttackDamage`
+  (the swing reads this); **Heal** = `Unit.Heal(amount)` (restore HP, capped, with a flash); **Dash** = blink
+  toward the point capped at `DashRange` (terrain-snapped when `Grounded`). `CastSlot(slot, point?)` is the
+  one cast chokepoint (`CastAbility()` = `CastSlot(0,null)` back-compat). **Abilities are PER-TURN**: granted
+  by cards in the pause, wiped by `Player.ClearAbilities()` at `CardBrawl.OnRoundTimeout` (weapons + soldiers
+  persist). `CardLibrary.BrawlDeck()` now grants Fireball/Enrage/Heal/Dash; `CardBrawl` draws a per-hero
+  **ability bar** in each bottom corner (hotkey + name + READY/cooldown, tinted per player), refreshed every
+  frame. Headless-tested (`TestAbilityBar`). Feel-check pending (needs a gamepad for P2).
+
 ---
 
 **Shelved — not now (revisit only when asked; full detail in git history):**
