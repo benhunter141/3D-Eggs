@@ -34,6 +34,8 @@ public partial class CardBrawl : Node3D
 	private Button _endTurnButton;
 	private readonly List<Button> _handButtons = new();
 
+	private int _previewedWave;                   // foes-first (Chunk 72): highest wave already staged in a pause
+
 	// P2 gamepad selection + edge-detect state (device 0).
 	private int _p2Cursor;
 	private bool _navLeftPrev, _navRightPrev, _confirmPrev, _endTurnPrev;
@@ -141,15 +143,28 @@ public partial class CardBrawl : Node3D
 
 	private void OnCardClicked(int index) => PlayHandCard(index, 0);   // P1 = mouse
 
-	// End Turn BEGINS the wave: unfreeze, start the clock, and spawn this round's escalating wave.
+	// End Turn BEGINS the wave: the foes were already STAGED during the pause (foes-first, Chunk 72), so
+	// this just unfreezes the world — the previewed enemies spring to life and the 15 s clock starts.
 	private void OnEndTurn()
 	{
 		if (_round.Current != RoundLoop.Phase.Pause)
 			return;
-		int wave = _round.RoundNumber;
-		_round.EndTurn();                       // -> PLAY (OnPhaseChanged unfreezes)
-		_waves.SpawnWave(wave, _units, ArenaCenter());
+		_round.EndTurn();                       // -> PLAY (OnPhaseChanged unfreezes the staged foes)
 		Refresh();
+	}
+
+	// Foes-first (Chunk 72): stage the coming wave DURING the pause so both eggs can SEE the threat
+	// (count + composition) and spend energy to counter it before committing. The foes drop into the
+	// Pausable Units node while the world is frozen, so they stand inert — no move/attack, can't trip the
+	// lose check — until End Turn unfreezes them. Spawns at most once per wave number (idempotent across
+	// repeated pause edges).
+	private void SpawnPreviewWave()
+	{
+		int wave = _round.RoundNumber;
+		if (_waves == null || _units == null || wave == _previewedWave)
+			return;
+		_previewedWave = wave;
+		_waves.SpawnWave(wave, _units, ArenaCenter());
 	}
 
 	// A wave survived (clock ran out): discard the spent hand, refill flat energy, deal a fresh hand. The
@@ -183,6 +198,8 @@ public partial class CardBrawl : Node3D
 	{
 		bool paused = phase == RoundLoop.Phase.Pause;
 		GetTree().Paused = paused;
+		if (paused)
+			SpawnPreviewWave();   // freeze FIRST, then stage the coming wave so it's inert from frame 0
 		if (_endTurnButton != null)
 		{
 			_endTurnButton.Disabled = !paused;
@@ -310,17 +327,20 @@ public partial class CardBrawl : Node3D
 	{
 		if (_phaseLabel == null)
 			return;
+		int waveCount = _waves != null ? _waves.CountForWave(_round.RoundNumber) : 0;
 		if (_round.Current == RoundLoop.Phase.Play)
 		{
 			_phaseLabel.Text = $"WAVE {_round.RoundNumber}   •   SURVIVE   {_round.TimeLeft:0.0}s";
 			_phaseLabel.AddThemeColorOverride("font_color", new Color(0.6f, 0.95f, 0.6f));
+			if (_waveLabel != null)
+				_waveLabel.Text = $"{waveCount} foes on the field — survive!";
 		}
 		else
 		{
-			_phaseLabel.Text = $"PAUSED — buff your eggs, then End Turn";
+			_phaseLabel.Text = $"WAVE {_round.RoundNumber} INCOMING — counter the foes, then End Turn";
 			_phaseLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.55f));
+			if (_waveLabel != null)
+				_waveLabel.Text = $"{waveCount} foes staged ahead — spend energy to counter them";
 		}
-		if (_waveLabel != null)
-			_waveLabel.Text = $"Next wave: {_round.RoundNumber}   ({(_waves != null ? _waves.CountForWave(_round.RoundNumber) : 0)} enemies)";
 	}
 }

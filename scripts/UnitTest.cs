@@ -45,6 +45,7 @@ public partial class UnitTest : Node3D
 		bool brawlBuffs = await TestBrawlBuffCards();
 		bool brawlHand = TestBrawlHandRouting();
 		bool brawlWaves = await TestBrawlWaves();
+		bool brawlPreview = await TestBrawlPreview();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
 		bool capturePoint = await TestCapturePoint();
@@ -70,7 +71,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && brawlBuffs && brawlHand && brawlWaves && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && brawlBuffs && brawlHand && brawlWaves && brawlPreview && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1230,6 +1231,63 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: waves scale + spawn Enemy units; survival never wins on an empty field but loses when both eggs fall"
 			: $"FAIL: scales={scales}, spawnedWave={spawnedWave}, noFalseWin={noFalseWin}, lostWhenBothDown={lostWhenBothDown}");
+		return pass;
+	}
+
+	// Chunk 72 (M15): foes-first wave preview. The reshaped brawl loop STAGES the coming wave during the
+	// pause (foes-first) so the eggs can read + counter the threat, then End Turn activates it. We verify
+	// the engine contract that makes "staged but inert" work: a wave enemy dropped into a Pausable node
+	// while the tree is frozen stays put (no chase / no attack / can't trip the lose check), and once the
+	// freeze lifts it springs to life and closes on its foe.
+	private async Task<bool> TestBrawlPreview()
+	{
+		GD.Print("=== UnitTest: foes-first wave preview — inert while paused, active on unfreeze (M15, Chunk 72) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// A Pausable container mirrors the scene's "Units" node: it freezes when the tree pauses.
+		var units = new Node3D { ProcessMode = Node.ProcessModeEnum.Pausable };
+		AddChild(units);
+
+		// A Player-team egg is the foe the wave will chase. Put it at the centre.
+		var capScene = GD.Load<PackedScene>("res://scenes/Captain.tscn");
+		var egg = capScene.Instantiate<Player>();
+		egg.ShowGameOverOnDeath = false;
+		units.AddChild(egg);
+		egg.GlobalPosition = new Vector3(0, 1, 0);
+
+		// Freeze FIRST (as OnPhaseChanged does), THEN stage the wave — the foes must be inert from frame 0.
+		GetTree().Paused = true;
+		var wm = new WaveManager { BaseCount = 1, PerWave = 0, SpawnRadius = 8.0f, SpawnHeight = 1.0f };
+		AddChild(wm);
+		int spawned = wm.SpawnWave(1, units, Vector3.Zero);
+
+		Enemy foe = null;
+		foreach (Node n in units.GetChildren())
+			if (n is Enemy e) { foe = e; break; }
+		bool staged = spawned == 1 && foe != null;
+
+		// While paused: advance several physics frames — the staged foe must NOT move toward the egg.
+		float distBeforeUnpause = staged ? foe.GlobalPosition.DistanceTo(egg.GlobalPosition) : 0f;
+		for (int i = 0; i < 8; i++) await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		float distWhilePaused = staged ? foe.GlobalPosition.DistanceTo(egg.GlobalPosition) : 0f;
+		bool inertWhilePaused = staged && Mathf.Abs(distWhilePaused - distBeforeUnpause) < 0.01f;
+
+		// End Turn lifts the freeze: the same foe now chases and closes the gap.
+		GetTree().Paused = false;
+		for (int i = 0; i < 12; i++) await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		float distAfterUnpause = staged && IsInstanceValid(foe) ? foe.GlobalPosition.DistanceTo(egg.GlobalPosition) : distWhilePaused;
+		bool activeOnUnfreeze = staged && distAfterUnpause < distWhilePaused - 0.2f;
+
+		GetTree().Paused = false;   // never leave the tree frozen for later subtests
+		GD.Print($"staged={staged}, inertWhilePaused={inertWhilePaused} (Δ {Mathf.Abs(distWhilePaused - distBeforeUnpause):0.000}), activeOnUnfreeze={activeOnUnfreeze} ({distWhilePaused:0.0}→{distAfterUnpause:0.0})");
+
+		bool pass = staged && inertWhilePaused && activeOnUnfreeze;
+		GD.Print(pass
+			? "PASS: staged foes sit inert while paused, then chase once the wave begins"
+			: $"FAIL: staged={staged}, inertWhilePaused={inertWhilePaused}, activeOnUnfreeze={activeOnUnfreeze}");
 		return pass;
 	}
 

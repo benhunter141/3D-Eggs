@@ -331,7 +331,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       LevelSelect. All headless-tested. Lose only when BOTH eggs fall. Reuses the M12 card model + `RoundLoop`,
       the M12.7 co-op control schemes / shared camera / `RequireAllPlayersDead`, and the M9 weapon plumbing
       (Chunks 66–71). Decided: buffs apply to whoever played the card; cards play in the PAUSE only; opponent =
-      escalating survival waves. **Chunk 71 balance feel-check pending (needs a gamepad for P2).**
+      escalating survival waves. **Chunk 71 balance feel-check pending (needs a gamepad for P2).** Chunk 72 done:
+      the loop is now foes-first — `CardBrawl.SpawnPreviewWave` stages each wave during the pause (inert in the
+      Pausable Units node while frozen) so both eggs see the threat and counter it with cards; End Turn just
+      unfreezes the staged foes. Refinement still queued: **Chunk 73** reskins the cards (nicer + smaller).
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -388,7 +391,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 
 ---
 
-### ▶ ACTIVE PLAN — M15 Co-op Card Brawl (Chunks 66–71)
+### ▶ ACTIVE PLAN — M15 Co-op Card Brawl (Chunks 66–73)
 
 **The only active plan.** A *local same-screen 2-player* card-driven survival mode. Each player drives a
 **basic egg** (weak punch only) — P1 keyboard+mouse, P2 gamepad (device 0) — and both draw from ONE shared
@@ -423,7 +426,25 @@ opponent = escalating waves; flat per-round energy (`BaseEnergy`, no KotH bonus)
   `BaseEnergy` 5 (arms both eggs + a soldier on wave 1), waves 3 → +2/round on a 17 m ring, 15 s rounds.
   **User feel-check still pending** (needs a gamepad for P2).
 
-**Build order 66 → 71; 66 + 68 are the load-bearing pair (weak egg + buff-the-player card category).**
+**Refinement chunks (72–73) — show-foes-first loop + nicer/smaller cards:**
+
+- [x] **Chunk 72 — Foes-first wave preview ("see the threat, then counter").** The brawl loop now STAGES
+  each wave during the pause: `CardBrawl.SpawnPreviewWave` (called from `OnPhaseChanged` right after
+  `GetTree().Paused = true`, idempotent per wave via `_previewedWave`) drops the coming wave's ring into the
+  Pausable Units node while the world is frozen — so the foes stand inert (no move/attack, can't trip the lose
+  check) and both eggs can read count + composition before committing cards. **End Turn** now just unfreezes
+  (no spawn there) — the staged foes spring to life for the 15 s wave. HUD reads "WAVE N INCOMING — counter the
+  foes". Headless-tested (`TestBrawlPreview`): a wave enemy spawned into a Pausable node while frozen stays put,
+  then chases once unpaused.
+- [ ] **Chunk 73 — Card visual polish (nicer + smaller).** Reskin the `CardBrawl` shared-hand UI so cards
+  read as proper cards and take up less screen space: tighter compact card frames (border + tinted header by
+  `BuffKind`/`CardKind`, title + cost + short icon/desc), a smaller hand footprint that stays fully on-screen
+  for both players, and keep the P1 mouse + P2 gamepad-cursor selection working against the smaller targets.
+  Visual/layout only — the `BrawlHand` routing core, two-click/cursor play, and buff effects stay identical.
+  Verify the hand still fits and both cursors still hit the resized cards.
+
+**Build order 66 → 73; 66 + 68 are the load-bearing pair (weak egg + buff-the-player card category).
+72 reshapes the loop (foes-first), 73 is the card-UI polish.**
 
 ---
 
