@@ -38,7 +38,11 @@ public partial class Player : Unit, ICardPlayer
 	// `Gamepad` reads ONE pad (`DeviceId`) — left stick moves, right stick aims, that pad's
 	// buttons attack/brace/swap/mount. All reads funnel through the public accessors below so
 	// allies (Chunk 45) can consult their captain's brace, etc.
-	public enum ControlScheme { Any, KeyboardMouse, Gamepad }
+	// `Ai` (M15 Co-op Card Brawl redesign): a subordinate egg spawned by a Soldier card. It carries the
+	// full Player weapon/ability machinery (so weapon/ability cards attach to it exactly like a hero egg)
+	// but reads NO device — a tiny chase-and-strike AI fills in move/aim/attack each frame, and it stays
+	// OUT of the "player" group so it isn't a captain for the camera, squad anchor, or the lose check.
+	public enum ControlScheme { Any, KeyboardMouse, Gamepad, Ai }
 	[Export] public ControlScheme Control = ControlScheme.Any;
 	[Export] public int DeviceId = 0;            // which gamepad to read when Control == Gamepad
 
@@ -231,7 +235,10 @@ public partial class Player : Unit, ICardPlayer
 	public override void _Ready()
 	{
 		base._Ready();   // init Health from MaxHealth
-		AddToGroup("player");   // allies find their formation anchor through this group
+		// AI subordinates (M15) are NOT captains: they stay out of "player" so the camera, ally formation
+		// anchor, and GameManager's both-captains-dead lose check only ever see the real hero eggs.
+		if (Control != ControlScheme.Ai)
+			AddToGroup("player");   // allies find their formation anchor through this group
 
 		_swordPivot = GetNode<Node3D>("SwordPivot");
 		_hitbox = GetNode<Area3D>("SwordPivot/Hitbox");
@@ -551,6 +558,11 @@ public partial class Player : Unit, ICardPlayer
 			return;
 		}
 
+		// Subordinate AI (M15): compute this frame's synthetic move/aim/attack intent BEFORE the shared
+		// pipeline reads it, so MoveInput()/Aim()/AttackJustPressed() route through the AI cases below.
+		if (Control == ControlScheme.Ai)
+			UpdateAi(dt);
+
 		// Move read is scheme-aware (Chunk 44): Any = blended action, KeyboardMouse = WASD only,
 		// Gamepad = this pad's left stick. Auto-normalized so diagonals aren't faster.
 		// Screen-up (W / stick up) maps to -Z (away from the camera).
@@ -694,12 +706,61 @@ public partial class Player : Unit, ICardPlayer
 	{
 		Velocity = Vector3.Zero;
 		SetHitboxActive(false);
+		// A subordinate egg (M15) isn't a captain — it just falls and is removed (no game-over reveal).
+		if (Control == ControlScheme.Ai)
+		{
+			QueueFree();
+			return;
+		}
 		// Co-op captains leave the reveal to GameManager (only when EVERY captain is down).
 		if (ShowGameOverOnDeath)
 			foreach (Node n in GetTree().GetNodesInGroup("game_over"))
 				if (n is CanvasItem ci)
 					ci.Visible = true;
 		GD.Print("[Player] GAME OVER");
+	}
+
+	// === Subordinate AI (M15 Co-op Card Brawl) ==========================================
+	// A Soldier-card egg has no device; this fills in its move/aim/attack intent each frame: hunt the
+	// nearest opposing unit (via the same UnitRegistry the rest of the AI uses), close to weapon reach,
+	// face it, strike on cooldown, and auto-cast a granted ability when it has a target. Cheap (a handful
+	// of subordinates), so it rescans every frame — no caching needed.
+	[Export] public float AiStopRangeFrac = 0.85f;   // close to this fraction of reach, then hold and strike
+	private Vector2 _aiMoveInput;                      // synthetic MoveInput() for the Ai scheme
+	private bool _aiWantAttack;                        // synthetic AttackJustPressed() for the Ai scheme
+	private Unit _aiTarget;                            // current quarry (live position chased each frame)
+
+	private void UpdateAi(float dt)
+	{
+		_aiTarget = UnitRegistry.FindNearestOpponent(Team, GlobalPosition);
+		if (_aiTarget == null || !IsInstanceValid(_aiTarget) || _aiTarget.IsDead)
+		{
+			_aiMoveInput = Vector2.Zero;
+			_aiWantAttack = false;
+			_aiTarget = null;
+			return;
+		}
+
+		Vector3 to = _aiTarget.GlobalPosition - GlobalPosition;
+		to.Y = 0f;
+		float dist = to.Length();
+		float stop = EffectiveReach * AiStopRangeFrac;
+		_aiMoveInput = dist > stop && dist > 0.001f
+			? new Vector2(to.X, to.Z) / dist          // unit XZ toward the quarry
+			: Vector2.Zero;                            // in range — stand and strike
+		_aiWantAttack = dist <= EffectiveReach;        // UpdateSwing's cooldown gates the actual cadence
+	}
+
+	// Turn an AI subordinate to face its quarry (forward is -Z), rate-limited like every other aim.
+	private void AimAi(float dt)
+	{
+		if (_aiTarget == null || !IsInstanceValid(_aiTarget))
+			return;
+		Vector3 to = _aiTarget.GlobalPosition - GlobalPosition;
+		to.Y = 0f;
+		if (to.LengthSquared() < 0.0025f)
+			return;
+		TurnTowardYaw(Mathf.Atan2(-to.X, -to.Z), dt);
 	}
 
 	// Rotate the player toward the mouse cursor. We shoot a ray from the camera
@@ -741,7 +802,11 @@ public partial class Player : Unit, ICardPlayer
 	// toward the right stick instead. Either way the turn is rate-limited by TurnTowardYaw.
 	private void Aim(float dt)
 	{
-		if (Control == ControlScheme.Gamepad)
+		if (Control == ControlScheme.Ai)
+		{
+			AimAi(dt);
+		}
+		else if (Control == ControlScheme.Gamepad)
 		{
 			Vector2 stick = StickVector(JoyAxis.RightX, JoyAxis.RightY, AimDeadzone);
 			if (stick != Vector2.Zero)                       // below deadzone = no re-aim, hold facing
@@ -774,14 +839,18 @@ public partial class Player : Unit, ICardPlayer
 	// Move intent on the XZ input plane (x = right, y = screen-down). Length ≤ 1.
 	public Vector2 MoveInput() => Control switch
 	{
+		ControlScheme.Ai            => _aiMoveInput,
 		ControlScheme.KeyboardMouse => KeyboardMove(),
 		ControlScheme.Gamepad       => StickVector(JoyAxis.LeftX, JoyAxis.LeftY, MoveDeadzone),
 		_                           => Input.GetVector("move_left", "move_right", "move_up", "move_down"),
 	};
 
-	// One-frame edges for attack / swap / mount; held state for brace.
+	// One-frame edges for attack / swap / mount; held state for brace. The Ai scheme never reads a
+	// device (so a hero's keystroke can't drive every subordinate) — it returns its synthetic intent,
+	// and false for the controls a subordinate has no use for (swap / mount / brace / squad commands).
 	public bool AttackJustPressed() => Control switch
 	{
+		ControlScheme.Ai            => _aiWantAttack,
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsMouseButtonPressed(MouseButton.Left), ref _attackHeldPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, AttackButton), ref _attackHeldPrev),
 		_                           => Input.IsActionJustPressed("attack"),
@@ -789,6 +858,7 @@ public partial class Player : Unit, ICardPlayer
 
 	public bool SwapJustPressed() => Control switch
 	{
+		ControlScheme.Ai            => false,
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.Q), ref _swapHeldPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, SwapButton), ref _swapHeldPrev),
 		_                           => Input.IsActionJustPressed("swap_weapon"),
@@ -796,6 +866,7 @@ public partial class Player : Unit, ICardPlayer
 
 	public bool MountJustPressed() => Control switch
 	{
+		ControlScheme.Ai            => false,
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.E), ref _mountHeldPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, MountButton), ref _mountHeldPrev),
 		_                           => Input.IsActionJustPressed("mount"),
@@ -803,6 +874,7 @@ public partial class Player : Unit, ICardPlayer
 
 	public bool BraceHeld() => Control switch
 	{
+		ControlScheme.Ai            => false,
 		ControlScheme.KeyboardMouse => Input.IsMouseButtonPressed(MouseButton.Right) || Input.IsPhysicalKeyPressed(Key.Space),
 		ControlScheme.Gamepad       => Input.IsJoyButtonPressed(DeviceId, BraceButton),
 		_                           => Input.IsActionPressed("brace"),
@@ -811,6 +883,7 @@ public partial class Player : Unit, ICardPlayer
 	// Squad-command edges (M7, Chunk 49): F / H / G (keyboard) or left-shoulder / d-pad (gamepad).
 	public bool CommandFollowPressed() => Control switch
 	{
+		ControlScheme.Ai            => false,
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.F), ref _cmdFollowPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CmdFollowButton), ref _cmdFollowPrev),
 		_                           => Input.IsActionJustPressed("command_follow"),
@@ -818,6 +891,7 @@ public partial class Player : Unit, ICardPlayer
 
 	public bool CommandHoldPressed() => Control switch
 	{
+		ControlScheme.Ai            => false,
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.H), ref _cmdHoldPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CmdHoldButton), ref _cmdHoldPrev),
 		_                           => Input.IsActionJustPressed("command_hold"),
@@ -825,14 +899,17 @@ public partial class Player : Unit, ICardPlayer
 
 	public bool CommandAttackPressed() => Control switch
 	{
+		ControlScheme.Ai            => false,
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.G), ref _cmdAttackPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CmdAttackButton), ref _cmdAttackPrev),
 		_                           => Input.IsActionJustPressed("command_attack"),
 	};
 
-	// Cast-ability edge (M15, Chunk 67): C (keyboard) or gamepad A.
+	// Cast-ability edge (M15, Chunk 67): C (keyboard) or gamepad A. A subordinate auto-casts a granted
+	// ability whenever it has a quarry (its cooldown gates the cadence).
 	public bool CastJustPressed() => Control switch
 	{
+		ControlScheme.Ai            => _aiTarget != null,
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.C), ref _castHeldPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CastButton), ref _castHeldPrev),
 		_                           => Input.IsActionJustPressed("cast_ability"),

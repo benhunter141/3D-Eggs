@@ -46,6 +46,7 @@ public partial class UnitTest : Node3D
 		bool brawlHand = TestBrawlHandRouting();
 		bool brawlWaves = await TestBrawlWaves();
 		bool brawlPreview = await TestBrawlPreview();
+		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
 		bool capturePoint = await TestCapturePoint();
@@ -71,7 +72,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && brawlBuffs && brawlHand && brawlWaves && brawlPreview && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && brawlBuffs && brawlHand && brawlWaves && brawlPreview && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1288,6 +1289,45 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: staged foes sit inert while paused, then chase once the wave begins"
 			: $"FAIL: staged={staged}, inertWhilePaused={inertWhilePaused}, activeOnUnfreeze={activeOnUnfreeze}");
+		return pass;
+	}
+
+	// M15 redesign: the squad placement grid. A soldier card attaches in one of the four cardinal
+	// directions next to an egg you control and can't overlap a taken cell — so ValidPlacements returns
+	// the empty 4-neighbours of the anchors, deduplicated and with occupied cells removed.
+	private bool TestSquadGrid()
+	{
+		GD.Print("=== UnitTest: squad placement grid (M15 redesign) ===");
+
+		// World <-> cell round-trips through a cell centre.
+		Vector2I cell = SquadGrid.WorldToCell(SquadGrid.CellToWorld(new Vector2I(3, -2), 1f));
+		bool roundTrip = cell == new Vector2I(3, -2);
+
+		// Lone anchor at origin (occupied by the egg itself): exactly its 4 free neighbours.
+		var anchorsOne = new System.Collections.Generic.List<Vector2I> { new Vector2I(0, 0) };
+		var occOne = new System.Collections.Generic.HashSet<Vector2I> { new Vector2I(0, 0) };
+		var p1 = SquadGrid.ValidPlacements(anchorsOne, occOne);
+		bool fourFree = p1.Count == 4
+			&& p1.Contains(new Vector2I(1, 0)) && p1.Contains(new Vector2I(-1, 0))
+			&& p1.Contains(new Vector2I(0, 1)) && p1.Contains(new Vector2I(0, -1));
+
+		// Block one neighbour: it drops out (no overlap).
+		var occBlocked = new System.Collections.Generic.HashSet<Vector2I> { new Vector2I(0, 0), new Vector2I(1, 0) };
+		var p2 = SquadGrid.ValidPlacements(anchorsOne, occBlocked);
+		bool blocked = p2.Count == 3 && !p2.Contains(new Vector2I(1, 0));
+
+		// Two adjacent anchors: union of their free neighbours, deduplicated (6 cells, none repeated).
+		var anchorsTwo = new System.Collections.Generic.List<Vector2I> { new Vector2I(0, 0), new Vector2I(1, 0) };
+		var occTwo = new System.Collections.Generic.HashSet<Vector2I> { new Vector2I(0, 0), new Vector2I(1, 0) };
+		var p3 = SquadGrid.ValidPlacements(anchorsTwo, occTwo);
+		bool dedup = p3.Count == 6 && new System.Collections.Generic.HashSet<Vector2I>(p3).Count == 6
+			&& !p3.Contains(new Vector2I(0, 0)) && !p3.Contains(new Vector2I(1, 0));
+
+		GD.Print($"roundTrip={roundTrip}, fourFree={fourFree}, blocked={blocked}, dedup={dedup}");
+		bool pass = roundTrip && fourFree && blocked && dedup;
+		GD.Print(pass
+			? "PASS: squad grid returns deduped, non-overlapping 4-adjacent placements"
+			: "FAIL: squad grid placement wrong");
 		return pass;
 	}
 

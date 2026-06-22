@@ -1,54 +1,96 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 
-// Co-op Card Brawl front-end (M15, Chunks 69–70). Two weak eggs (P1 keyboard+mouse, P2 gamepad) share
-// ONE hand of player-buff cards and ONE energy pool. The battle runs the M12 RoundLoop: it starts
-// PAUSED so the players spend energy to arm up / spawn soldiers, then End Turn begins a 15 s survival
-// WAVE — the WaveManager spawns an escalating ring of enemies and the frozen world unfreezes to fight.
-// At the timeout it auto-pauses, redeals a fresh hand, refills flat energy, and queues the next (harder)
-// wave. Lose only when BOTH eggs fall (GameManager.RequireAllPlayersDead + the eggs' ShowGameOverOnDeath
-// = false); survival has no win (GameManager.DisableWin).
+// Co-op Card Brawl front-end (M15, rebuilt). Two weak eggs (P1 keyboard+mouse, P2 gamepad) share ONE
+// hand of cards but each spends their OWN energy. The battle runs the M12 RoundLoop: it starts PAUSED so
+// the players spend energy to arm up / spawn soldiers, then a 3-2-1 countdown leads into a 15 s survival
+// WAVE — the WaveManager's foes (staged inert during the pause so they can be seen + countered) spring to
+// life. At the timeout it auto-pauses, redeals a fresh hand, refills each player's energy, and queues the
+// next (harder) wave. Lose only when BOTH eggs fall (GameManager.RequireAllPlayersDead + DisableWin).
 //
-// Cards play ONLY in the pause, and each play is tagged with the egg that triggered it so the buff lands
-// on THAT egg: P1 clicks a card with the mouse; P2 moves a cursor with the d-pad/stick and confirms with
-// A. The routing core is the headless-tested BrawlHand; this node is the UI + two-device input shell.
+// PLAY FLOW (the redesign): a card is never resolved blind. You pick a card, THEN choose WHERE it lands —
+//   · a weapon / ability card attaches to one of YOUR eggs (your hero or a soldier you control);
+//   · a soldier card attaches to a free cell in one of the four cardinal directions next to an egg you
+//     control (a SquadGrid placement — you build a little tile-squad, and it can't overlap a taken space).
+// Confirming spawns/equips immediately (so the squad visibly forms while frozen), marks the card SELECTED
+// (it stays in hand, the energy is reserved) and is reversible: click a selected card to UNSELECT it
+// (refund + undo) any time before End Turn. End Turn locks the selections in and runs the countdown.
+//
+// Targeting input mirrors the two devices: P1 clicks cards + on-field markers with the mouse (right-click
+// cancels); P2 moves a cursor with the d-pad/stick over the hand or the markers and confirms with A
+// (B cancels), Start ends the turn.
 public partial class CardBrawl : Node3D
 {
 	[Export] public int HandSize = 5;
-	[Export] public int BaseEnergy = 5;          // flat energy granted every wave (no KotH bonus in the brawl)
+	[Export] public int BaseEnergy = 5;          // flat energy granted to EACH player every wave
 	[Export] public float RoundSeconds = 15f;    // length of a survival wave before it auto-pauses
+	[Export] public float CountdownSeconds = 3f;  // 3-2-1 before the wave starts
+	[Export] public float SpawnHeight = 1.0f;     // ground height soldiers/markers sit at
+	[Export] public string SoldierScenePath = "res://scenes/Captain.tscn";   // a subordinate egg (AI-driven)
 
 	private readonly Deck _deck = new();
-	private EnergyPool _energy;
 	private RoundLoop _round;
-	private BrawlHand _hand;
 	private WaveManager _waves;
-	private Node _units;                          // container the eggs live in + spawned enemies drop into
+	private Node _units;                          // Pausable container the eggs + spawned enemies live in
 
-	private readonly List<Player> _players = new();        // [0] = P1, [1] = P2 (by control scheme)
-	private readonly List<ICardPlayer> _cardPlayers = new();
+	private readonly List<Player> _players = new();             // [0] = P1, [1] = P2 (by control scheme)
+	private readonly EnergyPool[] _energies = new EnergyPool[2];  // per-player energy (the redesign)
+	private readonly List<Player>[] _subordinates =              // soldier eggs each player has placed
+		{ new List<Player>(), new List<Player>() };
 
-	// UI
-	private Label _phaseLabel, _energyLabel, _promptLabel, _waveLabel, _drawCount, _discardCount;
+	private PackedScene _soldierScene;
+
+	// ── Selection / targeting state ────────────────────────────────────────────────────────────────────
+	// A resolved-but-reversible play: the card stays in hand marked SELECTED until End Turn.
+	private class Selection { public int Player; public Card Card; public Action Undo; }
+	private readonly Dictionary<int, Selection> _selections = new();   // keyed by hand index (stable in a pause)
+
+	// A candidate target while a card is armed: where it would land + the change to make (returns its undo).
+	private struct Candidate { public Vector3 World; public Func<Action> Apply; }
+
+	private class Armed
+	{
+		public int Player;
+		public int HandIndex;
+		public Card Card;
+		public List<Candidate> Candidates = new();
+		public List<Button> Markers = new();
+	}
+	private readonly Armed[] _armed = new Armed[2];   // one in-progress targeting per player
+
+	// ── Countdown ──────────────────────────────────────────────────────────────────────────────────────
+	private bool _countingDown;
+	private float _countdownLeft;
+
+	private int _previewedWave;                   // foes-first: highest wave already staged in a pause
+
+	// ── UI ───────────────────────────────────────────────────────────────────────────────────────────
+	private Control _root;
+	private Label _phaseLabel, _waveLabel, _promptLabel, _countdownLabel;
+	private Label _energyP1, _energyP2, _drawCount, _discardCount;
 	private HBoxContainer _handBox;
 	private Button _endTurnButton;
 	private readonly List<Button> _handButtons = new();
 
-	private int _previewedWave;                   // foes-first (Chunk 72): highest wave already staged in a pause
-
-	// P2 gamepad selection + edge-detect state (device 0).
+	// P2 gamepad edge-detect state (device 0).
 	private int _p2Cursor;
-	private bool _navLeftPrev, _navRightPrev, _confirmPrev, _endTurnPrev;
-	private const JoyButton ConfirmButton = JoyButton.A;      // play the cursor card
-	private const JoyButton EndTurnButton = JoyButton.Start;  // begin the wave
-	private static readonly Color CursorTint = new(0.7f, 1.0f, 0.7f);
+	private bool _navLeftPrev, _navRightPrev, _confirmPrev, _cancelPrev, _endTurnPrev;
+	private bool _rmbPrev;                          // P1 right-click cancel edge
+	private const JoyButton ConfirmButton = JoyButton.A;
+	private const JoyButton CancelButton  = JoyButton.B;
+	private const JoyButton EndTurnButton = JoyButton.Start;
+
+	private static readonly Color CursorTint  = new(0.7f, 1.0f, 0.7f);
+	private static readonly Color P1Color     = new(0.55f, 0.78f, 1.0f);   // mouse player
+	private static readonly Color P2Color     = new(1.0f, 0.78f, 0.5f);    // gamepad player
 
 	public override void _Ready()
 	{
-		ProcessMode = ProcessModeEnum.Always;   // keep ticking + driving the UI while the world is frozen
+		ProcessMode = ProcessModeEnum.Always;   // keep driving the UI while the world is frozen
 
-		// Find the two eggs (assigned by control scheme; fall back to scene order). The first egg's
-		// parent is the Units container both soldiers and wave enemies are dropped into.
+		// Find the two hero eggs (assigned by control scheme; fall back to scene order). Their parent is
+		// the Pausable Units container soldiers + wave enemies drop into.
 		Player p1 = null, p2 = null;
 		var ordered = new List<Player>();
 		foreach (Node n in GetTree().GetNodesInGroup("player"))
@@ -61,17 +103,18 @@ public partial class CardBrawl : Node3D
 		if (p1 == null && ordered.Count > 0) p1 = ordered[0];
 		if (p2 == null) foreach (Player p in ordered) if (p != p1) { p2 = p; break; }
 		_players.Add(p1); _players.Add(p2);
-		_cardPlayers.Add(p1); _cardPlayers.Add(p2);
 		_units = p1 != null ? p1.GetParent() : (Node)this;
+
+		_soldierScene = GD.Load<PackedScene>(SoldierScenePath);
 
 		_waves = GetNodeOrNull<WaveManager>("WaveManager");
 		if (_waves == null) { _waves = new WaveManager { Name = "WaveManager" }; AddChild(_waves); }
 
 		_round = new RoundLoop(RoundSeconds);
 		_round.PhaseChanged += OnPhaseChanged;
-		_energy = new EnergyPool(BaseEnergy, 0);
+		_energies[0] = new EnergyPool(BaseEnergy, 0);
+		_energies[1] = new EnergyPool(BaseEnergy, 0);
 		_deck.LoadStarter(CardLibrary.BrawlDeck());
-		_hand = new BrawlHand(_deck, _energy);
 
 		BuildUi();
 
@@ -81,83 +124,293 @@ public partial class CardBrawl : Node3D
 		Refresh();
 	}
 
-	// GetTree().Paused is global and survives scene changes — always lift it on the way out.
 	public override void _ExitTree() => GetTree().Paused = false;
 
 	public override void _Process(double delta)
 	{
+		if (_countingDown)
+		{
+			_countdownLeft -= (float)delta;
+			if (_countdownLabel != null)
+				_countdownLabel.Text = _countdownLeft > 0f ? Mathf.CeilToInt(_countdownLeft).ToString() : "FIGHT!";
+			if (_countdownLeft <= 0f)
+				StartWave();
+			PollGamepad();
+			return;
+		}
+
 		RoundLoop.Phase before = _round.Current;
 		_round.Tick((float)delta);
 		if (before == RoundLoop.Phase.Play && _round.Current == RoundLoop.Phase.Pause)
 			OnRoundTimeout();
 		UpdatePhaseHud();
 
+		PositionMarkers();
+		PollMouseCancel();
 		PollGamepad();
 	}
 
-	// P2's two-device hand control (device 0): d-pad / left-stick move the cursor, A confirms, Start ends
-	// the turn. Only the cursor moves + confirms in the pause (cards play between waves).
+	// ── Per-player gamepad hand/target control (device 0) ──────────────────────────────────────────────
 	private void PollGamepad()
 	{
 		float x = Input.GetJoyAxis(0, JoyAxis.LeftX);
-		bool left  = Input.IsJoyButtonPressed(0, JoyButton.DpadLeft)  || x < -0.5f;
-		bool right = Input.IsJoyButtonPressed(0, JoyButton.DpadRight) || x >  0.5f;
+		bool left    = Input.IsJoyButtonPressed(0, JoyButton.DpadLeft)  || x < -0.5f;
+		bool right   = Input.IsJoyButtonPressed(0, JoyButton.DpadRight) || x >  0.5f;
 		bool confirm = Input.IsJoyButtonPressed(0, ConfirmButton);
+		bool cancel  = Input.IsJoyButtonPressed(0, CancelButton);
 		bool endTurn = Input.IsJoyButtonPressed(0, EndTurnButton);
 
-		if (_round.Current == RoundLoop.Phase.Pause && _handButtons.Count > 0)
+		if (!_countingDown && _round.Current == RoundLoop.Phase.Pause)
 		{
-			if (left && !_navLeftPrev)   MoveCursor(-1);
-			if (right && !_navRightPrev) MoveCursor(+1);
-			if (confirm && !_confirmPrev) PlayHandCard(_p2Cursor, 1);
+			Armed a = _armed[1];
+			if (a != null)   // P2 is choosing a target
+			{
+				if (a.Markers.Count > 0)
+				{
+					if (left  && !_navLeftPrev)  MoveP2Cursor(-1, a.Markers.Count);
+					if (right && !_navRightPrev) MoveP2Cursor(+1, a.Markers.Count);
+					if (confirm && !_confirmPrev) ConfirmCandidate(a, _p2Cursor);
+				}
+				if (cancel && !_cancelPrev) DisarmPlayer(1);
+			}
+			else             // P2 is browsing the hand
+			{
+				if (_handButtons.Count > 0)
+				{
+					if (left  && !_navLeftPrev)  MoveP2Cursor(-1, _handButtons.Count);
+					if (right && !_navRightPrev) MoveP2Cursor(+1, _handButtons.Count);
+					if (confirm && !_confirmPrev) ArmOrToggle(1, _p2Cursor);
+				}
+			}
+			if (endTurn && !_endTurnPrev) RequestEndTurn();
 		}
-		if (endTurn && !_endTurnPrev) OnEndTurn();
 
-		_navLeftPrev = left; _navRightPrev = right; _confirmPrev = confirm; _endTurnPrev = endTurn;
+		_navLeftPrev = left; _navRightPrev = right; _confirmPrev = confirm;
+		_cancelPrev = cancel; _endTurnPrev = endTurn;
 	}
 
-	private void MoveCursor(int step)
+	private void MoveP2Cursor(int step, int count)
 	{
-		if (_handButtons.Count == 0)
-			return;
-		_p2Cursor = Mathf.PosMod(_p2Cursor + step, _handButtons.Count);
+		_p2Cursor = Mathf.PosMod(_p2Cursor + step, Mathf.Max(1, count));
 		ApplyCursorTint();
 	}
 
-	// Play hand[handIndex] on player[playerIndex] (0 = P1, 1 = P2). Cards play only in the pause; the buff
-	// lands on the triggering egg. Public so the headless test can drive routing without faking devices.
-	public bool PlayHandCard(int handIndex, int playerIndex)
+	// P1 right-click cancels an in-progress targeting.
+	private void PollMouseCancel()
 	{
-		if (_round.Current != RoundLoop.Phase.Pause)
-		{
-			if (_promptLabel != null) _promptLabel.Text = "Play cards between waves (during the pause).";
-			return false;
-		}
-		bool ok = _hand.Play(handIndex, playerIndex, _cardPlayers);
-		if (!ok && _promptLabel != null)
-			_promptLabel.Text = "Can't play that (not enough energy?).";
-		if (ok)
-			Refresh();
-		return ok;
+		bool rmb = Input.IsMouseButtonPressed(MouseButton.Right);
+		if (rmb && !_rmbPrev && _armed[0] != null)
+			DisarmPlayer(0);
+		_rmbPrev = rmb;
 	}
 
-	private void OnCardClicked(int index) => PlayHandCard(index, 0);   // P1 = mouse
+	// ── Card selection / targeting ─────────────────────────────────────────────────────────────────────
 
-	// End Turn BEGINS the wave: the foes were already STAGED during the pause (foes-first, Chunk 72), so
-	// this just unfreezes the world — the previewed enemies spring to life and the 15 s clock starts.
-	private void OnEndTurn()
+	// P1 clicks a hand card with the mouse.
+	private void OnHandPressed(int handIndex)
 	{
-		if (_round.Current != RoundLoop.Phase.Pause)
+		if (_countingDown || _round.Current != RoundLoop.Phase.Pause)
 			return;
-		_round.EndTurn();                       // -> PLAY (OnPhaseChanged unfreezes the staged foes)
+		if (_armed[0] != null) DisarmPlayer(0);   // clicking the hand abandons an in-progress aim
+		ArmOrToggle(0, handIndex);
+	}
+
+	// Arm a fresh card for targeting, or — if it's already SELECTED — unselect it (refund + undo).
+	private void ArmOrToggle(int player, int handIndex)
+	{
+		if (handIndex < 0 || handIndex >= _deck.Hand.Count)
+			return;
+		if (_selections.ContainsKey(handIndex))
+		{
+			Unselect(handIndex);
+			return;
+		}
+
+		Card card = _deck.Hand[handIndex];
+		if (!_energies[player].CanAfford(card))
+		{
+			SetPrompt($"P{player + 1}: not enough energy for {card.Title}.");
+			return;
+		}
+
+		List<Candidate> candidates = BuildCandidates(player, card);
+		if (candidates.Count == 0)
+		{
+			SetPrompt(card.Buff == Card.BuffKind.Soldier
+				? $"P{player + 1}: no free space to place a soldier (need a controlled egg)."
+				: $"P{player + 1}: no egg to attach {card.Title} to.");
+			return;
+		}
+
+		DisarmPlayer(player);
+		var armed = new Armed { Player = player, HandIndex = handIndex, Card = card, Candidates = candidates };
+		_armed[player] = armed;
+		BuildMarkers(armed);
+		SetPrompt(card.Buff == Card.BuffKind.Soldier
+			? $"P{player + 1}: choose a spot to place {card.Title}."
+			: $"P{player + 1}: choose an egg for {card.Title}.");
 		Refresh();
 	}
 
-	// Foes-first (Chunk 72): stage the coming wave DURING the pause so both eggs can SEE the threat
-	// (count + composition) and spend energy to counter it before committing. The foes drop into the
-	// Pausable Units node while the world is frozen, so they stand inert — no move/attack, can't trip the
-	// lose check — until End Turn unfreezes them. Spawns at most once per wave number (idempotent across
-	// repeated pause edges).
+	private void Unselect(int handIndex)
+	{
+		Selection sel = _selections[handIndex];
+		sel.Undo?.Invoke();
+		_energies[sel.Player].Add(sel.Card.EnergyCost);   // refund the reserved energy
+		_selections.Remove(handIndex);
+		SetPrompt($"P{sel.Player + 1}: unselected {sel.Card.Title}.");
+		Refresh();
+	}
+
+	// Resolve the armed card on the chosen candidate: perform the change, reserve energy, mark SELECTED.
+	private void ConfirmCandidate(Armed a, int index)
+	{
+		if (index < 0 || index >= a.Candidates.Count)
+			return;
+		Action undo = a.Candidates[index].Apply();
+		_energies[a.Player].Spend(a.Card);
+		_selections[a.HandIndex] = new Selection { Player = a.Player, Card = a.Card, Undo = undo };
+		SetPrompt($"P{a.Player + 1}: selected {a.Card.Title} (click it to unselect).");
+		DisarmPlayer(a.Player);
+		Refresh();
+	}
+
+	private void OnMarkerClicked(int player, int index)
+	{
+		if (_armed[player] != null)
+			ConfirmCandidate(_armed[player], index);
+	}
+
+	private void DisarmPlayer(int player)
+	{
+		Armed a = _armed[player];
+		if (a == null)
+			return;
+		foreach (Button m in a.Markers)
+			if (IsInstanceValid(m)) m.QueueFree();
+		_armed[player] = null;
+		if (player == 1) { _p2Cursor = 0; ApplyCursorTint(); }
+	}
+
+	// Candidate targets for `card` played by `player`: weapon/ability -> the player's controlled eggs;
+	// soldier -> the valid 4-adjacent placement cells around them.
+	private List<Candidate> BuildCandidates(int player, Card card)
+	{
+		var list = new List<Candidate>();
+		if (card.Buff == Card.BuffKind.Soldier)
+		{
+			var anchors = new List<Vector2I>();
+			foreach (Player egg in ControlledEggs(player))
+				anchors.Add(SquadGrid.WorldToCell(egg.GlobalPosition));
+			HashSet<Vector2I> occupied = AllOccupiedCells();
+			foreach (Vector2I cell in SquadGrid.ValidPlacements(anchors, occupied))
+			{
+				Vector2I c = cell;   // capture
+				Vector3 world = SquadGrid.CellToWorld(c, SpawnHeight);
+				list.Add(new Candidate { World = world + Vector3.Up * 0.4f, Apply = () => SpawnSoldier(player, c, card) });
+			}
+		}
+		else   // Weapon / Ability
+		{
+			foreach (Player egg in ControlledEggs(player))
+			{
+				Player e = egg;   // capture
+				list.Add(new Candidate { World = e.GlobalPosition + Vector3.Up * 1.5f, Apply = () => ApplyBuff(e, card) });
+			}
+		}
+		return list;
+	}
+
+	// Equip a weapon / grant an ability on `egg`, returning the undo that restores its prior loadout.
+	private Action ApplyBuff(Player egg, Card card)
+	{
+		if (card.Buff == Card.BuffKind.Ability)
+		{
+			Player.AbilityType prev = egg.CurrentAbility;
+			egg.GrantAbility(card.BuffAbility);
+			return () => { if (IsInstanceValid(egg)) egg.GrantAbility(prev); };
+		}
+		Player.WeaponType prevW = egg.CurrentWeapon;
+		egg.EquipWeapon(card.BuffWeapon);
+		return () => { if (IsInstanceValid(egg)) egg.EquipWeapon(prevW); };
+	}
+
+	// Spawn a subordinate egg (AI-driven) at the chosen grid cell on the player's team; undo frees it.
+	private Action SpawnSoldier(int player, Vector2I cell, Card card)
+	{
+		Player hero = _players[player];
+		var egg = _soldierScene.Instantiate<Player>();   // a subordinate egg (AI-driven)
+		egg.Control = Player.ControlScheme.Ai;
+		egg.StartUnarmed = true;
+		egg.ShowGameOverOnDeath = false;
+		egg.Team = hero != null ? hero.Team : Unit.TeamId.Player;
+		_units.AddChild(egg);
+		egg.GlobalPosition = SquadGrid.CellToWorld(cell, SpawnHeight);
+		_subordinates[player].Add(egg);
+		return () =>
+		{
+			_subordinates[player].Remove(egg);
+			if (IsInstanceValid(egg)) egg.QueueFree();
+		};
+	}
+
+	// The eggs a player controls right now: their hero (if alive) + their living soldiers.
+	private IEnumerable<Player> ControlledEggs(int player)
+	{
+		Player hero = _players[player];
+		if (hero != null && IsInstanceValid(hero) && !hero.IsDead)
+			yield return hero;
+		// Prune dead/freed soldiers as we go.
+		List<Player> subs = _subordinates[player];
+		for (int i = subs.Count - 1; i >= 0; i--)
+		{
+			Player s = subs[i];
+			if (s == null || !IsInstanceValid(s) || s.IsDead)
+				subs.RemoveAt(i);
+			else
+				yield return s;
+		}
+	}
+
+	// Every cell currently occupied by a standing unit (either team) — a soldier can't be placed onto one.
+	private HashSet<Vector2I> AllOccupiedCells()
+	{
+		var set = new HashSet<Vector2I>();
+		foreach (Node n in GetTree().GetNodesInGroup("units"))
+			if (n is Unit u && IsInstanceValid(u) && !u.IsDead)
+				set.Add(SquadGrid.WorldToCell(u.GlobalPosition));
+		return set;
+	}
+
+	// ── Round flow ─────────────────────────────────────────────────────────────────────────────────────
+
+	// End Turn: cancel any in-progress aim, lock the selections, run the 3-2-1, then start the wave.
+	private void RequestEndTurn()
+	{
+		if (_countingDown || _round.Current != RoundLoop.Phase.Pause)
+			return;
+		DisarmPlayer(0);
+		DisarmPlayer(1);
+		_countingDown = true;
+		_countdownLeft = Mathf.Max(0.1f, CountdownSeconds);
+		if (_countdownLabel != null) { _countdownLabel.Visible = true; _countdownLabel.Text = Mathf.CeilToInt(_countdownLeft).ToString(); }
+		if (_endTurnButton != null) { _endTurnButton.Disabled = true; _endTurnButton.Text = "Starting…"; }
+		Refresh();
+	}
+
+	// Countdown finished: selections lock in (undo discarded), the wave begins (foes unfreeze).
+	private void StartWave()
+	{
+		_countingDown = false;
+		_selections.Clear();
+		if (_countdownLabel != null) _countdownLabel.Visible = false;
+		_round.EndTurn();   // -> PLAY (OnPhaseChanged unfreezes the staged foes)
+		Refresh();
+	}
+
+	private void OnEndTurnButtonPressed() => RequestEndTurn();
+
+	// Foes-first: stage the coming wave DURING the pause so both eggs can SEE the threat and counter it.
 	private void SpawnPreviewWave()
 	{
 		int wave = _round.RoundNumber;
@@ -167,19 +420,25 @@ public partial class CardBrawl : Node3D
 		_waves.SpawnWave(wave, _units, ArenaCenter());
 	}
 
-	// A wave survived (clock ran out): discard the spent hand, refill flat energy, deal a fresh hand. The
-	// next (harder) wave is queued for the next End Turn.
+	// A wave survived: discard the spent hand, refill both players' energy, deal a fresh hand. Selections
+	// were already locked at StartWave, so clear the per-pause targeting state for the new hand.
 	private void OnRoundTimeout()
 	{
 		_deck.DiscardHand();
 		RefillEnergy();
 		_deck.Draw(HandSize);
+		_selections.Clear();
+		DisarmPlayer(0);
+		DisarmPlayer(1);
 		Refresh();
 	}
 
-	private void RefillEnergy() => _energy.Refill(0);   // flat BaseEnergy each wave (no held ground)
+	private void RefillEnergy()
+	{
+		_energies[0].Refill(0);
+		_energies[1].Refill(0);
+	}
 
-	// Midpoint of the eggs (the wave rings around them); origin if no eggs.
 	private Vector3 ArenaCenter()
 	{
 		Vector3 sum = Vector3.Zero;
@@ -191,9 +450,7 @@ public partial class CardBrawl : Node3D
 		return c;
 	}
 
-	// Freeze the world while paused (eggs/soldiers/enemies are in the Pausable Units node), run it while
-	// playing. This node + the UI are Always, so cards stay clickable in the pause. End Turn is live only
-	// while paused (it begins the wave).
+	// Freeze while paused, run while playing. This node + the UI are Always, so cards stay interactive.
 	private void OnPhaseChanged(RoundLoop.Phase phase)
 	{
 		bool paused = phase == RoundLoop.Phase.Pause;
@@ -202,8 +459,8 @@ public partial class CardBrawl : Node3D
 			SpawnPreviewWave();   // freeze FIRST, then stage the coming wave so it's inert from frame 0
 		if (_endTurnButton != null)
 		{
-			_endTurnButton.Disabled = !paused;
-			_endTurnButton.Text = paused ? "End Turn — start wave  ▶" : "Wave in progress…";
+			_endTurnButton.Disabled = !paused || _countingDown;
+			_endTurnButton.Text = paused ? "End Turn  ▶" : "Wave in progress…";
 		}
 		UpdatePhaseHud();
 		Refresh();
@@ -214,26 +471,38 @@ public partial class CardBrawl : Node3D
 	{
 		var ui = new CanvasLayer { Name = "Ui" };
 		AddChild(ui);
-		var root = new Control();
-		root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-		root.MouseFilter = Control.MouseFilterEnum.Ignore;
-		ui.AddChild(root);
+		_root = new Control();
+		_root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		_root.MouseFilter = Control.MouseFilterEnum.Ignore;
+		ui.AddChild(_root);
 
-		_phaseLabel = MakeLabel(root, Control.LayoutPreset.TopWide, 16, 56, 26, new Color(1f, 0.85f, 0.55f));
+		_phaseLabel = MakeLabel(_root, Control.LayoutPreset.TopWide, 16, 56, 26, new Color(1f, 0.85f, 0.55f));
 		_phaseLabel.HorizontalAlignment = HorizontalAlignment.Center;
-		_waveLabel = MakeLabel(root, Control.LayoutPreset.TopWide, 60, 92, 20, new Color(0.92f, 0.88f, 0.72f));
+		_waveLabel = MakeLabel(_root, Control.LayoutPreset.TopWide, 60, 92, 18, new Color(0.92f, 0.88f, 0.72f));
 		_waveLabel.HorizontalAlignment = HorizontalAlignment.Center;
 
-		_energyLabel = MakeLabel(root, Control.LayoutPreset.TopLeft, 20, 48, 22, new Color(0.7f, 1f, 0.8f));
-		_energyLabel.OffsetLeft = 24; _energyLabel.OffsetRight = 460;
-		_promptLabel = MakeLabel(root, Control.LayoutPreset.TopLeft, 52, 80, 16, new Color(0.78f, 0.8f, 0.86f));
-		_promptLabel.OffsetLeft = 24; _promptLabel.OffsetRight = 640;
+		_energyP1 = MakeLabel(_root, Control.LayoutPreset.TopLeft, 20, 48, 22, P1Color);
+		_energyP1.OffsetLeft = 24; _energyP1.OffsetRight = 360;
+		_energyP2 = MakeLabel(_root, Control.LayoutPreset.TopRight, 20, 48, 22, P2Color);
+		_energyP2.OffsetLeft = -360; _energyP2.OffsetRight = -24;
+		_energyP2.HorizontalAlignment = HorizontalAlignment.Right;
 
-		_drawCount = MakeLabel(root, Control.LayoutPreset.BottomLeft, -64, -24, 16, new Color(0.7f, 0.8f, 1f));
+		_promptLabel = MakeLabel(_root, Control.LayoutPreset.TopWide, 96, 122, 16, new Color(0.82f, 0.85f, 0.92f));
+		_promptLabel.HorizontalAlignment = HorizontalAlignment.Center;
+
+		_drawCount = MakeLabel(_root, Control.LayoutPreset.BottomLeft, -64, -24, 16, new Color(0.7f, 0.8f, 1f));
 		_drawCount.OffsetLeft = 24; _drawCount.OffsetRight = 200;
-		_discardCount = MakeLabel(root, Control.LayoutPreset.BottomRight, -64, -24, 16, new Color(0.7f, 0.8f, 1f));
+		_discardCount = MakeLabel(_root, Control.LayoutPreset.BottomRight, -64, -24, 16, new Color(0.7f, 0.8f, 1f));
 		_discardCount.OffsetLeft = -200; _discardCount.OffsetRight = -24;
 		_discardCount.HorizontalAlignment = HorizontalAlignment.Right;
+
+		_countdownLabel = MakeLabel(_root, Control.LayoutPreset.Center, -80, 80, 110, new Color(1f, 0.9f, 0.4f));
+		_countdownLabel.HorizontalAlignment = HorizontalAlignment.Center;
+		_countdownLabel.VerticalAlignment = VerticalAlignment.Center;
+		_countdownLabel.SetAnchorsPreset(Control.LayoutPreset.Center);
+		_countdownLabel.OffsetLeft = -200; _countdownLabel.OffsetRight = 200;
+		_countdownLabel.OffsetTop = -100; _countdownLabel.OffsetBottom = 100;
+		_countdownLabel.Visible = false;
 
 		_handBox = new HBoxContainer();
 		_handBox.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
@@ -241,19 +510,15 @@ public partial class CardBrawl : Node3D
 		_handBox.OffsetTop = -226; _handBox.OffsetBottom = -68;
 		_handBox.AddThemeConstantOverride("separation", 8);
 		_handBox.Alignment = BoxContainer.AlignmentMode.Center;
-		root.AddChild(_handBox);
+		_root.AddChild(_handBox);
 
-		_endTurnButton = new Button
-		{
-			CustomMinimumSize = new Vector2(300, 52),
-			Text = "End Turn — start wave  ▶",
-		};
+		_endTurnButton = new Button { CustomMinimumSize = new Vector2(280, 50), Text = "End Turn  ▶" };
 		_endTurnButton.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
-		_endTurnButton.OffsetLeft = -150; _endTurnButton.OffsetRight = 150;
-		_endTurnButton.OffsetTop = -60; _endTurnButton.OffsetBottom = -8;
+		_endTurnButton.OffsetLeft = -140; _endTurnButton.OffsetRight = 140;
+		_endTurnButton.OffsetTop = -58; _endTurnButton.OffsetBottom = -8;
 		_endTurnButton.AddThemeFontSizeOverride("font_size", 20);
-		_endTurnButton.Pressed += OnEndTurn;
-		root.AddChild(_endTurnButton);
+		_endTurnButton.Pressed += OnEndTurnButtonPressed;
+		_root.AddChild(_endTurnButton);
 	}
 
 	private static Label MakeLabel(Control parent, Control.LayoutPreset preset, float top, float bottom,
@@ -273,6 +538,12 @@ public partial class CardBrawl : Node3D
 		if (_handBox == null)
 			return;
 
+		// Hide the hand + End-Turn during the live wave so their (disabled) buttons can't swallow P1's
+		// attack clicks; they reappear at the next pause.
+		bool pause = _round.Current == RoundLoop.Phase.Pause;
+		_handBox.Visible = pause;
+		if (_endTurnButton != null) _endTurnButton.Visible = pause;
+
 		foreach (Node c in _handBox.GetChildren())
 			c.QueueFree();
 		_handButtons.Clear();
@@ -281,44 +552,51 @@ public partial class CardBrawl : Node3D
 			_handButtons.Add(MakeCardButton(_deck.Hand[i], i));
 
 		if (_handButtons.Count == 0) _p2Cursor = 0;
-		else _p2Cursor = Mathf.Clamp(_p2Cursor, 0, _handButtons.Count - 1);
+		else if (_armed[1] == null) _p2Cursor = Mathf.Clamp(_p2Cursor, 0, _handButtons.Count - 1);
 		ApplyCursorTint();
 
 		if (_drawCount != null) _drawCount.Text = $"DRAW  {_deck.DrawPile.Count}";
 		if (_discardCount != null) _discardCount.Text = $"DISCARD  {_deck.DiscardPile.Count}";
-		if (_energyLabel != null) _energyLabel.Text = $"ENERGY  {_energy.Energy} / {_energy.Granted}";
-		if (_promptLabel != null && _round.Current == RoundLoop.Phase.Pause && _promptLabel.Text == "")
-			_promptLabel.Text = "P1: click a card    P2: d-pad + A    then End Turn.";
+		if (_energyP1 != null) _energyP1.Text = $"P1  ⚡ {_energies[0].Energy} / {_energies[0].Granted}";
+		if (_energyP2 != null) _energyP2.Text = $"P2  ⚡ {_energies[1].Energy} / {_energies[1].Granted}";
 	}
 
-	// Compact card frame (Chunk 73): the clickable root stays a Button (so Pressed / Disabled / the P2
-	// cursor Modulate-tint all keep working), styled with a tinted border; child Controls (mouse-ignored,
-	// so clicks fall through to the button) draw a coloured header bar with the title, a cost badge, and a
-	// short wrapped description. Smaller than the old 150×200 text button so the whole hand stays on-screen.
+	private void SetPrompt(string text)
+	{
+		if (_promptLabel != null) _promptLabel.Text = text;
+	}
+
+	// Compact card frame. A selected card shows its owner's colour + a ✔; an armed card pulses brighter.
 	private Button MakeCardButton(Card card, int index)
 	{
 		Color accent = BuffColor(card);
+		bool selected = _selections.TryGetValue(index, out Selection sel);
+		bool armed = (_armed[0] != null && _armed[0].HandIndex == index) || (_armed[1] != null && _armed[1].HandIndex == index);
+		bool affordable = _energies[0].CanAfford(card) || _energies[1].CanAfford(card);
+
 		var b = new Button
 		{
 			CustomMinimumSize = new Vector2(116, 156),
 			ClipText = true,
-			Disabled = _round.Current != RoundLoop.Phase.Pause || !_energy.CanAfford(card),
+			// Selected cards stay clickable (to unselect); others need affordable energy + the pause.
+			Disabled = _countingDown || _round.Current != RoundLoop.Phase.Pause || (!selected && !affordable),
 		};
-		b.AddThemeStyleboxOverride("normal",   CardFrame(accent, 0.13f));
-		b.AddThemeStyleboxOverride("hover",    CardFrame(accent, 0.20f));
-		b.AddThemeStyleboxOverride("pressed",  CardFrame(accent, 0.20f));
-		b.AddThemeStyleboxOverride("disabled", CardFrame(accent, 0.07f));
-		b.Pressed += () => OnCardClicked(index);
+		float mix = armed ? 0.34f : (selected ? 0.26f : 0.13f);
+		b.AddThemeStyleboxOverride("normal",   CardFrame(accent, mix, selected ? sel.Player : -1));
+		b.AddThemeStyleboxOverride("hover",    CardFrame(accent, mix + 0.07f, selected ? sel.Player : -1));
+		b.AddThemeStyleboxOverride("pressed",  CardFrame(accent, mix + 0.07f, selected ? sel.Player : -1));
+		b.AddThemeStyleboxOverride("disabled", CardFrame(accent, 0.07f, selected ? sel.Player : -1));
+		b.Pressed += () => OnHandPressed(index);
 
 		var col = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
 		col.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		col.AddThemeConstantOverride("separation", 4);
 		b.AddChild(col);
 
-		// Tinted header bar with the title (dark text on the accent colour).
+		string title = selected ? $"✔ {card.Title}" : card.Title;
 		var header = new Label
 		{
-			Text = card.Title,
+			Text = title,
 			MouseFilter = Control.MouseFilterEnum.Ignore,
 			HorizontalAlignment = HorizontalAlignment.Center,
 			VerticalAlignment = VerticalAlignment.Center,
@@ -335,7 +613,7 @@ public partial class CardBrawl : Node3D
 
 		var cost = new Label
 		{
-			Text = $"⚡ {card.EnergyCost}",
+			Text = selected ? $"P{sel.Player + 1}  ⚡ {card.EnergyCost}" : $"⚡ {card.EnergyCost}",
 			MouseFilter = Control.MouseFilterEnum.Ignore,
 			HorizontalAlignment = HorizontalAlignment.Center,
 		};
@@ -360,18 +638,17 @@ public partial class CardBrawl : Node3D
 		return b;
 	}
 
-	// Dark card body with a tinted border; bg lightens toward the accent on hover (alpha arg).
-	private static StyleBoxFlat CardFrame(Color accent, float bgMix)
+	// Dark card body with a tinted border. A selected card's border takes its owner's colour.
+	private static StyleBoxFlat CardFrame(Color accent, float bgMix, int ownerPlayer)
 	{
 		var s = new StyleBoxFlat { BgColor = new Color(0.11f, 0.11f, 0.15f).Lerp(accent, bgMix) };
-		s.SetBorderWidthAll(2);
-		s.BorderColor = accent;
+		s.SetBorderWidthAll(ownerPlayer >= 0 ? 3 : 2);
+		s.BorderColor = ownerPlayer == 0 ? P1Color : ownerPlayer == 1 ? P2Color : accent;
 		s.SetCornerRadiusAll(6);
 		s.SetContentMarginAll(0);
 		return s;
 	}
 
-	// Soldier = blue, weapon = amber, ability = violet (so the shared hand reads at a glance).
 	private static Color BuffColor(Card card) => card.Buff switch
 	{
 		Card.BuffKind.Weapon  => new Color(0.95f, 0.72f, 0.35f),
@@ -379,11 +656,78 @@ public partial class CardBrawl : Node3D
 		_                     => new Color(0.45f, 0.66f, 0.96f),
 	};
 
-	// Tint P2's cursor card so the gamepad player can see their selection in the shared hand.
+	// Tint P2's cursor — over the markers while targeting, else over the hand.
 	private void ApplyCursorTint()
 	{
-		for (int i = 0; i < _handButtons.Count; i++)
-			_handButtons[i].Modulate = i == _p2Cursor ? CursorTint : Colors.White;
+		if (_armed[1] != null)
+		{
+			List<Button> markers = _armed[1].Markers;
+			for (int i = 0; i < markers.Count; i++)
+				if (IsInstanceValid(markers[i]))
+					markers[i].Modulate = i == _p2Cursor ? CursorTint : Colors.White;
+		}
+		else
+		{
+			for (int i = 0; i < _handButtons.Count; i++)
+				_handButtons[i].Modulate = i == _p2Cursor ? CursorTint : Colors.White;
+		}
+	}
+
+	// ── On-field target markers ────────────────────────────────────────────────────────────────────────
+	private void BuildMarkers(Armed a)
+	{
+		bool soldier = a.Card.Buff == Card.BuffKind.Soldier;
+		Color tint = a.Player == 0 ? P1Color : P2Color;
+		for (int i = 0; i < a.Candidates.Count; i++)
+		{
+			int idx = i;
+			var m = new Button
+			{
+				CustomMinimumSize = new Vector2(40, 40),
+				Text = soldier ? "+" : "▲",
+				// P2 confirms with A (cursor), so its markers ignore the mouse; P1's are mouse-clickable.
+				MouseFilter = a.Player == 0 ? Control.MouseFilterEnum.Stop : Control.MouseFilterEnum.Ignore,
+			};
+			var box = new StyleBoxFlat { BgColor = new Color(tint.R, tint.G, tint.B, 0.35f) };
+			box.SetBorderWidthAll(2);
+			box.BorderColor = tint;
+			box.SetCornerRadiusAll(soldier ? 8 : 20);
+			m.AddThemeStyleboxOverride("normal", box);
+			m.AddThemeStyleboxOverride("hover", box);
+			m.AddThemeStyleboxOverride("pressed", box);
+			m.AddThemeFontSizeOverride("font_size", 22);
+			if (a.Player == 0)
+				m.Pressed += () => OnMarkerClicked(0, idx);
+			_root.AddChild(m);
+			a.Markers.Add(m);
+		}
+		ApplyCursorTint();
+	}
+
+	// Keep each marker pinned over its world point (the camera eases even while frozen).
+	private void PositionMarkers()
+	{
+		Camera3D cam = GetViewport().GetCamera3D();
+		for (int p = 0; p < 2; p++)
+		{
+			Armed a = _armed[p];
+			if (a == null)
+				continue;
+			for (int i = 0; i < a.Markers.Count; i++)
+			{
+				Button m = a.Markers[i];
+				if (!IsInstanceValid(m))
+					continue;
+				if (cam == null || cam.IsPositionBehind(a.Candidates[i].World))
+				{
+					m.Visible = false;
+					continue;
+				}
+				m.Visible = true;
+				Vector2 screen = cam.UnprojectPosition(a.Candidates[i].World);
+				m.Position = screen - m.Size / 2f;
+			}
+		}
 	}
 
 	private void UpdatePhaseHud()
@@ -395,15 +739,13 @@ public partial class CardBrawl : Node3D
 		{
 			_phaseLabel.Text = $"WAVE {_round.RoundNumber}   •   SURVIVE   {_round.TimeLeft:0.0}s";
 			_phaseLabel.AddThemeColorOverride("font_color", new Color(0.6f, 0.95f, 0.6f));
-			if (_waveLabel != null)
-				_waveLabel.Text = $"{waveCount} foes on the field — survive!";
+			if (_waveLabel != null) _waveLabel.Text = $"{waveCount} foes on the field — survive!";
 		}
 		else
 		{
-			_phaseLabel.Text = $"WAVE {_round.RoundNumber} INCOMING — counter the foes, then End Turn";
+			_phaseLabel.Text = $"WAVE {_round.RoundNumber} INCOMING — build your squad, then End Turn";
 			_phaseLabel.AddThemeColorOverride("font_color", new Color(1.0f, 0.85f, 0.55f));
-			if (_waveLabel != null)
-				_waveLabel.Text = $"{waveCount} foes staged ahead — spend energy to counter them";
+			if (_waveLabel != null) _waveLabel.Text = $"{waveCount} foes staged — arm up, place soldiers, grant abilities";
 		}
 	}
 }
