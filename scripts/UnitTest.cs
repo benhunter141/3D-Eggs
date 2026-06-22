@@ -41,6 +41,7 @@ public partial class UnitTest : Node3D
 		bool weaponSwap = await TestWeaponSwap();
 		bool archetypes = await TestWeaponArchetypes();
 		bool basicEgg = await TestBasicEgg();
+		bool fireball = await TestFireballAbility();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
 		bool capturePoint = await TestCapturePoint();
@@ -66,7 +67,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -997,6 +998,59 @@ public partial class UnitTest : Node3D
 			? "PASS: basic egg punches weakly with no knockback; EquipWeapon(Sword) arms it (reach + damage + knockback up)"
 			: $"FAIL: punch(is={isPunch},weak={punchWeak},noKnock={punchNoKnock},short={punchShort},hitbox={punchHitbox}) " +
 			  $"armed(sword={nowSword},knocks={armedKnocks},reachUp={armedReachUp},dmgUp={armedDmgUp},hitbox={swordHitbox})");
+		return pass;
+	}
+
+	// Chunk 67 (M15): the player ability system. An UNGRANTED egg can't cast (no-op). Once granted
+	// Fireball it casts a MAGIC bolt scaled by INTELLIGENCE (the damage dealt == ScaledMagicDamage of
+	// the base), and the cooldown gates a back-to-back repeat. Real Captain scene so the _Ready wiring runs.
+	private async Task<bool> TestFireballAbility()
+	{
+		GD.Print("=== UnitTest: player ability — Fireball (Chunk 67) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var egg = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		egg.StartUnarmed = true;        // a basic brawl egg
+		AddChild(egg);
+		egg.GlobalPosition = Vector3.Zero;
+		egg.Rotation = Vector3.Zero;    // facing -Z
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Ungranted: no ability, CastAbility is a no-op.
+		bool ungrantedNoCast = !egg.HasAbility && !egg.CastAbility();
+
+		// Grant Fireball, with Intelligence so the bolt is Int-scaled (+50% at Int 5, scale 0.10).
+		egg.Intelligence = 5;
+		egg.GrantAbility(Player.AbilityType.Fireball);
+		bool granted = egg.HasAbility && egg.CurrentAbility == Player.AbilityType.Fireball && egg.AbilityReady;
+		float expected = egg.ScaledMagicDamage(egg.FireballDamage);   // 16 * 1.5 = 24
+
+		// A foe parked 6 m straight ahead (-Z), tough enough to survive one bolt so we can read the hit.
+		var foe = new Unit { Team = Unit.TeamId.Enemy, MaxHealth = 200f };
+		AddChild(foe);
+		foe.GlobalPosition = new Vector3(0f, 0f, -6f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		float before = foe.Health;
+		bool cast1 = egg.CastAbility();          // fires a bolt
+		bool cooldownGates = !egg.CastAbility();  // immediate repeat refused by the cooldown
+		GD.Print($"granted={granted}, cast1={cast1}, cooldownGates={cooldownGates}, expect magic dmg={expected:0.0}");
+
+		// Let the bolt fly into the foe (6 m at ~20 m/s ≈ 0.3 s).
+		for (int i = 0; i < 60; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float dealt = before - foe.Health;
+		bool hitForMagic = Mathf.IsEqualApprox(dealt, expected, 0.5f);
+		GD.Print($"foe HP {before}->{foe.Health} (dealt={dealt:0.0}, want {expected:0.0}, magicOk={hitForMagic})");
+
+		bool pass = ungrantedNoCast && granted && cast1 && cooldownGates && hitForMagic;
+		GD.Print(pass
+			? "PASS: ungranted egg can't cast; granted Fireball deals Int-scaled magic damage; cooldown gates repeats"
+			: $"FAIL: ungrantedNoCast={ungrantedNoCast}, granted={granted}, cast1={cast1}, cooldownGates={cooldownGates}, magicOk={hitForMagic}");
 		return pass;
 	}
 

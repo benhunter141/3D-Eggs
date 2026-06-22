@@ -317,7 +317,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       **buff whoever played them** (`sword` = equip a weapon, `fireball` = grant a castable ability) or
       **spawn subordinates** (`soldier`); End Turn starts a **15 s real-time survival wave**, then it pauses
       and redeals — repeat, surviving escalating waves. Chunk 66 done: weak unarmed `Punch` loadout +
-      `StartUnarmed` + runtime `EquipWeapon` on `Player` (M9 plumbing; Punch excluded from Q-swap). Lose only when BOTH eggs fall. Reuses the M12 card
+      `StartUnarmed` + runtime `EquipWeapon` on `Player` (M9 plumbing; Punch excluded from Q-swap). Chunk 67
+      done: `Player` ability system — `AbilityType` (None default | Fireball), `GrantAbility(kind)` +
+      scheme-aware `cast_ability` (C / gamepad A), and `Fireball` (a straight/ballistic magic projectile on a
+      cooldown whose damage is baked in via `ScaledMagicDamage`/Int at cast). None granted by default, so every
+      other captain is byte-identical. Lose only when BOTH eggs fall. Reuses the M12 card
       model + `RoundLoop`, the M12.7 co-op control schemes / shared camera / `RequireAllPlayersDead`, and the
       M9 weapon plumbing (Chunks 66–71). New: weak-egg loadout + runtime weapon/ability grants on `Player`, a
       player-buff card category applied to the triggering player, a two-device shared hand, and a wave/survival
@@ -395,9 +399,9 @@ opponent = escalating waves; flat per-round energy (`BaseEnergy`, no KotH bonus)
 
 - [x] **Chunk 66 — Basic egg + runtime loadout.** Weak unarmed `Punch` `WeaponType` + `StartUnarmed` +
   runtime `EquipWeapon` on `Player` (Punch excluded from Q-swap). Headless-tested.
-- [ ] **Chunk 67 — Player ability system + Fireball.** `GrantAbility(kind)` + scheme-aware `cast_ability`;
-  `Fireball` = magic projectile on a cooldown, damage via `ScaledMagicDamage` (Int). None granted by default.
-  **Headless-test:** granted Fireball casts magic damage; ungranted = no-op; cooldown gates repeats.
+- [x] **Chunk 67 — Player ability system + Fireball.** `GrantAbility(kind)` + scheme-aware `cast_ability`
+  (C / gamepad A); `AbilityType` (None default | Fireball); `Fireball` = magic projectile on a cooldown,
+  damage baked in via `ScaledMagicDamage` (Int) at cast. None granted by default. Headless-tested.
 - [ ] **Chunk 68 — Player-buff card category.** Pure card model gains `GrantWeapon`/`GrantAbility` cards; the
   play API carries the triggering player so the buff lands on THAT egg (and `soldier` spawns onto that
   player's team). `CardLibrary.BrawlDeck()` + brawl pool (Sword, Fireball, Soldier, …). **Headless-test:**

@@ -24,6 +24,12 @@ public partial class Player : Unit
 {
 	public enum WeaponType { Spear, Sword, Axe, Mace, Punch }
 
+	// Castable abilities the egg can be GRANTED at runtime (M15, Chunk 67). `None` (the default) =
+	// no ability, so every existing captain spawns exactly as before — only a card-granted egg in the
+	// Co-op Card Brawl ever carries one. `Fireball` lobs a magic projectile scaled by INTELLIGENCE on a
+	// cooldown. Add an ability by extending this enum + a case in CastAbility.
+	public enum AbilityType { None, Fireball }
+
 	// --- Control scheme (M12.7, Chunk 44: two-player couch co-op) ---
 	// Which input device drives THIS captain. `Any` (default) is today's blended read —
 	// keyboard+gamepad move, mouse aim — so every existing single-player level is untouched.
@@ -58,10 +64,15 @@ public partial class Player : Unit
 	private const JoyButton CmdHoldButton   = JoyButton.DpadLeft;     // 13
 	private const JoyButton CmdAttackButton = JoyButton.DpadRight;    // 14
 
+	// Cast-ability button (M15, Chunk 67) — mirrors the cast_ability action so the explicit Gamepad
+	// scheme matches Any. Button A (0) is otherwise unused by the captain's bindings.
+	private const JoyButton CastButton = JoyButton.A;                // 0
+
 	// Prev-frame pressed state for the device-scoped schemes, so a raw "is pressed" bool becomes
 	// a one-frame "just pressed" (the action system gives this for free, but only un-scoped).
 	private bool _attackHeldPrev, _swapHeldPrev, _mountHeldPrev;
 	private bool _cmdFollowPrev, _cmdHoldPrev, _cmdAttackPrev;
+	private bool _castHeldPrev;
 
 	// One weapon's resolved numbers. The Inspector exports below feed these in _Ready so each
 	// weapon stays tunable while the swing code reads a single uniform set.
@@ -94,6 +105,24 @@ public partial class Player : Unit
 	// instead of StartingWeapon — the Co-op Card Brawl eggs start helpless and get armed only by
 	// cards (EquipWeapon at runtime). Default false so every existing scene spawns as today.
 	[Export] public bool StartUnarmed = false;
+
+	// --- Castable ability (M15, Chunk 67) ---
+	// The egg can be GRANTED a castable ability at runtime (a `fireball` card). None by default, so
+	// every existing captain is untouched; cards are the only way an egg gains one. cast_ability (C /
+	// gamepad A) fires the granted ability, gated by a per-ability cooldown. Fireball is a MAGIC hit —
+	// its damage scales with INTELLIGENCE (ScaledMagicDamage), the lane Int feeds.
+	[Export] public AbilityType StartingAbility = AbilityType.None; // ability the egg spawns with (per-scene default)
+	[Export] public float FireballDamage = 16.0f;   // BASE magic damage (pre-Int-scale) of a cast fireball
+	[Export] public float FireballCooldown = 1.2f;  // seconds between fireball casts
+	[Export] public PackedScene FireballScene;       // projectile to spawn; falls back to res://scenes/Fireball.tscn
+
+	private AbilityType _ability = AbilityType.None;
+	private float _abilityCooldownTimer;             // counts down; > 0 blocks the next cast
+
+	// Read-only views (HUD + headless tests).
+	public AbilityType CurrentAbility => _ability;
+	public bool HasAbility => _ability != AbilityType.None;
+	public bool AbilityReady => _ability != AbilityType.None && _abilityCooldownTimer <= 0f;
 
 	// Spear profile — long reach, no knockback.
 	[Export] public float SpearDamage = 40.0f;
@@ -237,6 +266,8 @@ public partial class Player : Unit
 		SetThrustOffset(0f);
 		SetHitboxActive(false);
 
+		_ability = StartingAbility;   // usually None; a brawl scene / card grants one (Chunk 67)
+
 		_formationYaw = Rotation.Y;   // squad starts wheeled to wherever we spawn facing
 	}
 
@@ -268,6 +299,60 @@ public partial class Player : Unit
 	{
 		ApplyWeapon(weapon);
 		GD.Print($"[Player] {Name} equipped {_weapon} (reach {_reach:0.0} m, dmg {_damage:0.0}, knockback {_knockback:0.0})");
+	}
+
+	// --- Castable ability (Chunk 67) ---
+
+	// Grant the egg a castable ability at runtime (a `fireball` card). Public so cards (and the headless
+	// test) can hand an ability to a specific egg. AbilityType.None clears it. Ready to cast immediately.
+	public void GrantAbility(AbilityType kind)
+	{
+		_ability = kind;
+		_abilityCooldownTimer = 0f;
+		GD.Print($"[Player] {Name} granted ability {_ability}");
+	}
+
+	// Fire the currently-granted ability if it's off cooldown and we're alive. Returns true if a cast
+	// actually went out (so the headless test can assert ungranted = no-op and the cooldown gates repeats).
+	// Public so a UI / test can drive it without faking input.
+	public bool CastAbility()
+	{
+		if (_ability == AbilityType.None || IsDead || _abilityCooldownTimer > 0f)
+			return false;
+
+		switch (_ability)
+		{
+			case AbilityType.Fireball:
+				CastFireball();
+				_abilityCooldownTimer = FireballCooldown;
+				return true;
+		}
+		return false;
+	}
+
+	// Lob a Fireball straight along our facing (-Z, where the captain is aiming). Its damage is baked in
+	// at cast time as a MAGIC hit scaled by our Intelligence, so a smarter egg's bolts hit harder; the
+	// projectile itself carries no stats. Spawned on our parent so it outlives us, tagged with our team.
+	private void CastFireball()
+	{
+		FireballScene ??= GD.Load<PackedScene>("res://scenes/Fireball.tscn");
+		if (FireballScene == null)
+		{
+			GD.PrintErr($"[Player] {Name} has no FireballScene");
+			return;
+		}
+
+		Vector3 dir = -GlobalTransform.Basis.Z;
+		dir.Y = 0f;
+		dir = dir.LengthSquared() > 0.0001f ? dir.Normalized() : Vector3.Forward;
+
+		var fb = FireballScene.Instantiate<Fireball>();
+		fb.Damage = ScaledMagicDamage(FireballDamage);   // Intelligence scales magic (Chunk 36 lane)
+		GetParent().AddChild(fb);
+		fb.GlobalPosition = GlobalPosition + dir * 1.0f; // emerge just ahead of the egg
+		fb.Launch(dir, Team);
+
+		GD.Print($"[Player] {Name} cast Fireball for {fb.Damage:0.0} (Int x{IntelligenceMultiplier:0.00})");
 	}
 
 	// --- Mount (Chunk 28) ---
@@ -467,6 +552,12 @@ public partial class Player : Unit
 		if (CommandFollowPressed()) IssueSquadCommand(Ally.CommandMode.Follow);
 		if (CommandHoldPressed())   IssueSquadCommand(Ally.CommandMode.Hold);
 		if (CommandAttackPressed()) IssueSquadCommand(Ally.CommandMode.AttackMove);
+
+		// Cast the granted ability (M15) — fireball etc., gated by its cooldown. No-op when ungranted.
+		if (_abilityCooldownTimer > 0f)
+			_abilityCooldownTimer -= dt;
+		if (_ability != AbilityType.None && CastJustPressed())
+			CastAbility();
 
 		UpdateSwing(dt);
 	}
@@ -695,6 +786,14 @@ public partial class Player : Unit
 		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.G), ref _cmdAttackPrev),
 		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CmdAttackButton), ref _cmdAttackPrev),
 		_                           => Input.IsActionJustPressed("command_attack"),
+	};
+
+	// Cast-ability edge (M15, Chunk 67): C (keyboard) or gamepad A.
+	public bool CastJustPressed() => Control switch
+	{
+		ControlScheme.KeyboardMouse => JustPressed(Input.IsPhysicalKeyPressed(Key.C), ref _castHeldPrev),
+		ControlScheme.Gamepad       => JustPressed(Input.IsJoyButtonPressed(DeviceId, CastButton), ref _castHeldPrev),
+		_                           => Input.IsActionJustPressed("cast_ability"),
 	};
 
 	// WASD / arrows as a normalized-ish move vector (KeyboardMouse scheme — keyboard only, so a
