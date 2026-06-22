@@ -277,17 +277,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       controller aim + squad ownership + the shared two-captain camera (Chunks 44–46) + the `CoopStand`
       scene with the both-captains-fall lose rule (Chunk 47). Removed the first four levels from the menu.
       *Local* couch co-op — NOT the networked M13. Feel-check pending (needs a gamepad for P2).
-- [ ] **M12.8 — Slay-the-Spire-feel pass (Slay the Eggs look & UX):** make the card mode LOOK and (in the
-      PAUSE phase) PLAY like StS without ripping out the real-time march. Real card frames (cost orb / title
-      banner / art panel / desc), a compact fanned hover-lift hand that stops eating ~40% of the screen,
-      board/tray separation + camera reframe, StS HUD chrome (energy orb + card-back pile stacks), and play
-      juice (Chunks 55–59). **Visual reskin only** — two-click play and the auto-battler stay. Drag-to-target +
-      enemy intent (was "Chunk F") and a full turn-based remake are explicitly OUT of scope unless asked.
-- [~] **M13 — Multiplayer:** 2 players over the network, server-authoritative. Hardest, last.
-  Now broken into Chunks 50–54 (net bootstrap → captain spawn/ownership → state replication →
-  server-authoritative combat/input RPCs → networked co-op level + synced match state) — see §7.
-  **Build gated** on M1–M5 feeling great (and the outstanding feel-checks); plan is laid out so
-  the netcode build can start when the user is ready.
+- [ ] **M12.8 — Slay-the-Spire-feel pass (SHELVED — revisit only when asked):** card-mode visual reskin
+      (card frames, fanned hover-lift hand, board/tray + camera reframe, StS HUD chrome, play juice;
+      Chunks 55–59). Visual only — two-click play + auto-battler stay.
+- [ ] **M13 — Multiplayer (SHELVED — revisit only when asked):** 2 players over the network,
+      server-authoritative (Chunks 50–54). The hardest, last milestone.
 - [~] **M14 — Traversable terrain (fighting on slopes):** units walk + fight up and down real terrain
       elevation in the **Highlands** level — heightmap collision + gravity + floor-snapping, terrain-aware
       spawns/formation, ballistic projectiles, and a terrain-following camera (Chunks 60–65). **Highlands
@@ -372,501 +366,61 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 - [x] **Chunk 22** — Level 5 "Pinball Arena" (walled 44×44 arena + 8 bumpers).
 - [x] **Chunk 23** — Adjustable dynamic zoom (`ZoomBias` on mouse wheel / keys).
 
-**M7 — Ally commands:** now planned + in progress as Chunks 48–49 — see the dedicated section
-near the end of §7 (it builds late, after the M12.x chunks, so its chunk numbers follow Chunk 47).
+- [x] **Chunks 24–25 (M8)** — googly eyes on every unit; distinct per-weapon meshes.
+- [x] **Chunks 26–27 (M9)** — data-driven `WeaponType→WeaponProfile`; `swap_weapon` cycles spear/sword/axe/mace/bow.
+- [x] **Chunks 28–29 (M10)** — `Mount` base + Donkey; faster Chocobo; mount/dismount + mounted combat.
+- [x] **Chunks 30–31 (M11)** — `CapturePoint` period scoring; KotH level + `KothManager` HUD/authority.
+- [x] **Chunks 32–39 (M12)** — card model/piles/UI, Unit+Action play, round loop, dev panel, HP/Str/Int, KotH energy, run rooms, relics/potions.
+- [x] **Chunks 40–43 (M12.5)** — endzone football pitch, endzone-gated placement, forward-march AI, 5 s turns + unit-heavy deck.
+- [x] **Chunks 44–47 (M12.7)** — co-op control schemes + controller aim, squad ownership, shared two-captain camera, `CoopStand` + both-fall lose; removed Levels 1–4 from menu.
+- [x] **Chunks 48–49 (M7)** — `Ally` command model (Follow/Hold/AttackMove, off by default); captain `IssueSquadCommand` dispatch.
+- [x] **Chunks 60–64 (M14)** — terrain heightmap collision, grounded movement (`Unit.Grounded`, default OFF), terrain spawn/formation, ballistic projectiles, terrain-following camera.
+- [~] **Chunk 65 (M14)** — Highlands gentle-terrain redesign (rebuilt for cost + looks). *Open: knockback-on-slopes tuning + Highlands feel-check.*
 
 ---
 
-### ▶ PLANNED — M8 Camera & Visual Identity Polish (Chunks 24–25)
+### ▶ ACTIVE PLAN — M15 Co-op Card Brawl (Chunks 66–71)
 
-**Goal:** cartoony eyes and recognizable weapon meshes — cheap, high-impact identity wins.
+**The only active plan.** A *local same-screen 2-player* card-driven survival mode. Each player drives a
+**basic egg** (weak punch only) — P1 keyboard+mouse, P2 gamepad (device 0) — and both draw from ONE shared
+hand. In the between-rounds **pause** they spend shared energy on cards: `sword`/`fireball` **buff whoever
+played the card**, `soldier` spawns a subordinate for that player. **End Turn** runs a **15 s real-time
+survival wave**; at timeout it pauses, redeals, and queues the next (harder) wave. Lose only when **both**
+eggs fall.
 
-- [x] **Chunk 24 — Cartoony eyes on units.** Give every `Unit` a pair of simple
-  camera-/forward-facing eye visuals (white + pupil), sized per archetype, as a child node.
-  Pure visual; no logic. User feel-check for cuteness.
-- [x] **Chunk 25 — Visually distinct weapon meshes.** Replace placeholder weapon visuals with
-  recognizable meshes per weapon (spear/pike shaft+tip, sword blade+guard, bow, stone, arrow)
-  so a unit's weapon reads at a glance. Pure visual; reused across the matching scenes.
+**Locked decisions:** buffs apply to whoever played the card (no target click); cards play in the PAUSE only;
+opponent = escalating waves; flat per-round energy (`BaseEnergy`, no KotH bonus). Reuses the M12 card model +
+`RoundLoop`, the M12.7 control schemes / shared camera / `RequireAllPlayersDead`, and the M9 weapon plumbing.
+**Off by default** — only this new scene/captains opt in; every other mode stays byte-identical.
 
----
+- [x] **Chunk 66 — Basic egg + runtime loadout.** Weak unarmed `Punch` `WeaponType` + `StartUnarmed` +
+  runtime `EquipWeapon` on `Player` (Punch excluded from Q-swap). Headless-tested.
+- [ ] **Chunk 67 — Player ability system + Fireball.** `GrantAbility(kind)` + scheme-aware `cast_ability`;
+  `Fireball` = magic projectile on a cooldown, damage via `ScaledMagicDamage` (Int). None granted by default.
+  **Headless-test:** granted Fireball casts magic damage; ungranted = no-op; cooldown gates repeats.
+- [ ] **Chunk 68 — Player-buff card category.** Pure card model gains `GrantWeapon`/`GrantAbility` cards; the
+  play API carries the triggering player so the buff lands on THAT egg (and `soldier` spawns onto that
+  player's team). `CardLibrary.BrawlDeck()` + brawl pool (Sword, Fireball, Soldier, …). **Headless-test:**
+  each card type resolves on the named player; existing Unit/Action play unchanged.
+- [ ] **Chunk 69 — Shared-hand co-op card UI (two devices).** Pause hand operable by both: P1 mouse, P2
+  gamepad cursor (highlight + confirm); each play records the triggering player. Shared energy + hand; End
+  Turn from either device. **Headless-test:** selection→play routing carries the correct player id.
+- [ ] **Chunk 70 — Wave/survival scene + manager + co-op lose.** `scenes/Levels/CoopCardBrawl.tscn`: two
+  basic eggs (P1 `KeyboardMouse`, P2 `Gamepad` device 0), shared camera, `RoundLoop` pause→15 s→redeal,
+  `BrawlDeck()`. `WaveManager` spawns an escalating wave each round; energy refills to flat `BaseEnergy`;
+  `GameManager.RequireAllPlayersDead = true`. Add to `LevelSelect` with a P1/P2 note. **Headless-test:**
+  wave N spawns the scaled count; advancing queues the next; lose only when both eggs are down.
+- [ ] **Chunk 71 — Balance + feel pass.** Tune punch vs granted weapons/abilities, soldier strength, energy
+  costs, wave scaling/pacing so the 15 s rounds feel fair. **User feel-check** (needs a gamepad for P2).
 
-### ▶ PLANNED — M9 Weapons & Loadouts (Chunks 26–27)
-
-**Goal:** make the weapon a real choice — the captain can wield a sword instead of the pike,
-and weapons differ in reach / damage / knockback / look.
-
-- [x] **Chunk 26 — Player weapon swap (spear ↔ sword).** Give `Player` a `WeaponType`
-  (Spear | Sword) driving hitbox reach, damage, knockback, and thrust/swing feel + the
-  Chunk-25 mesh. Add a `swap_weapon` input to toggle in-game (and/or per-level default).
-  Sword = short reach + knockback (existing sword rules); spear = long reach, no knockback.
-  Headless-test: each weapon's reach + knockback match its profile.
-- [x] **Chunk 27 — More weapon archetypes.** Add a couple more weapons (e.g. axe = heavy/slow/
-  high-damage, mace = knockback, bow = ranged) as `WeaponType` entries reusing the Chunk-26
-  plumbing + Chunk-25 visuals, so allies/enemies can be skinned with them too. Headless-test:
-  each archetype's stats resolve correctly.
-
----
-
-### ▶ PLANNED — M10 Mounts (Chunks 28–29)
-
-**Goal:** rideable mounts for speed & charm — a cute donkey and a chocobo.
-
-- [x] **Chunk 28 — Mount base + Donkey.** `scripts/Mount.cs` + `scenes/Donkey.tscn`:
-  mount/dismount (proximity + `mount` input), mounted state raises move speed & changes the
-  player silhouette (rider on mount), mounted combat still works; dismount drops you beside the
-  mount. Headless-test: mounting raises speed, dismount restores it.
-- [x] **Chunk 29 — Chocobo mount.** `scenes/Chocobo.tscn` reusing `Mount.cs` — faster than the
-  donkey (`MountSpeed` 13 vs 9), distinct look (taller upright yellow body, orange beak/legs,
-  crest + tail feathers, googly eyes). Headless-test: chocobo `MountSpeed` > donkey and riding
-  it tops the donkey's ride speed. One added beside the donkey in Level 1 to try.
+**Build order 66 → 71; 66 + 68 are the load-bearing pair (weak egg + buff-the-player card category).**
 
 ---
 
-### ▶ PLANNED — M11 King of the Hill Mode (Chunks 30–31)
-
-**Goal:** a scoring mode where holding ground matters — and the foundation Slay the Eggs (M12)
-draws energy from.
-
-- [x] **Chunk 30 — Capture zone + period scoring.** `scripts/CapturePoint.cs` +
-  `scenes/CapturePoint.tscn`: an `Area3D` zone tracking which team has units inside; every
-  **period (15 s for now)** it awards a point to the team holding it at period end (contested =
-  no award). Emits a signal / exposes state for HUD + energy hooks. Headless-test: holder at
-  period end scores; contested scores nobody.
-- [x] **Chunk 31 — KotH mode level + HUD.** `scenes/Levels/KingOfTheHill.tscn` (one central
-  `CapturePoint` + player phalanx vs swordmen/bowmen) + `scripts/KothManager.cs` — a `CanvasLayer`
-  HUD showing per-team score, period countdown, and contest state, and the mode's match authority:
-  win at `WinScore` (3) held periods or an enemy wipeout, lose on player death or enemy 3. Added as
-  battle 6 on LevelSelect.
-
----
-
-### ▶ PLANNED — M12 Slay the Eggs — Card Battler Mode (Chunks 32–39)
-
-**Goal:** a Slay-the-Spire-style PvE mode layered on the battlefield — build a deck and spend
-energy (earned by holding KotH points, M11) to deploy units and trigger actions across a run of
-rooms.
-
-**New durable rules (promote into §5 as chunks land):**
-- **Cards = Units or Actions.** A **Unit card** is played onto a **location** (a battlefield
-  zone / `CapturePoint`-style slot) to spawn that unit for your team. An **Action card** is
-  played onto a **friendly unit**, which then performs the action (move / attack / buff / spell).
-- **Round = timed real-time play + tactical pause.** The mode **starts PAUSED** with an opening hand;
-  **End Turn begins a round** — play runs in real time for `RoundSeconds` (default 15, dev-tunable),
-  units move/fight and the player may play cards live — then at **timeout** the mode **pauses**
-  (battlefield frozen) **and redeals** a fresh hand (discard + refill energy + draw 5); the player
-  sets up again and hits **End Turn** to play on. The pause is also where per-period energy is
-  awarded (Chunk 37).
-- **Unit stats: HP / Str / Int.** **Str** scales weapon attack power + strength-based actions;
-  **Int** scales magic-based actions. Stats live on `Unit` (or a card-mode component).
-- **Energy from holding ground.** Card energy each round = KotH points your team holds at the
-  pause (M11) — territory *is* your economy.
-- **Run = rooms.** PvE like StS: a series of rooms (combat / event), collecting **cards**,
-  **relics**, and **potions** between them.
-
-- [x] **Chunk 32 — Card model + piles + hand UI.** `scripts/Cards/` data model (Card, Deck) +
-  draw / hand / discard piles with reshuffle; on-screen UI showing all three piles (StS-style:
-  draw count, hand, discard). Headless-test: draw/discard/reshuffle cycle conserves the deck.
-- [x] **Chunk 33 — Unit & Action cards (play targeting).** Unit cards target a **location**
-  (spawn there); Action cards target a **friendly unit** (it performs the action). Play resolves
-  to a real spawn / a real unit behavior on the battlefield. Headless-test: a unit card spawns at
-  a location; an action card makes its target unit act.
-- [x] **Chunk 34 — Round loop: timed real-time play + tactical pause.** The card battle **starts
-  PAUSED** with an opening hand; **End Turn BEGINS a round** → a **PLAY phase** (real time for
-  `RoundSeconds`, default 15; units move/fight and cards are playable live) → at **timeout** it
-  auto-flips to a **PAUSE phase** (battlefield frozen via `GetTree().Paused = true`, with `CardBattle`
-  at `ProcessMode = Always` and the `Units` node `Pausable` so the UI/cards keep running while units
-  freeze) **and redeals** (discard hand, refill energy, draw a fresh 5); End Turn plays the next round.
-  Pure `RoundLoop` state machine drives it; HUD banner shows round/phase + countdown. End Turn is
-  disabled during PLAY. Headless-tested: starts paused; End Turn begins a round; timeout advances the
-  round counter + repauses; cards playable in both phases (`_ExitTree` lifts the global pause on the
-  way out so the menu/next scene isn't frozen).
-- [x] **Chunk 35 — Dev panel: live round-length control.** A toggleable in-mode dev panel (DEV button
-  or F3) to adjust `RoundSeconds` live while testing (−/+ in 5 s steps, clamped 5–60) plus a manual
-  pause/resume toggle for debugging. `RoundLoop.RetuneRoundSeconds` caps the live clock to the new
-  length; `RoundLoop.Resume` continues the SAME round (no redeal/bump, unlike End Turn). Pure dev tool.
-- [x] **Chunk 36 — HP / Str / Int stats wired in.** Add Str/Int to units; Str scales weapon
-  damage + strength actions, Int scales magic actions. Headless-test: higher Str → more weapon
-  damage; higher Int → stronger magic action.
-- [x] **Chunk 37 — Energy from KotH points.** `scripts/Cards/EnergyPool.cs` (pure model): each round's
-  energy = a base allowance + a bonus per capture point your team holds at the pause (territory = economy).
-  `CardBattle` refills it from the live count of player-held `capture_points` at every pause and GATES
-  plays (unaffordable cards are disabled / refused). Two `CapturePoint`s added to `CardBattle.tscn`.
-  Headless-tested: holding more points grants more energy; energy gates plays.
-- [x] **Chunk 38 — Run structure (rooms + rewards + events).** `scripts/Cards/RunMap.cs` (pure model):
-  a fixed-shape sequence of rooms (Combat / Event / Boss) you traverse; `CompleteCurrentRoom()` marks
-  the room cleared, advances the map, and returns a `RoomReward` (card choices); `TakeReward()` adds a
-  chosen card to the run's growing `Collection` (the deck carried between rooms, seeded from the starter
-  deck) or skips. `CardLibrary.RewardPool()` is the reward card pool. `CardBattle` is a thin view:
-  room-track HUD, a paused-only "Clear Room" control that pops a reward picker, each new room reloads
-  the battle deck from `Collection`, plus a run-complete banner. Headless-tested.
-- [x] **Chunk 39 — Relics & potions.** Passive **relics** (run-long modifiers) + consumable
-  **potions** (one-shot effects), collected through the run. Headless-test: a relic's modifier
-  applies; a potion consumes and triggers its effect.
-
----
-
-### ▶ PLANNED — M12.5 Endzone Auto-Battler Reshape (Chunks 40–43)
-
-**Goal:** reshape "Slay the Eggs" into a football-pitch auto-battler — a smaller, fully
-on-screen field with two **endzones**; you deploy units in YOUR endzone and they **march
-toward the enemy endzone unless aggro'd**; faster 5 s turns; a unit-heavy starter deck.
-Only `CardBattle` is touched — the other levels (real formations, global enemy chase) must
-stay exactly as they are, so every new behavior is **off by default** and `CardBattle`
-opts in.
-
-- [x] **Chunk 40 — Football field: smaller arena + endzones + camera reframe.** Shrink the
-  `CardBattle.tscn` ground from 50×50 to a smaller pitch (longer along Z than wide — march
-  lanes), and add two translucent ground strips: a **player endzone** at the near end (+Z,
-  toward camera) and an **enemy endzone** at the far end (−Z). Reframe `Camera3D` (raise /
-  pull back / tilt — and/or FOV) so the WHOLE pitch is visible in front of it, including the
-  near edge by the camera (today it clips off-screen). Move the seed swordmen/bowmen into the
-  far enemy endzone. Store the player-endzone bounds on `CardBattle` for Chunks 41–42. Pure
-  visual + layout; **user feel-check** that the field is fully on-screen and uncramped.
-- [x] **Chunk 41 — Endzone-gated unit placement.** Unit cards may only be placed inside the
-  PLAYER endzone. `TryPlayAtLocation` validates the ground-ray point against the endzone
-  bounds and rejects an out-of-zone click with a prompt ("Place units in your endzone") —
-  the card stays pending so the player can re-aim. Action-card targeting is unchanged. Pull
-  the bounds test into a tiny pure helper (e.g. an `Endzone` struct with `Contains`, in
-  `scripts/Cards/`) so it's headless-testable. **Headless-test:** a point inside the endzone
-  is accepted, a point outside is rejected.
-- [x] **Chunk 42 — Forward-march unit AI (advance to enemy endzone unless aggro'd).** Add a
-  shared opt-in march behavior on `Unit` (e.g. `MarchMode` + a per-team `MarchDirection` and
-  an `AggroRange`): when no opponent is within `AggroRange`, the unit walks toward the
-  OPPOSING endzone (friendly → −Z, enemy → +Z); when one is in range it engages with its
-  existing chase/attack. Wire it into `Ally`, `Enemy`, `Swordman`, `Bowman` _PhysicsProcess
-  as a fallback path; default OFF so other levels keep global chase / real formations.
-  `CardBattle` turns it ON for every unit — the seed enemies (in `_Ready`) and every spawned
-  unit (`SpawnUnit`) — with the march direction set by team. **Headless-test:** a march-mode
-  unit with no foe in range moves toward its goal direction; with a foe inside `AggroRange`
-  it stops marching and engages. Feel-check the advance pacing.
-- [x] **Chunk 43 — Mode tuning: 5 s turns + unit-heavy starter deck.** Default `RoundSeconds`
-  to **5** (script default + explicit on `CardBattle.tscn`). Reweight `CardLibrary.StarterDeck()`
-  to be **mostly Unit cards** (units the clear majority, a few actions) so the opening deck
-  is about deploying a force. **Headless-test:** the starter deck is majority Unit; default
-  round length is 5 s.
-
----
-
-### ▶ PLANNED — M12.7 Two-Player Couch Co-op (Chunks 44–47)
-
-**Goal:** one new *local same-screen* co-op level. **Player 1** drives a captain with
-**keyboard + mouse**; **Player 2** drives a second captain with a **gamepad**. Each captain
-leads **6 pikemen + 2 bowmen** in formation, and both squads fight a **shared AI enemy force**.
-A single shared camera frames both captains; the match is lost only when **both** captains fall.
-The first four levels are removed from the menu. This is NOT the networked M13 — no netcode,
-just two input devices on one machine.
-
-**Invariant — don't disturb the other levels.** Every behavior below is **off by default**
-(`Any` control scheme, no `CaptainPath`, single camera target, single-captain lose rule); only
-the new co-op scene opts in. Existing levels (real formations, blended keyboard+gamepad on one
-captain, single-target camera, lose-on-player-death) must behave EXACTLY as they do today.
-
-**New durable rules (promote into §5 as chunks land):**
-- **Control schemes.** `Player.ControlScheme` ∈ {`Any`, `KeyboardMouse`, `Gamepad`}. `Any`
-  (default) = today's blended read (keyboard+gamepad move, mouse aim) so single-player levels
-  are untouched. `KeyboardMouse` reads only the keyboard for move + mouse for aim. `Gamepad`
-  reads a specific pad (`DeviceId`) — **left stick = move, right stick = aim** (directional, no
-  mouse), face buttons = attack/brace/swap/mount/zoom.
-- **Squad ownership.** An `Ally` with `CaptainPath` set anchors its formation slot + facing to
-  THAT captain (not `GetFirstNodeInGroup("player")`), so two squads follow two captains.
-- **Co-op match state.** `GameManager` gains `RequireAllPlayersDead` (default false). When true
-  (co-op scene), LOSE fires only once EVERY `player`-group captain is dead/gone; WIN is unchanged
-  (all enemies cleared).
-
-- [x] **Chunk 44 — Per-captain control schemes + controller aim.** Add `Player.ControlScheme`
-  (`Any`|`KeyboardMouse`|`Gamepad`) + `DeviceId`, default `Any` = current behavior. Route move /
-  aim / attack / brace / swap / mount / zoom through scheme-aware reads: `Gamepad` uses left stick
-  to move, **right stick to aim** (turn toward the stick direction, rate-limited like the mouse
-  aim), and that pad's buttons; `KeyboardMouse` uses keyboard + mouse only. Pull the stick-aim
-  math (stick vector → desired yaw) into a tiny pure helper. **Headless-test:** right-stick vector
-  resolves to the correct facing yaw; `Any` still reads the blended path.
-- [x] **Chunk 45 — Squad ownership (allies bound to a specific captain).** Add `Ally.CaptainPath`
-  (NodePath export); when set, the ally resolves its captain from it and anchors slot + facing to
-  that captain; unset = today's first-`player`-group behavior. **Headless-test:** an ally with an
-  explicit captain follows that captain's slot, not another captain's.
-- [x] **Chunk 46 — Shared two-player camera.** Give `FollowCamera` an optional second target
-  (`Target2`); when set, center on the **midpoint** of both captains and size the distance to keep
-  both (plus crowd spread) framed, reusing the dynamic-zoom fit. Single-target path unchanged.
-  **Headless-test:** with two targets the focus point is their midpoint and the distance grows as
-  they separate.
-- [x] **Chunk 47 — Co-op level scene + co-op lose rule + menu.** Build
-  `scenes/Levels/CoopStand.tscn`: two captains (P1 `KeyboardMouse`, P2 `Gamepad` device 0), each
-  leading **6 Pikemen + 2 bowmen** (friendly archers — re-team a Bowman to the player side or use
-  a bow-skinned ranged `Ally`, whichever keeps squad cohesion) wired to their captain via
-  `CaptainPath`, vs a shared AI enemy force (swordmen + bowmen); the shared two-captain camera;
-  `GameManager` with `RequireAllPlayersDead = true`. **Remove Level 1–4** from `LevelSelect.tscn`
-  and delete their scene files (git keeps history); renumber the menu and add the co-op level +
-  a P1/P2 controls note. **User feel-check** (needs a gamepad to test P2).
-
----
-
-### ▶ PLANNED — M7 Ally Commands (Chunks 48–49)
-
-**Goal:** let the captain DIRECT the squad beyond the default loose leash — recall to formation,
-hold a spot, or push forward — without disturbing any existing level. Every behaviour is **off by
-default** (allies spawn `Follow` = today's loose-leash) and `MarchMode` is resolved before commands,
-so the football auto-battler is untouched too.
-
-- [x] **Chunk 48 — Ally command model (Follow / Hold / Attack-move).** `Ally.CommandMode`
-  (`Follow` default | `Hold` | `AttackMove`) + a `_commandPoint` anchor and `HoldAt` / `AttackMoveTo`
-  / `FollowCaptain` setters. **Follow** = today's behaviour (leash to the moving formation slot).
-  **Hold** plants on a fixed point and engages foes within `LeashRadius` of THAT point, else settles
-  back on it. **Attack-move** advances to a fixed point, engaging foes within `AggroRange` en route,
-  then holds. The leash scan now anchors on `CommandAnchor()` and the arrive logic on a shared
-  `ArriveVelocity(point)`. Headless-tested: default is Follow; Hold plants; Attack-move advances; a
-  held ally engages a near foe.
-- [x] **Chunk 49 — Captain issues squad commands.** `Player` reads scheme-aware command edges
-  (Follow / Hold / Attack-move) and `IssueSquadCommand` dispatches them to the allies bound to it
-  (`a.Captain == this` — its `CaptainPath` squad, or the whole player squad in single-player):
-  **Hold** plants each ally where it stands, **Attack-move** sends them to a point
-  `AttackMoveDistance` ahead of the captain's facing, **Follow** recalls them to formation.
-  Per-captain (co-op: P1 keys F/H/G, P2 gamepad left-shoulder/d-pad) so squads take orders
-  independently. New `command_follow` / `command_hold` / `command_attack` input actions + a HUD hint
-  line. Headless-tested: a captain's order reaches only its own squad, with the right mode + target.
-
-**(Later — M7 polish, unnumbered for now: a command-state HUD marker over each ally, and an
-attack-move ground-target reticle.)**
-
----
-
-### ▶ PLANNED — M13 Multiplayer (Chunks 50–54)
-
-**Goal:** 2 players over the network, **server-authoritative** — the hardest, last milestone.
-One player **hosts** (acts as server + plays); the other **joins** by address. The server owns
-all simulation (units, AI, combat, knockback, match state); clients send input and render
-replicated state. Built on **Godot 4 high-level multiplayer** — `ENetMultiplayerPeer`,
-`MultiplayerSpawner`, `MultiplayerSynchronizer`, and `[Rpc]` methods — so it layers on the
-existing `Unit`/`Player`/`GameManager` spine without rewriting combat.
-
-**Invariant — don't disturb single-player / couch co-op.** All netcode is **off unless a peer
-is active** (`Multiplayer.MultiplayerPeer` set / `GetTree().GetMultiplayer().HasMultiplayerPeer()`).
-With no peer, every unit keeps simulating locally exactly as today (offline play, the couch-coop
-scene, the card battler must be byte-identical). Authority checks short-circuit to "I am authority"
-when there's no peer.
-
-**New durable rules (promote into §5 as chunks land):**
-- **Server is the sole authority.** Only the server runs AI, applies damage/knockback, spawns/frees
-  units, and decides win/lose. Clients are thin: send input via RPC, display synchronized state.
-- **One Player per peer.** Each connected peer owns exactly one captain; `SetMultiplayerAuthority`
-  ties that captain (input) to its peer. AI units stay under server authority.
-- **Net play is opt-in by scene.** A networked level sets up the peer + spawner; offline scenes
-  never create a peer, so the authority short-circuit keeps them unchanged.
-
-- [ ] **Chunk 50 — Net bootstrap: host/join lobby + ENet peer.** A `scenes/Menu/Lobby.tscn` +
-  `scripts/Net/NetGame.cs` (autoload-style singleton or scene script): **Host** creates an
-  `ENetMultiplayerPeer.CreateServer(port)`, **Join** does `CreateClient(address, port)`; show a
-  live connected-peer list and a Start button (host only). Wire `peer_connected` /
-  `peer_disconnected` / `connected_to_server` / `connection_failed` signals. No gameplay yet —
-  just establish and tear down the connection cleanly. Add Lobby to `LevelSelect`. **Headless-test:**
-  a server peer reports `IsServer`/peer count; the authority short-circuit returns true with no peer.
-- [ ] **Chunk 51 — Networked captain spawn + ownership.** A `scenes/Levels/NetStand.tscn` with a
-  `MultiplayerSpawner` that spawns one captain per peer on the server and replicates it to clients;
-  `SetMultiplayerAuthority(peerId)` on each so a client only drives its own captain. `Player` reads
-  input **only when it is the multiplayer authority** (and the authority check short-circuits to true
-  offline, so existing scenes are untouched). **Headless-test:** authority resolves to the owning peer
-  id; a non-authority Player skips its input read.
-- [ ] **Chunk 52 — State replication (transforms + health).** Attach `MultiplayerSynchronizer`s (or a
-  hand-rolled server→client state RPC) to units replicating position, yaw, and `Health` from the
-  server. The server spawns/frees all AI + ally units via the spawner; clients never spawn. Dead units
-  free server-side and the despawn replicates. **Headless-test:** a server-side health change is the
-  value clients would read from the synced property; only the server mutates it.
-- [ ] **Chunk 53 — Server-authoritative combat & input RPCs.** Client captain input (move dir, aim yaw,
-  attack/brace/swap/command edges) goes to the server via `[Rpc(RpcMode.AnyPeer)]`; the server applies
-  it to that peer's captain, resolves all `TakeDamage`/`AddKnockback`/death there, and lets replication
-  carry results back. Clients never resolve damage locally. **Headless-test:** an input RPC routed to
-  the server moves/acts the right captain; a client-side damage call is ignored when not authority.
-- [ ] **Chunk 54 — Networked co-op level + synced match state + menu.** Make `NetStand` a full battle:
-  two captains (one per peer) each leading a squad vs a shared server-run enemy force; `GameManager`
-  runs **only on the server** and broadcasts win/lose to clients (drives the shared `victory`/`game_over`
-  groups so `ResultMenu` works for everyone); `RequireAllPlayersDead` reused so it ends only when both
-  captains fall. Listed on `LevelSelect`. **Headless-test:** server-decided match result propagates to a
-  client; clients don't independently declare win/lose. **User feel-check** (needs two machines / two
-  instances).
-
----
-
----
-
-### ▶ PLANNED — M12.8 Slay-the-Spire-Feel Pass (Chunks 55–59)
-
-**Goal:** the card mode (`scenes/Cards/CardBattle.tscn` + `scripts/Cards/CardBattle.cs`) currently
-renders each hand card as a bare `Button` whose face is one multi-line text string — it reads as an
-"ugly transparent block," the hand band eats ~40% of the screen, and the hand `CanvasLayer` overlaps
-the near edge of the 3D pitch. This milestone makes it LOOK like Slay the Spire (and PLAY like it in
-the PAUSE phase) **without** changing the model or the real-time auto-battler. **Visual reskin only.**
-
-**Invariant — model & play untouched.** No changes to `Deck`/`Card`/`EnergyPool`/`RunMap`/`CardPlay`
-or the two-click aim (click card → click ground/unit). The round loop, energy gating, endzone march,
-and run structure all behave EXACTLY as today. These chunks only touch how `CardBattle` *draws* the
-hand/HUD and how the `Camera3D`/layout frame the board. Each is independently feel-checkable.
-
-**OUT of scope (don't build unless asked):** drag-to-target play, enemy intent telegraph icons, and a
-full turn-based remake (dropping the real-time march). Decided against in the planning convo.
-
-- [ ] **Chunk 55 — `CardView` card frame (keystone).** Replace the `Button`-with-text in
-  `CardBattle.MakeCardButton` with a reusable composite control (a small `scenes/Cards/CardView.tscn`
-  or an in-code builder): rounded `StyleBoxFlat` frame, a **cost orb** badge (circular, top-left, the
-  `EnergyCost` number), a **title banner** colored by kind (Unit=blue / Action=amber), an **art panel**
-  (solid tint / simple per-kind icon placeholder for now — real art later), and a **description box**
-  at the bottom. Preserve today's behavior: click-to-select (`OnCardSelected`), pending-card highlight,
-  and affordability dimming (`Disabled = _pendingReward != null || !_energy.CanAfford(card)`). Biggest
-  single visual win; the rest build on it. Pure visual; user feel-check.
-- [ ] **Chunk 56 — Compact fanned hand + hover-lift.** Stop the hand eating ~40% of the screen at rest:
-  render the `CardView`s smaller and **overlapping in a slight arc** (manual fan / negative separation
-  instead of the plain `HandBox` row), and on hover **enlarge + raise** the focused card above its
-  neighbors (mouse enter/exit → scale + z-order). At rest the hand is a thin ribbon; hovering "opens" a
-  card. Reclaims most of the bottom-screen real estate. Pure visual; feel-check.
-- [ ] **Chunk 57 — Board/tray separation + camera reframe.** Tilt/raise the `Camera3D` (currently
-  `y=30, z=23`, ~50° tilt) and/or drop FOV so the whole pitch sits in the upper portion and its near
-  edge no longer hides behind the hand; add a dark **hand-tray band** (styled panel strip) behind the
-  cards so board and hand are visually distinct (the StS shelf). Feel-check nothing important clips.
-- [ ] **Chunk 58 — StS HUD chrome (energy orb + pile stacks).** Reskin existing widgets only: turn the
-  centered "ENERGY x/y" `EnergyLabel` into a **crystal orb** bottom-center/left (big number in a circular
-  `StyleBox`), and turn the flat `DrawPanel`/`DiscardPanel` into little **card-back stacks** with the
-  count overlaid (bottom-left / bottom-right); make End Turn the big rounded bottom-right button. No
-  logic change — same labels/counts, new look.
-- [ ] **Chunk 59 — Play juice.** Cheap `Tween`s, no model change: cards slide up into the hand on draw,
-  fly toward the discard stack on play, the energy orb pulses on refill, hovered cards tween smoothly.
-  Final polish pass; feel-check.
-
-**(Independent of M13 — these can be built whenever the user asks; they don't gate, and aren't gated by,
-the netcode chunks. Build order recommendation: 55 → 57 → 58 → 56 → 59, but 55 first regardless.)**
-
----
-
-### ▶ PLANNED — M14 Traversable Terrain — fighting on slopes (Chunks 60–65)
-
-**Goal:** in the **Highlands** level, units WALK AND FIGHT up and down real terrain elevation — not just a
-visual backdrop ridge. The current `scenes/Levels/Highlands.tscn` is a flat field ringed by visual-only
-hills (`scripts/Scenery.cs`); this milestone makes that terrain solid and the units climb it.
-
-**Why this is the project's highest-risk change.** Every fighter shares ONE movement pattern: build a
-horizontal (X/Z) velocity, force `Y = 0`, then `MoveAndSlide()` on a flat plane — **no gravity, no floor
-snapping** — and spawns sit at a fixed `y ≈ 1` (`Player.cs` "Flat ground for now", `Ally.ArriveVelocity`
-zeroes Y, etc.). The terrain mesh has **no collision**. Projectiles fly dead level (`Stone.cs`/`Arrow.cs`
-set `direction.Y = 0`). The camera and formation slots assume a fixed height. So slopes touch the movement
-core of `Player`/`Ally`/`Enemy`/`Swordman`/`Bowman`/`Mount` at once.
-
-**Invariant — flat levels stay byte-identical.** All grounded behaviour is **opt-in** via a `Unit.Grounded`
-export, **default OFF**; only Highlands turns it on. With it OFF the `Y = 0` + flat-plane motion every other
-level (Pinball / KotH / Co-op / card battler / crowd tests) relies on must be UNCHANGED. Headless-test that a
-non-grounded unit moves exactly as before.
-
-**New durable rules (promote into §5 as chunks land):**
-- **Grounded movement.** When `Grounded` is on, a unit applies gravity to a Y velocity, sets
-  `UpDirection = Vector3.Up` + a `FloorSnapLength` so it sticks to downhill slopes, and `FloorMaxAngle` so
-  shallow hills are walkable but cliffs block. Off = today's `Y = 0` flat motion.
-- **Heightmap terrain.** `Scenery` exposes its height function as solid collision via a `HeightMapShape3D`
-  generated from the SAME height field that draws the mesh, so visuals and collision match exactly.
-- **Ballistic projectiles.** On grounded levels stones/arrows lob in an arc (gravity) toward the target's
-  actual height instead of flying level, so up/downhill shots connect.
-
-- [x] **Chunk 60 — Terrain collision (heightmap).** Give `Scenery`'s hills a `HeightMapShape3D` (or trimesh)
-  built from its height function under a `StaticBody3D`, with `FloorMaxAngle`-friendly slope; keep the flat
-  centre level. Replace Highlands' separate flat ground plane with the terrain collision (keep boundary walls).
-  **Headless-test:** a downward ray / a dropped body lands at the height the function predicts.
-- [x] **Chunk 61 — Grounded movement on `Unit` (keystone).** Add `Unit.Grounded` (default OFF) + shared
-  gravity/floor-snap helper; route every subclass's `Velocity = horizontal*scale + knockback` through it so
-  Y becomes the gravity term when grounded, untouched (0) when not. Set `UpDirection`/`FloorSnapLength`/
-  `FloorMaxAngle`. **Headless-test:** a grounded unit on a slope settles to the surface and can climb it; a
-  non-grounded unit's motion is byte-identical to today.
-- [x] **Chunk 62 — Spawn / formation / facing height.** Grounded units settle to terrain on spawn (ray-place
-  or let gravity drop them); formation-slot + command points sample terrain height so allies don't steer at a
-  point in the air; mounts follow the ground under the rider. **Headless-test:** a slot point on a slope
-  resolves to the terrain surface height.
-- [x] **Chunk 63 — Ballistic projectiles.** On grounded levels, `Stone`/`Arrow` lob in a gravity arc aimed at
-  the target's real position (height included) instead of level flight; flat levels keep the straight shot.
-  Shared `Ballistics.SolveArcVelocity` solver; arrows tip along the arc; lobbed shots free on terrain impact.
-  **Headless-test:** an arced shot's trajectory reaches a target above/below the launch height.
-- [x] **Chunk 64 — Terrain-following camera.** Damp `FollowCamera`'s focus height (and lift it) so the view
-  doesn't jolt as the captain climbs/descends, reusing the dynamic-zoom fit. Single-target + flat path
-  unchanged. **Headless-test:** the focus height eases toward the target's Y rather than snapping.
-- [~] **Chunk 65 — Highlands redesign + tune.** Reworked `Scenery.HeightAt` from "flat field ringed by a
-  26 m wall of hills" into GENTLE PLAYABLE terrain: low rolling swells across the whole field
-  (`PlayAmplitude`) + a couple of crossing ridges (`Ridge()`/`RidgeHeight`/`RidgeWidth`), with only the
-  distant backdrop rising for a highland horizon (`BackdropHeight`/`RampWidth`). Set `Grounded = true` on
-  every Highlands unit so they walk/fight the slopes. Knockback-on-slopes tuning still open. **User feel-check.**
-
-**(Highlands-scoped by decision: do NOT roll `Grounded` out to other levels unless asked. Build order is
-60 → 61 → 62 → 63 → 64 → 65; 60 + 61 are the load-bearing pair.)**
-
----
-
-### ▶ PLANNED — M15 Co-op Card Brawl — Slay the Eggs reborn (Chunks 66–71)
-
-**Goal:** a brand-new *local same-screen 2-player* survival mode that fuses the card battler (M12) with couch
-co-op (M12.7). Each player drives a **basic egg** that can only throw a **weak punch**; both players share ONE
-hand of cards. Between rounds the field freezes and they spend shared energy to play cards — `sword`/`fireball`
-**buff the egg of whoever played the card**, `soldier` spawns a subordinate. **End Turn** runs a **15 s
-real-time survival wave**; at timeout it pauses, redeals a fresh hand, and the next (harder) wave is queued.
-Survive the waves; you lose only when **both** eggs fall.
-
-**Design decisions (locked with the user):**
-- **Basic egg = weak punch.** Both human captains start unarmed with a weak, short-reach, no-knockback punch.
-  Cards are the ONLY way to get stronger.
-- **Card targeting = whoever played it.** Weapon/ability cards auto-apply to the egg of the device that played
-  the card (no target click). `soldier` spawns allied to that same player.
-- **Play in the PAUSE only.** Cards are NOT playable during the live 15 s wave (unlike today's `CardBattle`),
-  so nobody fumbles cards while driving an egg.
-- **Opponent = escalating survival waves.** Each round spawns a fresh, larger enemy wave. No KotH points here,
-  so energy is a flat per-round allowance (`BaseEnergy`, no territory bonus).
-- **Both-fall lose rule** reused from co-op (`RequireAllPlayersDead`).
-
-**Invariant — don't disturb existing modes.** This is a NEW scene + manager; the endzone `CardBattle`, the
-couch-coop `CoopStand`, and every other level stay byte-identical. New `Player`/`Card` behaviour is opt-in
-(weak-egg loadout only on this scene's captains; new card-effect category is additive; the existing
-Unit/Action card resolution is untouched). The M12 model classes gain additive members only.
-
-**New durable rules (promote into §5 as chunks land):**
-- **Runtime loadout on `Player`.** A `Player` can be spawned as a "basic egg" (a weak unarmed `Punch` profile)
-  and be upgraded at runtime — `EquipWeapon(WeaponType)` swaps its loadout (reusing the M9 `swap_weapon`
-  plumbing) and `GrantAbility(kind)` adds a castable ability.
-- **Player abilities.** A `Player` holds granted abilities (e.g. `Fireball` = a magic projectile on a cooldown,
-  scaling with `Intelligence`), cast via a scheme-aware `cast_ability` input. None granted by default.
-- **Player-buff cards.** Beyond Unit/Action, a card may carry a **player-upgrade** effect (`GrantWeapon` /
-  `GrantAbility`); resolving it applies to the **triggering player** (the play API now carries which player
-  played the card). `soldier` stays a Unit card but spawns onto the triggering player's team/captain.
-
-- [x] **Chunk 66 — Basic egg + runtime loadout swap on `Player`.** Added a weak unarmed `Punch` `WeaponType`
-  (last enum value; `Punch*` profile exports — dmg 6, reach 1.0 < sword 1.4, no knockback) + a `StartUnarmed`
-  export so a `Player` spawns wielding the Punch instead of `StartingWeapon`. `EquipWeapon(WeaponType)` arms the
-  egg at runtime via the M9 profile plumbing. `SwapWeapon` skips Punch (`SwappableWeaponCount`) so Q only ever
-  cycles the four real weapons — existing armed scenes byte-identical. Headless-tested (`TestBasicEgg`): the
-  unarmed punch is weak + no-knockback + short, and `EquipWeapon(Sword)` raises reach/damage and restores knockback.
-- [ ] **Chunk 67 — Player ability system + Fireball.** `Player` carries granted abilities; `GrantAbility(kind)`
-  adds one; a scheme-aware `cast_ability` input casts the active ability. `Fireball` = a magic projectile on a
-  cooldown, damage via `ScaledMagicDamage` (Int). New `cast_ability` input action (key + gamepad button).
-  Nothing granted by default. **Headless-test:** granting Fireball enables a cast that deals magic damage;
-  without it, casting is a no-op; cooldown gates repeat casts.
-- [ ] **Chunk 68 — Player-buff card category (applied to the playing egg).** Extend the pure card model: a card
-  can `GrantWeapon` or `GrantAbility` (in addition to Unit/Action); the play API gains the triggering player so
-  resolution applies to THAT egg (weapon→`EquipWeapon`, ability→`GrantAbility`), and a `soldier` Unit card
-  spawns onto that player's team/captain. `CardLibrary.BrawlDeck()` + brawl card pool (Sword, Fireball, Soldier,
-  …). **Headless-test:** each card type resolves to the right effect on the named player; the existing
-  Unit/Action resolution is unchanged.
-- [ ] **Chunk 69 — Shared-hand co-op card UI (two devices).** The pause-phase hand is operable by BOTH players:
-  P1 selects with the mouse, P2 with a gamepad cursor (highlight + confirm button); each play records which
-  player triggered it so the buff lands on the right egg. Shared energy + shared hand (either player can play
-  any affordable card). End Turn available to either device. **Headless-test where possible** (selection→play
-  routing carries the correct player id); UI feel-check.
-- [ ] **Chunk 70 — Wave/survival mode: scene + manager + co-op lose.** `scenes/Levels/CoopCardBrawl.tscn`: two
-  basic eggs (P1 `KeyboardMouse`, P2 `Gamepad` device 0), the shared two-captain camera, the `RoundLoop`
-  pause→15 s→pause-redeal cadence, and `CardLibrary.BrawlDeck()`. A `WaveManager` spawns an escalating enemy
-  wave each round; energy refills to a flat `BaseEnergy` each pause (no KotH). `GameManager` with
-  `RequireAllPlayersDead = true`; survive N waves to win (or endless). Add to `LevelSelect` with a P1/P2 controls
-  note. **Headless-test:** wave N spawns the scaled count; advancing a round queues the next wave; lose fires
-  only when both eggs are down.
-- [ ] **Chunk 71 — Balance + feel pass.** Tune punch vs card-granted weapons/abilities, soldier strength, card
-  energy costs, the flat per-round energy, and wave scaling/pacing so the 15 s rounds feel fair for two players.
-  **User feel-check** (needs a gamepad for P2).
-
-**(Build order 66 → 71; 66 + 68 are the load-bearing pair — the weak egg and the buff-the-player card category.
-Independent of M13; build whenever the user asks.)**
-
----
-
-Then proceed to multiplayer polish & netcode hardening as needed (lag handling, reconnection),
-updating checkboxes and §8 as you go.
+**Shelved — not now (revisit only when asked; full detail in git history):**
+- **M12.8 — Slay-the-Spire-feel pass (Chunks 55–59):** card-mode visual reskin (card frames, fanned
+  hover-lift hand, board/tray + camera reframe, StS HUD chrome, play juice). Visual only.
+- **M13 — Multiplayer (Chunks 50–54):** networked 2-player, server-authoritative. The hardest, last.
 
 ## 8. Quick Reference
 
