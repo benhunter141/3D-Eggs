@@ -237,9 +237,9 @@ public partial class CardBrawl : Node3D
 
 		_handBox = new HBoxContainer();
 		_handBox.SetAnchorsPreset(Control.LayoutPreset.CenterBottom);
-		_handBox.OffsetLeft = -560; _handBox.OffsetRight = 560;
-		_handBox.OffsetTop = -250; _handBox.OffsetBottom = -70;
-		_handBox.AddThemeConstantOverride("separation", 10);
+		_handBox.OffsetLeft = -380; _handBox.OffsetRight = 380;
+		_handBox.OffsetTop = -226; _handBox.OffsetBottom = -68;
+		_handBox.AddThemeConstantOverride("separation", 8);
 		_handBox.Alignment = BoxContainer.AlignmentMode.Center;
 		root.AddChild(_handBox);
 
@@ -291,29 +291,92 @@ public partial class CardBrawl : Node3D
 			_promptLabel.Text = "P1: click a card    P2: d-pad + A    then End Turn.";
 	}
 
+	// Compact card frame (Chunk 73): the clickable root stays a Button (so Pressed / Disabled / the P2
+	// cursor Modulate-tint all keep working), styled with a tinted border; child Controls (mouse-ignored,
+	// so clicks fall through to the button) draw a coloured header bar with the title, a cost badge, and a
+	// short wrapped description. Smaller than the old 150×200 text button so the whole hand stays on-screen.
 	private Button MakeCardButton(Card card, int index)
 	{
+		Color accent = BuffColor(card);
 		var b = new Button
 		{
-			CustomMinimumSize = new Vector2(150, 200),
-			Text = $"{card.Title}\n\nCost {card.EnergyCost}\n\n{card.Description}",
-			AutowrapMode = TextServer.AutowrapMode.WordSmart,
-			ClipText = false,
+			CustomMinimumSize = new Vector2(116, 156),
+			ClipText = true,
 			Disabled = _round.Current != RoundLoop.Phase.Pause || !_energy.CanAfford(card),
 		};
-		b.AddThemeFontSizeOverride("font_size", 14);
-		b.AddThemeColorOverride("font_color", BuffColor(card));
+		b.AddThemeStyleboxOverride("normal",   CardFrame(accent, 0.13f));
+		b.AddThemeStyleboxOverride("hover",    CardFrame(accent, 0.20f));
+		b.AddThemeStyleboxOverride("pressed",  CardFrame(accent, 0.20f));
+		b.AddThemeStyleboxOverride("disabled", CardFrame(accent, 0.07f));
 		b.Pressed += () => OnCardClicked(index);
+
+		var col = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore };
+		col.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+		col.AddThemeConstantOverride("separation", 4);
+		b.AddChild(col);
+
+		// Tinted header bar with the title (dark text on the accent colour).
+		var header = new Label
+		{
+			Text = card.Title,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			VerticalAlignment = VerticalAlignment.Center,
+			CustomMinimumSize = new Vector2(0, 26),
+			ClipText = true,
+		};
+		var bar = new StyleBoxFlat { BgColor = accent };
+		bar.SetContentMarginAll(2);
+		bar.CornerRadiusTopLeft = bar.CornerRadiusTopRight = 5;
+		header.AddThemeStyleboxOverride("normal", bar);
+		header.AddThemeFontSizeOverride("font_size", 13);
+		header.AddThemeColorOverride("font_color", new Color(0.1f, 0.1f, 0.13f));
+		col.AddChild(header);
+
+		var cost = new Label
+		{
+			Text = $"⚡ {card.EnergyCost}",
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			HorizontalAlignment = HorizontalAlignment.Center,
+		};
+		cost.AddThemeFontSizeOverride("font_size", 12);
+		cost.AddThemeColorOverride("font_color", accent);
+		col.AddChild(cost);
+
+		var desc = new Label
+		{
+			Text = card.Description,
+			MouseFilter = Control.MouseFilterEnum.Ignore,
+			AutowrapMode = TextServer.AutowrapMode.WordSmart,
+			HorizontalAlignment = HorizontalAlignment.Center,
+			SizeFlagsVertical = Control.SizeFlags.ExpandFill,
+		};
+		desc.AddThemeFontSizeOverride("font_size", 10);
+		desc.AddThemeColorOverride("font_color", new Color(0.82f, 0.84f, 0.9f));
+		desc.OffsetLeft = 4; desc.OffsetRight = -4;
+		col.AddChild(desc);
+
 		_handBox.AddChild(b);
 		return b;
+	}
+
+	// Dark card body with a tinted border; bg lightens toward the accent on hover (alpha arg).
+	private static StyleBoxFlat CardFrame(Color accent, float bgMix)
+	{
+		var s = new StyleBoxFlat { BgColor = new Color(0.11f, 0.11f, 0.15f).Lerp(accent, bgMix) };
+		s.SetBorderWidthAll(2);
+		s.BorderColor = accent;
+		s.SetCornerRadiusAll(6);
+		s.SetContentMarginAll(0);
+		return s;
 	}
 
 	// Soldier = blue, weapon = amber, ability = violet (so the shared hand reads at a glance).
 	private static Color BuffColor(Card card) => card.Buff switch
 	{
-		Card.BuffKind.Weapon  => new Color(1.0f, 0.85f, 0.55f),
-		Card.BuffKind.Ability => new Color(0.8f, 0.65f, 1.0f),
-		_                     => new Color(0.6f, 0.8f, 1.0f),
+		Card.BuffKind.Weapon  => new Color(0.95f, 0.72f, 0.35f),
+		Card.BuffKind.Ability => new Color(0.72f, 0.52f, 0.97f),
+		_                     => new Color(0.45f, 0.66f, 0.96f),
 	};
 
 	// Tint P2's cursor card so the gamepad player can see their selection in the shared hand.

@@ -334,7 +334,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       escalating survival waves. **Chunk 71 balance feel-check pending (needs a gamepad for P2).** Chunk 72 done:
       the loop is now foes-first — `CardBrawl.SpawnPreviewWave` stages each wave during the pause (inert in the
       Pausable Units node while frozen) so both eggs see the threat and counter it with cards; End Turn just
-      unfreezes the staged foes. Refinement still queued: **Chunk 73** reskins the cards (nicer + smaller).
+      unfreezes the staged foes. Chunk 73 done: card-UI reskin — compact tinted-border card frames (`CardFrame`)
+      with a coloured header bar, `⚡ cost` badge + wrapped desc, cards 150×200→116×156 and the hand footprint
+      shrunk so 5 cards stay fully on-screen; clickable `Button` root preserved (P1 click, P2 cursor tint).
+      **All M15 chunks (66–73) built; Chunk 71 balance feel-check still pending (needs a gamepad for P2).**
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -436,12 +439,14 @@ opponent = escalating waves; flat per-round energy (`BaseEnergy`, no KotH bonus)
   (no spawn there) — the staged foes spring to life for the 15 s wave. HUD reads "WAVE N INCOMING — counter the
   foes". Headless-tested (`TestBrawlPreview`): a wave enemy spawned into a Pausable node while frozen stays put,
   then chases once unpaused.
-- [ ] **Chunk 73 — Card visual polish (nicer + smaller).** Reskin the `CardBrawl` shared-hand UI so cards
-  read as proper cards and take up less screen space: tighter compact card frames (border + tinted header by
-  `BuffKind`/`CardKind`, title + cost + short icon/desc), a smaller hand footprint that stays fully on-screen
-  for both players, and keep the P1 mouse + P2 gamepad-cursor selection working against the smaller targets.
-  Visual/layout only — the `BrawlHand` routing core, two-click/cursor play, and buff effects stay identical.
-  Verify the hand still fits and both cursors still hit the resized cards.
+- [x] **Chunk 73 — Card visual polish (nicer + smaller).** Reskinned the `CardBrawl` shared-hand UI: each
+  card's clickable root stays a `Button` (so Pressed / `Disabled` / the P2 cursor `Modulate`-tint all keep
+  working) but is now a compact card frame — `CardFrame()` gives a dark body + tinted border that lightens on
+  hover, with mouse-ignored child Controls drawing a coloured header bar (title, dark-on-accent), a `⚡ cost`
+  badge, and a short wrapped description. Border/header tint by `BuffKind` (weapon amber / ability violet /
+  soldier blue). Cards shrank 150×200 → 116×156 and the hand footprint ±560 → ±380 (sep 10 → 8) so 5 cards
+  stay fully on-screen above the End Turn button. Visual/layout only — `BrawlHand` routing, two-click/cursor
+  play, and buff effects unchanged. Builds clean.
 
 **Build order 66 → 73; 66 + 68 are the load-bearing pair (weak egg + buff-the-player card category).
 72 reshapes the loop (foes-first), 73 is the card-UI polish.**
