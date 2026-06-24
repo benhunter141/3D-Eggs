@@ -355,7 +355,9 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       Chunk 78 done: shared `materials/ground.gdshader` (world-space checkerboard + grid + 2-band cel light)
       replaces the flat solid-colour grounds in KotH / Pinball / CoopCardBrawl / CoopStand (per-level tint);
       Pinball walls warmed to matte stone, CoopCardBrawl fences given wood, corner posts added to KotH + Brawl.
-      Feel-check pending.
+      Chunk 79 done: billboarded `HealthBar3D` on every `Unit` (dark bg + team-coloured fill draining right→left),
+      grown sized-off-the-egg in `_Ready`, hidden until hurt and on death; crowd-cheap (shared bg mesh + 3 unshaded
+      billboard mats, only the fill quad per-instance). Feel-check pending.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -370,7 +372,9 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 > **Always end EVERY reply with a one-sentence summary line** of the form
 > `Done: Chunk N — <short name>.` (chunk number + its short name). It must be the very
 > last sentence. For work that isn't a numbered chunk, name it succinctly instead
-> (e.g. `Done: in-game controls HUD.`).
+> (e.g. `Done: in-game controls HUD.`). **Immediately after that summary line, on its own
+> final line, state the number of outstanding (unchecked `[ ]`) chunks remaining in §7**,
+> of the form `Outstanding chunks: N.` — count every `[ ]` box in the Build Plan (§7).
 >
 > Keep chunks self-contained and small. Headless-test logic where possible (§4).
 
@@ -455,19 +459,30 @@ Each chunk is self-contained and testable by running one level.
   dressing to KotH and CoopCardBrawl (CoopStand already richly dressed; Highlands keeps its code-shaded terrain
   and the `CapturePoint` disc keeps its team-signal state colours). Headless-loads clean for all four scenes.
   Feel-check pending.
-- [ ] **Chunk 79 — Floating health bars + hit flash.** A reusable billboarded `HealthBar3D` on `Unit` (shown
-  only when damaged, coloured by team) + a white emissive **hit-flash** on `TakeDamage` that decays.
-  Viewport-guarded so `--headless` stays safe. Test: crowd HP is readable and hits flash.
+- [x] **Chunk 79 — Floating health bars + hit flash.** Reusable billboarded `HealthBar3D` on `Unit` — a dark
+  bg quad + a team-coloured fill that drains right→left, grown in `_Ready` (`SetupHealthBar`) sized off the egg,
+  **hidden until the unit is hurt** and again on death; `RefreshHealthBar` (from `TakeDamage`/`Heal`/`Die`)
+  tracks HP. Crowd-cheap: shared static bg mesh + 3 unshaded billboard materials (depth-test-off + render-
+  priority so bars read over bodies), only the fill quad per-instance (resizable via `QuadMesh.CenterOffset`).
+  The paired **hit-flash** already rides `TakeDamage` via the toon shader's `flash` uniform (Chunk 76).
+  Resource-only build, `--headless`-safe (logic tests stay green). Feel-check pending.
 - [ ] **Chunk 80 — Combat juice particles.** Low-count `GPUParticles3D` one-shots: hit sparks on
   sword/fist/fireball impact, a **death poof** on `Die`/`OnDeath`, dust on knockback bounce. Pooled or
   one-shot-then-free; keep counts modest for the 940MX. Test: hits and deaths feel punchy.
 - [ ] **Chunk 81 — Toon UI/HUD & card theme.** A shared `Theme` resource (font, accent palette, rounded
   panel StyleBoxes) applied across `LevelSelect`, `Hud`, `ResultMenu`, `PauseMenu`, and the `CardBrawl`
   hand/ability bars so the front-end matches the new in-game look. Test: menus + HUD + cards cohere.
+- [ ] **Chunk 82 — Violent egg-break on death.** When a unit (egg) dies, the egg shell should **shatter
+  open violently** instead of just freeing/poofing — fling shell-shard fragments outward with knockback-
+  scaled velocity + spin, a yolk splat/burst, and a sharp impact pop, so deaths read as eggs cracking
+  apart. Reuse the death hook (`OnDeath` / `Die`) and the Chunk-80 particle kit; keep it cheap on the
+  940MX (low fragment/particle counts, one-shot-then-free) and viewport-guarded so `--headless` stays
+  safe. Builds on the EggMesh/EggCracks shell + outline so shards inherit the toon look. Test: a unit
+  death visibly bursts the egg open.
 
-**Build order 75 → 81. 75 + 76 + 77 are load-bearing (environment + toon shade + outline). 78–81 layer the
-requested polish (ground dressing, health bars, particles, UI). Keep every shader Compatibility-safe and
-every change headless-test-green.**
+**Build order 75 → 82. 75 + 76 + 77 are load-bearing (environment + toon shade + outline). 78–82 layer the
+requested polish (ground dressing, health bars, particles, UI, violent egg-break deaths). Keep every shader
+Compatibility-safe and every change headless-test-green.**
 
 ---
 

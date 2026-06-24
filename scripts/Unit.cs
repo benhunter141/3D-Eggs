@@ -85,6 +85,14 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	[Export] public bool ShowEyes = true;
 	[Export] public float EyeScale = 1.0f;   // per-archetype multiplier on eye size
 
+	// --- Floating health bar (M16, Chunk 79) ---
+	// A billboarded bar hangs above each unit, shown only once it's been hurt (full-HP units
+	// stay uncluttered) and coloured by team. Built off the egg's size so it scales per
+	// archetype; pure visual, kept cheap for crowds (see HealthBar3D). The hit-flash that
+	// pairs with it already rides on TakeDamage via the toon shader's `flash` uniform.
+	[Export] public bool ShowHealthBar = true;
+	[Export] public float HealthBarScale = 1.0f;   // per-archetype multiplier on bar size
+
 	// --- Health-as-cracks look (shell damage overlay) ---
 	// Which crack pattern the EggCracks shader draws (we're trying a few looks; see the
 	// shader's `style` uniform). Maps 1:1 to that int, so the enum order is load-bearing.
@@ -179,6 +187,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		UnitRegistry.Register(this);
 		SetupHitFeedback();
 		SetupEyes();
+		SetupHealthBar();
 
 		// Grounded units lean on CharacterBody3D's floor handling: stand upright, stick to downhill
 		// slopes, and refuse to climb anything past MaxSlopeAngle. Left at scene defaults when OFF, so
@@ -398,6 +407,44 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		return _eyePupilMat;
 	}
 
+	// The floating bar above the unit (null until built / when ShowHealthBar is off).
+	private HealthBar3D _healthBar;
+
+	// Grow the floating health bar above the egg, sized off the body so each archetype gets a
+	// proportional bar. Hidden at full HP (it only appears once a unit is hurt). Safe headless —
+	// it builds mesh/material resources only, no viewport work.
+	private void SetupHealthBar()
+	{
+		if (!ShowHealthBar)
+			return;
+
+		float width = 1.0f, height = 1.7f;
+		if (_bodyMesh is EggMesh egg)
+		{
+			width = egg.Width;
+			height = egg.Height;
+		}
+
+		float barWidth = width * 1.5f * HealthBarScale;
+		float barHeight = Mathf.Max(0.05f, width * 0.16f * HealthBarScale);
+		float barY = height * 0.5f + barHeight * 2.2f;   // float just above the egg's top
+
+		_healthBar = new HealthBar3D { Name = "HealthBar", Position = new Vector3(0f, barY, 0f) };
+		AddChild(_healthBar);
+		_healthBar.Build(barWidth, barHeight, Team);
+		_healthBar.Visible = false;   // unhurt units stay uncluttered
+	}
+
+	// Push current HP into the bar and toggle it: hidden at full HP or once dead, else shown.
+	private void RefreshHealthBar()
+	{
+		if (_healthBar == null)
+			return;
+		float frac = MaxHealth > 0f ? Mathf.Clamp(Health / MaxHealth, 0f, 1f) : 0f;
+		_healthBar.SetFraction(frac);
+		_healthBar.Visible = !IsDead && frac < 0.999f;
+	}
+
 	// Fade the active flash. Only Unit defines _Process (subclasses use _PhysicsProcess),
 	// so this never clashes with their per-frame logic.
 	public override void _Process(double delta)
@@ -426,6 +473,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 
 		Health = Mathf.Max(0f, Health - amount);
 		UpdateCrackDamage();   // shell cracks spread as HP drops
+		RefreshHealthBar();    // floating bar tracks the hit
 		GD.Print($"[Unit] {Name} took {amount} dmg -> {Health}/{MaxHealth} HP");
 
 		if (knockbackStrength > 0f)
@@ -454,6 +502,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 			return;
 		Health = Mathf.Min(MaxHealth, Health + amount);
 		UpdateCrackDamage();   // shell knits back as HP rises
+		RefreshHealthBar();    // floating bar tracks the mend
 		Flash(0.5f);
 	}
 
@@ -507,6 +556,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	{
 		IsDead = true;
 		GD.Print($"[Unit] {Name} died");
+		RefreshHealthBar();   // hide the bar on death
 		Flash(1f);            // full white pop on death
 		PlaySound(0.7f);      // lower pitch reads as a heavier death thud
 		OnDeath();
