@@ -1,10 +1,12 @@
-[gd_scene load_steps=9 format=3 uid="uid://dpikeman0eggs01"]
+[gd_scene load_steps=10 format=3 uid="uid://dpikeman0eggs01"]
 
 [ext_resource type="Script" path="res://scripts/Ally.cs" id="1_ally"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
 
-[sub_resource type="StandardMaterial3D" id="Mat_pike"]
-albedo_color = Color(0.36, 0.42, 0.5, 1)
+[sub_resource type="ShaderMaterial" id="Mat_pike"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.36, 0.42, 0.5, 1)
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_pike"]
 radius = 0.4

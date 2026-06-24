@@ -345,7 +345,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       stylized ground/arena dressing, floating health bars + hit-flash, combat particles, and a unified
       toon UI/HUD/card theme. **GL-Compatibility-renderer-safe only** (no Vulkan features) and tuned for the
       940MX. Visual/material/scene-decoration changes; headless logic tests stay green. Each chunk is
-      individually testable by running a level.
+      individually testable by running a level. Chunk 75 done (shared toon environment + sun kit). Chunk 76
+      done: `materials/toon.gdshader` (banded cel `light()` + fresnel rim, per-instance `base_color`) now the
+      `material_override` on all 7 unit egg bodies; `Unit.cs` drives the hit-flash via the shader's `flash`
+      uniform and keeps the EggCracks `next_pass` on either body-material type. Feel-check pending.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -418,11 +421,15 @@ Each chunk is self-contained and testable by running one level.
   (WorldEnvironment + warm key `DirectionalLight3D`, soft PSSM shadows, max-dist 90 for Highlands). Instanced
   into all five levels, replacing each scene's inline grey sky/light (no script referenced those nodes).
   Compatibility-safe. Feel-check pending.
-- [ ] **Chunk 76 — Toon unit shader.** A shared `materials/toon.gdshader` (spatial, Compatibility-safe):
-  **stepped/banded diffuse** off the sun + a **fresnel rim light**, taking base colour from a per-instance
-  uniform (or albedo) so each unit keeps its team tint. Swap each unit egg's `material_override` to a
-  `ShaderMaterial` instancing it (Captain, Ally, Swordman, Bowman, Pikeman, Skeleton, Archer). Test: a crowd
-  reads as one cohesive cartoon style.
+- [x] **Chunk 76 — Toon unit shader.** Shared `materials/toon.gdshader` (spatial, Compatibility-safe):
+  a custom `light()` quantizes the sun's N·L into hard **bands** (cel look, with a `band_floor` so shadowed
+  sides keep the tint) + a fragment **fresnel rim**; team tint is a per-instance `base_color` uniform. Each
+  unit egg's `material_override` is now a `ShaderMaterial` instancing it (Captain, Ally, Swordman, Bowman,
+  Pikeman, Skeleton, Archer). `Unit.cs` learned to drive the **hit-flash through the shader's `flash`
+  uniform** (not StandardMaterial emission) and still hang the EggCracks `next_pass` off whichever body
+  material it finds — so flash + shell-cracks keep working on the toon bodies. Non-egg bodies (weapons,
+  mounts) stay StandardMaterial via the preserved fallback path. Headless logic tests stay green. Feel-check
+  pending (shader GLSL only validates under the GL renderer when run).
 - [ ] **Chunk 77 — Outline pass (inverted hull).** Give every egg a crisp dark **outline** via a child
   back-face hull (cull_front, grow-along-normal, unshaded black) — cheap in Compatibility — so units pop
   against the ground and each other. Fold it into `EggMesh` (optional second surface) or a reusable outline

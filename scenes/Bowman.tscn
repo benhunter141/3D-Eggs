@@ -1,10 +1,12 @@
-[gd_scene load_steps=10 format=3 uid="uid://dbowman0eggs001"]
+[gd_scene load_steps=11 format=3 uid="uid://dbowman0eggs001"]
 
 [ext_resource type="Script" path="res://scripts/Bowman.cs" id="1_bow"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
 
-[sub_resource type="StandardMaterial3D" id="Mat_bow"]
-albedo_color = Color(0.2, 0.42, 0.22, 1)
+[sub_resource type="ShaderMaterial" id="Mat_bow"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.2, 0.42, 0.22, 1)
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_bow"]
 radius = 0.4

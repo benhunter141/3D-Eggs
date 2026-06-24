@@ -142,9 +142,15 @@ public partial class Unit : CharacterBody3D, ICardUnit
 			? 1f
 			: Mathf.Clamp(1f - KnockbackVelocity.Length() / KnockbackControlThreshold, 0f, 1f);
 
-	// Flash state: a per-instance copy of the body material, driven each frame.
+	// Flash state: a per-instance copy of the body material, driven each frame. The body
+	// is either the toon ShaderMaterial (units, M16) — flash driven by its `flash` uniform —
+	// or a plain StandardMaterial3D (anything else) — flash driven by emission. Exactly one is
+	// non-null; both crack and flash code branch on which we found. `_bodyMaterial` is the base
+	// of whichever, used to hang the crack next_pass (NextPass lives on Material).
 	private MeshInstance3D _bodyMesh;
 	private StandardMaterial3D _bodyMat;
+	private ShaderMaterial _bodyShaderMat;
+	private Material _bodyMaterial;
 	private Color _baseColor;
 	private float _flash;   // 1 = full flash, decays to 0
 
@@ -218,21 +224,29 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	private void SetupHitFeedback()
 	{
 		_bodyMesh = GetNodeOrNull<MeshInstance3D>("MeshInstance3D");
-		if (_bodyMesh != null && _bodyMesh.GetActiveMaterial(0) is StandardMaterial3D src)
+		Material active = _bodyMesh?.GetActiveMaterial(0);
+		if (_bodyMesh != null && active is ShaderMaterial shsrc)
+		{
+			// Toon-shaded unit body (M16): own a per-instance copy so one unit can flash/crack
+			// without lighting up every other instance sharing the scene's shader material. The
+			// flash is a shader uniform, so emission keeps working independent of the hit-flash.
+			_bodyShaderMat = (ShaderMaterial)shsrc.Duplicate();
+			_bodyMaterial = _bodyShaderMat;
+			if (_bodyShaderMat.GetShaderParameter("base_color").VariantType == Variant.Type.Color)
+				_baseColor = (Color)_bodyShaderMat.GetShaderParameter("base_color");
+			_bodyShaderMat.SetShaderParameter("flash", 0f);
+			AssignBodyMaterial(_bodyShaderMat);
+			SetupCracks();
+		}
+		else if (_bodyMesh != null && active is StandardMaterial3D src)
 		{
 			_bodyMat = (StandardMaterial3D)src.Duplicate();
+			_bodyMaterial = _bodyMat;
 			_baseColor = _bodyMat.AlbedoColor;
 			_bodyMat.EmissionEnabled = true;        // emission drives the "pop"; energy 0 at rest
 			_bodyMat.Emission = FlashColor;
 			_bodyMat.EmissionEnergyMultiplier = 0f;
-			// Assign back to whichever slot the source came from so our copy actually renders:
-			// material_override OUTRANKS a surface override, so for the unit bodies (which set
-			// material_override in the scene) we must replace THAT slot — writing a surface
-			// override here would be silently shadowed (and with it the flash + crack next_pass).
-			if (_bodyMesh.MaterialOverride != null)
-				_bodyMesh.MaterialOverride = _bodyMat;
-			else
-				_bodyMesh.SetSurfaceOverrideMaterial(0, _bodyMat);
+			AssignBodyMaterial(_bodyMat);
 			SetupCracks();
 		}
 
@@ -251,10 +265,22 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	// again with the EggCracks shader, blended on top so the base colour + hit-flash are
 	// untouched. The Shader is loaded once and shared; the ShaderMaterial is per-instance so
 	// each egg cracks from its own random seed and carries its own live damage value.
+	// Assign our per-instance body copy back to whichever slot the source came from so it
+	// actually renders: material_override OUTRANKS a surface override, so for the unit bodies
+	// (which set material_override in the scene) we must replace THAT slot — writing a surface
+	// override there would be silently shadowed (and with it the flash + crack next_pass).
+	private void AssignBodyMaterial(Material mat)
+	{
+		if (_bodyMesh.MaterialOverride != null)
+			_bodyMesh.MaterialOverride = mat;
+		else
+			_bodyMesh.SetSurfaceOverrideMaterial(0, mat);
+	}
+
 	private void SetupCracks()
 	{
 		_crackShader ??= GD.Load<Shader>("res://shaders/EggCracks.gdshader");
-		if (_crackShader == null)
+		if (_crackShader == null || _bodyMaterial == null)
 			return;
 
 		_crackMat = new ShaderMaterial { Shader = _crackShader };
@@ -262,7 +288,7 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		_crackMat.SetShaderParameter("seed", new Vector2(
 			(float)GD.RandRange(0.0, 100.0), (float)GD.RandRange(0.0, 100.0)));
 		_crackMat.SetShaderParameter("style", (int)CrackPattern);
-		_bodyMat.NextPass = _crackMat;
+		_bodyMaterial.NextPass = _crackMat;
 		UpdateCrackDamage();
 	}
 
@@ -376,12 +402,19 @@ public partial class Unit : CharacterBody3D, ICardUnit
 	// so this never clashes with their per-frame logic.
 	public override void _Process(double delta)
 	{
-		if (_bodyMat == null || _flash <= 0f)
+		if (_bodyMaterial == null || _flash <= 0f)
 			return;
 
 		_flash = Mathf.Max(0f, _flash - (float)delta / FlashDuration);
-		_bodyMat.AlbedoColor = _baseColor.Lerp(FlashColor, _flash * 0.85f);
-		_bodyMat.EmissionEnergyMultiplier = _flash * 2.0f;
+		if (_bodyShaderMat != null)
+		{
+			_bodyShaderMat.SetShaderParameter("flash", _flash);
+		}
+		else if (_bodyMat != null)
+		{
+			_bodyMat.AlbedoColor = _baseColor.Lerp(FlashColor, _flash * 0.85f);
+			_bodyMat.EmissionEnergyMultiplier = _flash * 2.0f;
+		}
 	}
 
 	// Take `amount` damage. `hitDirection` points the way we'd be shoved (attacker→us);

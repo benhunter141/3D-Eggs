@@ -1,10 +1,12 @@
-[gd_scene load_steps=7 format=3 uid="uid://dally0eggs00001"]
+[gd_scene load_steps=8 format=3 uid="uid://dally0eggs00001"]
 
 [ext_resource type="Script" path="res://scripts/Ally.cs" id="1_ally"]
 [ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
 
-[sub_resource type="StandardMaterial3D" id="Mat_ally"]
-albedo_color = Color(0.3, 0.5, 0.85, 1)
+[sub_resource type="ShaderMaterial" id="Mat_ally"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.3, 0.5, 0.85, 1)
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape_ally"]
 radius = 0.4
