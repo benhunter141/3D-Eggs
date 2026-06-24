@@ -338,6 +338,14 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       with a coloured header bar, `⚡ cost` badge + wrapped desc, cards 150×200→116×156 and the hand footprint
       shrunk so 5 cards stay fully on-screen; clickable `Button` root preserved (P1 click, P2 cursor tint).
       **All M15 chunks (66–73) built; Chunk 71 balance feel-check still pending (needs a gamepad for P2).**
+- [ ] **M16 — Visual overhaul (toon/cel look) ⭐ ACTIVE:** the game "looks terrible" — flat-shaded
+      primitives, drab solid-colour ground, grey sky, no outlines/AO/particles/health-bars. Fix it GLOBALLY
+      with a cohesive **toon / cel-shaded** style + the requested juice/health-bars/UI/environment scope
+      (Chunks 75–81). Shared environment+sun kit, a toon `.gdshader` + inverted-hull outline on every unit,
+      stylized ground/arena dressing, floating health bars + hit-flash, combat particles, and a unified
+      toon UI/HUD/card theme. **GL-Compatibility-renderer-safe only** (no Vulkan features) and tuned for the
+      940MX. Visual/material/scene-decoration changes; headless logic tests stay green. Each chunk is
+      individually testable by running a level.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -394,9 +402,55 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 
 ---
 
-### ▶ ACTIVE PLAN — M15 Co-op Card Brawl (Chunks 66–73)
+### ▶ ACTIVE PLAN — M16 Visual Overhaul · toon/cel look (Chunks 75–81)
 
-**The only active plan.** A *local same-screen 2-player* card-driven survival mode. Each player drives a
+**The only active plan.** The game looks like an untextured prototype: flat solid-colour egg meshes, a drab
+single-colour ground plane, a grey procedural sky, box fences, one light — no outlines, AO, rim/toon shading,
+particles, or health bars. This milestone fixes the LOOK **globally** with a cohesive **toon / cel-shaded**
+art direction plus the requested juice / health-bars / UI / environment scope. Changes are visual/material/
+scene-decoration and apply to ALL modes at once (that's the point — one pass lifts every level). **Hard
+constraints:** GL-Compatibility renderer only (NO Vulkan-only features — see §9), keep it cheap on the NVIDIA
+940MX, and headless logic tests must stay green (guard any viewport/particle code so `--headless` is safe).
+Each chunk is self-contained and testable by running one level.
+
+- [ ] **Chunk 75 — Shared toon environment & sun kit.** A reusable `Environment` + sky (warm gradient
+  top/horizon), subtle distance fog, **glow/bloom**, Filmic/ACES tonemap + exposure, and a coloured ambient,
+  paired with a warm key `DirectionalLight3D` + tuned soft shadows. Apply the SAME kit to every level scene
+  (`CoopCardBrawl`, `CoopStand`, `Highlands`, `KingOfTheHill`, `Level5_PinballArena`). Biggest bang-for-buck —
+  instant global lift before any per-unit work. Test: open any battle and confirm the lighting/sky/glow read.
+- [ ] **Chunk 76 — Toon unit shader.** A shared `materials/toon.gdshader` (spatial, Compatibility-safe):
+  **stepped/banded diffuse** off the sun + a **fresnel rim light**, taking base colour from a per-instance
+  uniform (or albedo) so each unit keeps its team tint. Swap each unit egg's `material_override` to a
+  `ShaderMaterial` instancing it (Captain, Ally, Swordman, Bowman, Pikeman, Skeleton, Archer). Test: a crowd
+  reads as one cohesive cartoon style.
+- [ ] **Chunk 77 — Outline pass (inverted hull).** Give every egg a crisp dark **outline** via a child
+  back-face hull (cull_front, grow-along-normal, unshaded black) — cheap in Compatibility — so units pop
+  against the ground and each other. Fold it into `EggMesh` (optional second surface) or a reusable outline
+  scene. Test: silhouettes are crisp in a packed brawl. *(75+76+77 = the load-bearing trio — the bulk of the
+  "looks" jump.)*
+- [ ] **Chunk 78 — Stylized ground & arena dressing.** Replace the drab ground with a toon-friendly two-tone
+  surface (soft grid / edge tint), recolour + soften the fences/walls and the `CapturePoint` disc to match,
+  and add light prop dressing so the arenas read as intentional, not placeholder. Test: each arena looks
+  designed.
+- [ ] **Chunk 79 — Floating health bars + hit flash.** A reusable billboarded `HealthBar3D` on `Unit` (shown
+  only when damaged, coloured by team) + a white emissive **hit-flash** on `TakeDamage` that decays.
+  Viewport-guarded so `--headless` stays safe. Test: crowd HP is readable and hits flash.
+- [ ] **Chunk 80 — Combat juice particles.** Low-count `GPUParticles3D` one-shots: hit sparks on
+  sword/fist/fireball impact, a **death poof** on `Die`/`OnDeath`, dust on knockback bounce. Pooled or
+  one-shot-then-free; keep counts modest for the 940MX. Test: hits and deaths feel punchy.
+- [ ] **Chunk 81 — Toon UI/HUD & card theme.** A shared `Theme` resource (font, accent palette, rounded
+  panel StyleBoxes) applied across `LevelSelect`, `Hud`, `ResultMenu`, `PauseMenu`, and the `CardBrawl`
+  hand/ability bars so the front-end matches the new in-game look. Test: menus + HUD + cards cohere.
+
+**Build order 75 → 81. 75 + 76 + 77 are load-bearing (environment + toon shade + outline). 78–81 layer the
+requested polish (ground dressing, health bars, particles, UI). Keep every shader Compatibility-safe and
+every change headless-test-green.**
+
+---
+
+### ✅ DONE — M15 Co-op Card Brawl (Chunks 66–74)
+
+**Built — all chunks done.** A *local same-screen 2-player* card-driven survival mode. Each player drives a
 **basic egg** (weak punch only) — P1 keyboard+mouse, P2 gamepad (device 0) — and both draw from ONE shared
 hand. In the between-rounds **pause** they spend shared energy on cards: `sword`/`fireball` **buff whoever
 played the card**, `soldier` spawns a subordinate for that player. **End Turn** runs a **15 s real-time
