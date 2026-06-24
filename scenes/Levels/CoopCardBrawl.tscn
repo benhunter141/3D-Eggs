@@ -106,11 +106,11 @@ Target = NodePath("../Units/Captain1")
 Target2 = NodePath("../Units/Captain2")
 Offset = Vector3(0, 18, 15)
 DynamicZoom = true
-MinDistance = 26.0
+MinDistance = 18.0
 MaxDistance = 40.0
 FitScale = 0.6
 ZoomMargin = 10.0
-ZoomBiasMin = -8.0
+ZoomBiasMin = -16.0
 ZoomBiasMax = 12.0
 
 [node name="WaveManager" type="Node" parent="."]

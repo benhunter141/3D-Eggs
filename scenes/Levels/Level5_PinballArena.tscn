@@ -100,10 +100,10 @@ script = ExtResource("1_camera")
 Target = NodePath("../Captain")
 Offset = Vector3(0, 24, 22)
 DynamicZoom = true
-MinDistance = 16.0
+MinDistance = 11.0
 MaxDistance = 18.0
 ZoomStep = 2.0
-ZoomBiasMin = -3.0
+ZoomBiasMin = -9.0
 ZoomBiasMax = 5.0
 
 [node name="Pikeman1" parent="." instance=ExtResource("3_pikeman")]

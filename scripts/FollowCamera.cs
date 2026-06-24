@@ -32,7 +32,7 @@ public partial class FollowCamera : Camera3D
 
 	[ExportGroup("Dynamic Zoom")]
 	[Export] public bool DynamicZoom = false;                 // off = classic fixed offset (uses Offset as-is)
-	[Export] public float MinDistance = 28.0f;                // closest the camera zooms in (tight fight)
+	[Export] public float MinDistance = 22.0f;                // closest the camera zooms in (tight fight)
 	[Export] public float MaxDistance = 58.0f;                // farthest it zooms out (units flung wide)
 	[Export] public float FitScale = 1.5f;                    // camera distance per unit of spread — bigger = zoom out sooner
 	[Export] public float ZoomMargin = 10.0f;                 // extra distance so the farthest unit isn't right on the edge
@@ -41,7 +41,7 @@ public partial class FollowCamera : Camera3D
 
 	[ExportGroup("Player Zoom Bias")]
 	[Export] public float ZoomStep = 3.0f;                    // metres added/removed per wheel notch / key press
-	[Export] public float ZoomBiasMin = -24.0f;              // most the player can pull IN  (negative = closer)
+	[Export] public float ZoomBiasMin = -36.0f;              // most the player can pull IN  (negative = closer)
 	[Export] public float ZoomBiasMax = 24.0f;               // most the player can push OUT (positive = farther)
 	[Export] public float MinFixedDistance = 6.0f;           // hard floor in non-dynamic levels so a hard zoom-in can't pass through the player
 
