@@ -338,7 +338,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       with a coloured header bar, `⚡ cost` badge + wrapped desc, cards 150×200→116×156 and the hand footprint
       shrunk so 5 cards stay fully on-screen; clickable `Button` root preserved (P1 click, P2 cursor tint).
       **All M15 chunks (66–73) built; Chunk 71 balance feel-check still pending (needs a gamepad for P2).**
-- [ ] **M16 — Visual overhaul (toon/cel look) ⭐ ACTIVE:** the game "looks terrible" — flat-shaded
+- [~] **M16 — Visual overhaul (toon/cel look) ⭐ ACTIVE:** the game "looks terrible" — flat-shaded
       primitives, drab solid-colour ground, grey sky, no outlines/AO/particles/health-bars. Fix it GLOBALLY
       with a cohesive **toon / cel-shaded** style + the requested juice/health-bars/UI/environment scope
       (Chunks 75–81). Shared environment+sun kit, a toon `.gdshader` + inverted-hull outline on every unit,
@@ -413,11 +413,11 @@ constraints:** GL-Compatibility renderer only (NO Vulkan-only features — see �
 940MX, and headless logic tests must stay green (guard any viewport/particle code so `--headless` is safe).
 Each chunk is self-contained and testable by running one level.
 
-- [ ] **Chunk 75 — Shared toon environment & sun kit.** A reusable `Environment` + sky (warm gradient
-  top/horizon), subtle distance fog, **glow/bloom**, Filmic/ACES tonemap + exposure, and a coloured ambient,
-  paired with a warm key `DirectionalLight3D` + tuned soft shadows. Apply the SAME kit to every level scene
-  (`CoopCardBrawl`, `CoopStand`, `Highlands`, `KingOfTheHill`, `Level5_PinballArena`). Biggest bang-for-buck —
-  instant global lift before any per-unit work. Test: open any battle and confirm the lighting/sky/glow read.
+- [x] **Chunk 75 — Shared toon environment & sun kit.** `scenes/Shared/ToonEnvironment.tres` (warm gradient
+  sky, depth fog, glow/bloom, ACES tonemap + exposure, coloured ambient) + `scenes/Shared/ToonSky.tscn`
+  (WorldEnvironment + warm key `DirectionalLight3D`, soft PSSM shadows, max-dist 90 for Highlands). Instanced
+  into all five levels, replacing each scene's inline grey sky/light (no script referenced those nodes).
+  Compatibility-safe. Feel-check pending.
 - [ ] **Chunk 76 — Toon unit shader.** A shared `materials/toon.gdshader` (spatial, Compatibility-safe):
   **stepped/banded diffuse** off the sun + a **fresnel rim light**, taking base colour from a per-instance
   uniform (or albedo) so each unit keeps its team tint. Swap each unit egg's `material_override` to a
