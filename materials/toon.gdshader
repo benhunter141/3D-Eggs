@@ -19,14 +19,19 @@ uniform vec4 base_color : source_color = vec4(0.82, 0.78, 0.62, 1.0);
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 
-// Cel banding + dark-side floor (so shadowed sides keep the tint, never crush to black).
-uniform float bands : hint_range(1.0, 6.0) = 3.0;
-uniform float band_floor : hint_range(0.0, 1.0) = 0.30;
+// Cel banding: a hard 3-step ramp. band_floor lifts the darkest band so shadowed
+// sides keep the tint; shadow_tint cools/darkens the unlit band so the light/shadow
+// split reads even under ambient fill.
+uniform float band_floor : hint_range(0.0, 1.0) = 0.22;
+uniform float band_mid : hint_range(0.0, 1.0) = 0.6;
+uniform float edge1 : hint_range(0.0, 1.0) = 0.27;   // shadow -> mid threshold
+uniform float edge2 : hint_range(0.0, 1.0) = 0.62;   // mid -> lit threshold
+uniform vec3 shadow_tint = vec3(0.78, 0.82, 1.0);    // cool the shadow band
 
 // Fresnel rim light.
 uniform vec4 rim_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
-uniform float rim_strength : hint_range(0.0, 2.0) = 0.45;
-uniform float rim_power : hint_range(0.5, 8.0) = 3.0;
+uniform float rim_strength : hint_range(0.0, 2.0) = 0.7;
+uniform float rim_power : hint_range(0.5, 8.0) = 2.5;
 
 void fragment() {
 	ALBEDO = mix(base_color.rgb, flash_color.rgb, flash * 0.85);
@@ -39,9 +44,10 @@ void fragment() {
 }
 
 void light() {
-	// Quantize the sun's lambert term into hard bands for the cel look.
+	// Hard 3-step toon ramp off the sun's lambert term — crisp light/mid/shadow split.
 	float ndl = clamp(dot(normalize(NORMAL), normalize(LIGHT)), 0.0, 1.0);
-	float stepped = floor(ndl * bands) / bands;
-	stepped = mix(band_floor, 1.0, stepped);   // lift the darkest band so the tint reads
-	DIFFUSE_LIGHT += ATTENUATION * LIGHT_COLOR.rgb * ALBEDO * stepped;
+	float ramp = ndl < edge1 ? band_floor : (ndl < edge2 ? band_mid : 1.0);
+	// Cool + darken the darkest band so the shadow side reads even with ambient fill.
+	vec3 tint = mix(shadow_tint, vec3(1.0), smoothstep(edge1, edge2, ndl));
+	DIFFUSE_LIGHT += ATTENUATION * LIGHT_COLOR.rgb * ALBEDO * tint * ramp;
 }

@@ -14,7 +14,44 @@ public partial class EggMesh : MeshInstance3D
     [Export] public int RadialSegments = 24;     // around
     [Export] public int Rings = 24;              // top-to-bottom
 
-    public override void _Ready() => BuildEgg();
+    // Toon outline (M16, Chunk 77): a back-face inverted hull of this same mesh, grown
+    // along the normals + drawn flat dark, so every egg gets a crisp cartoon outline.
+    [Export] public bool ShowOutline = true;
+    [Export] public float OutlineWidth = 0.045f;
+
+    private static Shader _outlineShader;
+
+    public override void _Ready()
+    {
+        BuildEgg();
+        BuildOutline();
+    }
+
+    // Hang a child MeshInstance3D that re-draws this egg's mesh as a dark inverted hull.
+    // Runtime only (skipped in the editor) so .tscn files stay clean and never accumulate
+    // duplicate children across editor reloads; sharing the same Mesh resource keeps it cheap.
+    private void BuildOutline()
+    {
+        if (!ShowOutline || Engine.IsEditorHint() || Mesh == null)
+            return;
+        if (GetNodeOrNull("Outline") != null)
+            return;
+
+        _outlineShader ??= GD.Load<Shader>("res://materials/outline.gdshader");
+        if (_outlineShader == null)
+            return;
+
+        var mat = new ShaderMaterial { Shader = _outlineShader };
+        mat.SetShaderParameter("outline_width", OutlineWidth);
+
+        AddChild(new MeshInstance3D
+        {
+            Name = "Outline",
+            Mesh = Mesh,
+            MaterialOverride = mat,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+        });
+    }
 
     private void BuildEgg()
     {

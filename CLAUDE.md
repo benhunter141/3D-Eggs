@@ -348,7 +348,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       individually testable by running a level. Chunk 75 done (shared toon environment + sun kit). Chunk 76
       done: `materials/toon.gdshader` (banded cel `light()` + fresnel rim, per-instance `base_color`) now the
       `material_override` on all 7 unit egg bodies; `Unit.cs` drives the hit-flash via the shader's `flash`
-      uniform and keeps the EggCracks `next_pass` on either body-material type. Feel-check pending.
+      uniform and keeps the EggCracks `next_pass` on either body-material type — then RETUNED after a feel-check
+      (ambient was washing the bands flat): dropped `ToonEnvironment` ambient + switched to a hard 3-step ramp
+      with cooled shadow band + stronger rim. Chunk 77 done: `materials/outline.gdshader` inverted-hull outline
+      folded into `EggMesh` (runtime child, default on) so every egg has a crisp dark cartoon silhouette.
+      Feel-check pending.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -428,13 +432,17 @@ Each chunk is self-contained and testable by running one level.
   Pikeman, Skeleton, Archer). `Unit.cs` learned to drive the **hit-flash through the shader's `flash`
   uniform** (not StandardMaterial emission) and still hang the EggCracks `next_pass` off whichever body
   material it finds — so flash + shell-cracks keep working on the toon bodies. Non-egg bodies (weapons,
-  mounts) stay StandardMaterial via the preserved fallback path. Headless logic tests stay green. Feel-check
-  pending (shader GLSL only validates under the GL renderer when run).
-- [ ] **Chunk 77 — Outline pass (inverted hull).** Give every egg a crisp dark **outline** via a child
-  back-face hull (cull_front, grow-along-normal, unshaded black) — cheap in Compatibility — so units pop
-  against the ground and each other. Fold it into `EggMesh` (optional second surface) or a reusable outline
-  scene. Test: silhouettes are crisp in a packed brawl. *(75+76+77 = the load-bearing trio — the bulk of the
-  "looks" jump.)*
+  mounts) stay StandardMaterial via the preserved fallback path. Headless logic tests stay green. **Tuned
+  after a feel-check** ("only the ground looks different"): the toon banding was being washed out by heavy
+  flat ambient, so `ToonEnvironment.tres` ambient dropped (energy 1.0→0.5, sky contribution 0.65→0.4) to let
+  the sun carve form, and the shader switched to a hard 3-step ramp with a cooled/darkened shadow band +
+  stronger rim (0.45→0.7) so the cel split reads.
+- [x] **Chunk 77 — Outline pass (inverted hull).** Every egg now gets a crisp dark **outline** via a runtime
+  child back-face hull: `materials/outline.gdshader` (`cull_front`, grow-along-normal, `unshaded`, dark) drawn
+  on a second copy of the egg's own Mesh. Folded into `EggMesh` (`ShowOutline`/`OutlineWidth`, default on) —
+  built runtime-only (`Engine.IsEditorHint()` guard, no duplicate-on-reload) and sharing the egg's Mesh so it's
+  cheap; applies to EVERY egg (units + mounts) for one cohesive cartoon silhouette. Headless-safe (resource
+  load only). Feel-check pending. *(75+76+77 = the load-bearing trio — the bulk of the "looks" jump.)*
 - [ ] **Chunk 78 — Stylized ground & arena dressing.** Replace the drab ground with a toon-friendly two-tone
   surface (soft grid / edge tint), recolour + soften the fences/walls and the `CapturePoint` disc to match,
   and add light prop dressing so the arenas read as intentional, not placeholder. Test: each arena looks
