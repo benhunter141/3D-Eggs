@@ -1,7 +1,8 @@
-[gd_scene load_steps=16 format=3 uid="uid://b3degg0coopbrawl"]
+[gd_scene load_steps=21 format=3 uid="uid://b3degg0coopbrawl"]
 
 [ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="1_camera"]
 [ext_resource type="PackedScene" path="res://scenes/Shared/ToonSky.tscn" id="8_sky"]
+[ext_resource type="Shader" path="res://materials/ground.gdshader" id="9_ground"]
 [ext_resource type="PackedScene" path="res://scenes/Captain.tscn" id="2_captain"]
 [ext_resource type="Script" path="res://scripts/Cards/CardBrawl.cs" id="3_brawl"]
 [ext_resource type="Script" path="res://scripts/WaveManager.cs" id="4_waves"]
@@ -12,12 +13,41 @@
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
 size = Vector2(44, 44)
 
-[sub_resource type="StandardMaterial3D" id="Mat_ground"]
-albedo_color = Color(0.27, 0.3, 0.24, 1)
-roughness = 1.0
+[sub_resource type="ShaderMaterial" id="Mat_ground"]
+shader = ExtResource("9_ground")
+shader_parameter/base_color = Color(0.25, 0.31, 0.22, 1)
+shader_parameter/alt_color = Color(0.3, 0.37, 0.26, 1)
+shader_parameter/grid_color = Color(0.17, 0.21, 0.14, 1)
+shader_parameter/cell_size = 5.0
+shader_parameter/line_width = 0.04
+shader_parameter/grid_strength = 0.45
+shader_parameter/checker_strength = 0.5
+shader_parameter/band_floor = 0.6
+shader_parameter/edge = 0.5
 
 [sub_resource type="BoxShape3D" id="BoxShape_ground"]
 size = Vector3(44, 0.2, 44)
+
+[sub_resource type="StandardMaterial3D" id="Mat_fence"]
+albedo_color = Color(0.45, 0.3, 0.16, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_post"]
+top_radius = 0.3
+bottom_radius = 0.35
+height = 3.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_post"]
+albedo_color = Color(0.34, 0.22, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_cap"]
+radius = 0.45
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="Mat_cap"]
+albedo_color = Color(0.86, 0.4, 0.24, 1)
+roughness = 0.8
 
 [sub_resource type="BoxMesh" id="BoxMesh_fenceNS"]
 size = Vector3(44, 2, 0.7)
@@ -52,6 +82,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -22)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="FenceN"]
 mesh = SubResource("BoxMesh_fenceNS")
+surface_material_override/0 = SubResource("Mat_fence")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="FenceN"]
 shape = SubResource("BoxShape_fenceNS")
@@ -61,6 +92,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 22)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="FenceS"]
 mesh = SubResource("BoxMesh_fenceNS")
+surface_material_override/0 = SubResource("Mat_fence")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="FenceS"]
 shape = SubResource("BoxShape_fenceNS")
@@ -70,6 +102,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 1, 0)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="FenceE"]
 mesh = SubResource("BoxMesh_fenceEW")
+surface_material_override/0 = SubResource("Mat_fence")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="FenceE"]
 shape = SubResource("BoxShape_fenceEW")
@@ -79,9 +112,52 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 1, 0)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="FenceW"]
 mesh = SubResource("BoxMesh_fenceEW")
+surface_material_override/0 = SubResource("Mat_fence")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="FenceW"]
 shape = SubResource("BoxShape_fenceEW")
+
+[node name="Decor" type="Node3D" parent="."]
+
+[node name="PostNW" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 1.5, -22)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_post")
+
+[node name="CapNW" type="MeshInstance3D" parent="Decor/PostNW"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+mesh = SubResource("SphereMesh_cap")
+surface_material_override/0 = SubResource("Mat_cap")
+
+[node name="PostNE" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 1.5, -22)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_post")
+
+[node name="CapNE" type="MeshInstance3D" parent="Decor/PostNE"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+mesh = SubResource("SphereMesh_cap")
+surface_material_override/0 = SubResource("Mat_cap")
+
+[node name="PostSW" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -22, 1.5, 22)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_post")
+
+[node name="CapSW" type="MeshInstance3D" parent="Decor/PostSW"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+mesh = SubResource("SphereMesh_cap")
+surface_material_override/0 = SubResource("Mat_cap")
+
+[node name="PostSE" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 22, 1.5, 22)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_post")
+
+[node name="CapSE" type="MeshInstance3D" parent="Decor/PostSE"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+mesh = SubResource("SphereMesh_cap")
+surface_material_override/0 = SubResource("Mat_cap")
 
 [node name="Units" type="Node3D" parent="."]
 process_mode = 1

@@ -352,6 +352,9 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       (ambient was washing the bands flat): dropped `ToonEnvironment` ambient + switched to a hard 3-step ramp
       with cooled shadow band + stronger rim. Chunk 77 done: `materials/outline.gdshader` inverted-hull outline
       folded into `EggMesh` (runtime child, default on) so every egg has a crisp dark cartoon silhouette.
+      Chunk 78 done: shared `materials/ground.gdshader` (world-space checkerboard + grid + 2-band cel light)
+      replaces the flat solid-colour grounds in KotH / Pinball / CoopCardBrawl / CoopStand (per-level tint);
+      Pinball walls warmed to matte stone, CoopCardBrawl fences given wood, corner posts added to KotH + Brawl.
       Feel-check pending.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
@@ -443,10 +446,15 @@ Each chunk is self-contained and testable by running one level.
   built runtime-only (`Engine.IsEditorHint()` guard, no duplicate-on-reload) and sharing the egg's Mesh so it's
   cheap; applies to EVERY egg (units + mounts) for one cohesive cartoon silhouette. Headless-safe (resource
   load only). Feel-check pending. *(75+76+77 = the load-bearing trio — the bulk of the "looks" jump.)*
-- [ ] **Chunk 78 — Stylized ground & arena dressing.** Replace the drab ground with a toon-friendly two-tone
-  surface (soft grid / edge tint), recolour + soften the fences/walls and the `CapturePoint` disc to match,
-  and add light prop dressing so the arenas read as intentional, not placeholder. Test: each arena looks
-  designed.
+- [x] **Chunk 78 — Stylized ground & arena dressing.** Shared `materials/ground.gdshader` (Compatibility-safe):
+  a world-space two-tone **checkerboard** + soft **grid lines** + gentle 2-band cel `light()` turns the flat
+  solid-colour plane into a toon surface; per-level base/alt/grid tint lives in each scene's ShaderMaterial
+  (grass for KotH/Brawl, dirt for the barnyard, stone for Pinball). Applied to KotH, Pinball, CoopCardBrawl, and
+  CoopStand grounds. **Recoloured/softened the arena edges:** Pinball walls bluish-metallic → warm matte stone;
+  CoopCardBrawl fences default-white → wood; added **corner posts** (cylinder + warm-cap sphere) as light prop
+  dressing to KotH and CoopCardBrawl (CoopStand already richly dressed; Highlands keeps its code-shaded terrain
+  and the `CapturePoint` disc keeps its team-signal state colours). Headless-loads clean for all four scenes.
+  Feel-check pending.
 - [ ] **Chunk 79 — Floating health bars + hit flash.** A reusable billboarded `HealthBar3D` on `Unit` (shown
   only when damaged, coloured by team) + a white emissive **hit-flash** on `TakeDamage` that decays.
   Viewport-guarded so `--headless` stays safe. Test: crowd HP is readable and hits flash.
