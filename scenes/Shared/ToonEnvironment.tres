@@ -1,0 +1,44 @@
+[gd_resource type="Environment" load_steps=3 format=3 uid="uid://b3degg0toonenv01"]
+
+; Shared toon environment (M16, Chunk 75). Compatibility-renderer safe:
+; sky gradient + depth fog + glow + ACES tonemap + coloured ambient.
+; Referenced by scenes/Shared/ToonSky.tscn, instanced in every level.
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.36, 0.55, 0.86, 1)
+sky_horizon_color = Color(0.98, 0.86, 0.66, 1)
+sky_curve = 0.12
+sky_energy_multiplier = 1.05
+ground_bottom_color = Color(0.46, 0.41, 0.34, 1)
+ground_horizon_color = Color(0.86, 0.76, 0.6, 1)
+ground_curve = 0.1
+ground_energy_multiplier = 0.9
+sun_angle_max = 40.0
+sun_curve = 0.12
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[resource]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+ambient_light_color = Color(0.74, 0.78, 0.92, 1)
+ambient_light_sky_contribution = 0.65
+ambient_light_energy = 1.0
+tonemap_mode = 3
+tonemap_exposure = 1.02
+tonemap_white = 1.0
+glow_enabled = true
+glow_normalized = true
+glow_intensity = 0.45
+glow_strength = 1.0
+glow_bloom = 0.08
+glow_blend_mode = 1
+glow_hdr_threshold = 0.92
+glow_hdr_scale = 2.0
+fog_enabled = true
+fog_light_color = Color(0.87, 0.84, 0.79, 1)
+fog_density = 0.0035
+fog_sky_affect = 0.18
+fog_aerial_perspective = 0.28

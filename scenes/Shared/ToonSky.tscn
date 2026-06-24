@@ -1,0 +1,22 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3degg0toonsky01"]
+
+; Shared sky+sun kit (M16, Chunk 75). Instance this in a level and delete the
+; level's own inline WorldEnvironment + DirectionalLight3D. Warm key light with
+; tuned soft PSSM shadows; max-distance 90 covers the big Highlands terrain too.
+
+[ext_resource type="Environment" path="res://scenes/Shared/ToonEnvironment.tres" id="1_env"]
+
+[node name="ToonSky" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("1_env")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.330366, 0.378522, 0, 0.753, 0.658, -0.5, -0.569794, 0.652695, 0, 12, 0)
+light_color = Color(1, 0.95, 0.84, 1)
+light_energy = 1.15
+shadow_enabled = true
+shadow_blur = 1.5
+directional_shadow_mode = 1
+directional_shadow_max_distance = 90.0
+directional_shadow_split_1 = 0.12
