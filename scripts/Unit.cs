@@ -562,9 +562,13 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		RefreshHealthBar();   // hide the bar on death
 		Flash(1f);            // full white pop on death
 		PlaySound(0.7f);      // lower pitch reads as a heavier death thud
-		// Death poof in the unit's own colour (juice, Chunk 80). Parented to our CONTAINER, not
-		// self, so it outlives the corpse's QueueFree. Headless-safe.
-		Particles.DeathPoof(GetParent(), GlobalPosition + Vector3.Up * 0.6f, _baseColor);
+		// Violent egg-break (juice, Chunk 82): the shell shatters into tumbling shards + a yolk
+		// splat + a sharp pop instead of a soft poof. The burst is biased along the killing shove
+		// and scaled by its speed, so a pinball-fling death bursts harder and sprays that way.
+		// Parented to our CONTAINER, not self, so it outlives the corpse's QueueFree. Headless-safe.
+		float burstForce = KnockbackVelocity.Length() / Mathf.Max(0.01f, MinBounceSpeed);
+		Particles.EggBurst(GetParent(), GlobalPosition + Vector3.Up * 0.6f, _baseColor,
+			KnockbackVelocity, burstForce);
 		OnDeath();
 	}
 

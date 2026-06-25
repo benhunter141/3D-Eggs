@@ -364,7 +364,9 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       headless-safe (skips when `DisplayServer.GetName()=="headless"`). Feel-check pending. Chunk 81 done: shared
       `scenes/Shared/ToonTheme.tres` Theme (cream-on-dark, rounded Button styleboxes + Label/Panel defaults) applied
       to LevelSelect / ResultMenu / PauseMenu / Hud and loaded onto CardBrawl's UI root so the whole front-end
-      coheres with the toon look. Chunk 82 (violent egg-break death) is the last M16 chunk.
+      coheres with the toon look. Chunk 82 done: `Die()` now fires `Particles.EggBurst` — the egg shell SHATTERS
+      violently (tumbling shell shards + a yolk splat + a sharp pop, biased/scaled by the killing shove) instead of
+      the soft death poof. **All M16 chunks (75–82) built; feel-checks pending.**
 - [ ] **M17 — Enemy bestiary (10 foes, Co-op Card Brawl) ⭐:** the brawl only ever spawns one enemy
       (Skeletons in a line). Replace that with a **varied 10-enemy roster, ordered by difficulty**, that
       feeds the escalating waves so each round reads as a distinct, recognizable threat. Roster (easy→hard):
@@ -510,13 +512,14 @@ Each chunk is self-contained and testable by running one level.
   (Overlay), `Hud` (Controls panel), and loaded onto `CardBrawl`'s `_root` in code so the End-Turn button + bars
   inherit it (cards/markers/ability slots keep their own explicit styleboxes). Compatibility-safe, headless-clean.
   Feel-check pending.
-- [ ] **Chunk 82 — Violent egg-break on death.** When a unit (egg) dies, the egg shell should **shatter
-  open violently** instead of just freeing/poofing — fling shell-shard fragments outward with knockback-
-  scaled velocity + spin, a yolk splat/burst, and a sharp impact pop, so deaths read as eggs cracking
-  apart. Reuse the death hook (`OnDeath` / `Die`) and the Chunk-80 particle kit; keep it cheap on the
-  940MX (low fragment/particle counts, one-shot-then-free) and viewport-guarded so `--headless` stays
-  safe. Builds on the EggMesh/EggCracks shell + outline so shards inherit the toon look. Test: a unit
-  death visibly bursts the egg open.
+- [x] **Chunk 82 — Violent egg-break on death.** `Die()` now fires `Particles.EggBurst` (replacing the soft
+  Chunk-80 `DeathPoof`): the shell SHATTERS — a fan of ~12 lit shell-shard fragments tumbles outward (spin via
+  `AngularVelocityMin/Max` + gravity, per-spawn shell colour), a ~9-blob egg-yolk-yellow splat bursts from the
+  core and arcs down, and a sharp bright additive pop punches at the break. The burst is biased along the
+  killing shove (`KnockbackVelocity`) and scaled by its speed (`burstForce = |knockback|/MinBounceSpeed`), so a
+  pinball-fling death sprays that way and explodes harder. Reuses the Chunk-80 one-shot-then-free `Spawn` helper
+  (shared shard `BoxMesh` + yolk `SphereMesh` + lit shell / unshaded yolk mats), kept low-count for the 940MX and
+  `Headless`-guarded so `--headless` logic tests stay green. Feel-check pending.
 
 **Build order 75 → 82. 75 + 76 + 77 are load-bearing (environment + toon shade + outline). 78–82 layer the
 requested polish (ground dressing, health bars, particles, UI, violent egg-break deaths). Keep every shader

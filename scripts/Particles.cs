@@ -18,8 +18,12 @@ public static class Particles
 
     private static QuadMesh _sparkMesh;
     private static SphereMesh _puffMesh;
+    private static BoxMesh _shardMesh;                 // shell fragment (egg-break, Chunk 82)
+    private static SphereMesh _yolkMesh;               // yolk blob (egg-break, Chunk 82)
     private static StandardMaterial3D _additiveMat;   // sparks: glowing, billboarded
     private static StandardMaterial3D _alphaMat;       // poof / dust: soft alpha billboard
+    private static StandardMaterial3D _shellMat;       // shell shards: lit, per-spawn colour
+    private static StandardMaterial3D _yolkMat;        // yolk goop: unshaded yellow billboard
     private static CurveTexture _fadeCurve;            // alpha 1 -> 0 over particle life (shared)
 
     // Bright spark fan on a non-lethal hit. `direction` points the way we were shoved
@@ -73,6 +77,76 @@ public static class Particles
         Spawn(parent, position, PuffMesh(), process, AlphaMat(), count: 14, lifetime: 0.55f);
     }
 
+    // Violent egg-break on death (M16, Chunk 82). The shell SHATTERS apart instead of just
+    // poofing: a fan of shell-shard fragments tumbles outward (spin + gravity), a yolk splat
+    // bursts from the core, and a sharp bright pop punches at the impact — so a death reads as
+    // an egg cracking open. `direction` biases the throw the way the killing shove pushed (so a
+    // pinball-fling death sprays that way) and `force` (≈ shove speed over MinBounceSpeed) scales
+    // how hard it bursts, so a heavy knockback kill explodes harder than a quiet expiry. Shell
+    // shards take the unit's own `shellColor`; the yolk is always egg-yolk yellow. Headless-safe.
+    public static void EggBurst(Node parent, Vector3 position, Color shellColor, Vector3 direction, float force)
+    {
+        if (Headless || parent == null || !GodotObject.IsInstanceValid(parent))
+            return;
+
+        Vector3 bias = direction;
+        bias.Y = 0f;
+        bias = bias.LengthSquared() > 0.0001f ? bias.Normalized() : Vector3.Zero;
+        float boost = 1f + Mathf.Clamp(force, 0f, 2f);   // 1..3x throw on a hard shove kill
+
+        // 1) Shell shards — chunky fragments of the cracked shell, flung up + outward, tumbling.
+        var shards = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
+            EmissionSphereRadius = 0.3f,
+            Direction = (Vector3.Up * 1.2f + bias).Normalized(),
+            Spread = 70f,
+            Gravity = new Vector3(0f, -16f, 0f),
+            InitialVelocityMin = 4.5f * boost,
+            InitialVelocityMax = 8.5f * boost,
+            AngularVelocityMin = -720f,   // degrees/sec — shards tumble as they fly
+            AngularVelocityMax = 720f,
+            ScaleMin = 0.7f,
+            ScaleMax = 1.5f,
+            Color = shellColor,
+        };
+        Spawn(parent, position, ShardMesh(), shards, ShellMat(), count: 12, lifetime: 0.85f);
+
+        // 2) Yolk splat — a goopy yellow burst from the core that arcs down and splats.
+        var yolk = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
+            EmissionSphereRadius = 0.14f,
+            Direction = (Vector3.Up * 0.6f + bias).Normalized(),
+            Spread = 80f,
+            Gravity = new Vector3(0f, -18f, 0f),
+            InitialVelocityMin = 2.5f * boost,
+            InitialVelocityMax = 5.5f * boost,
+            ScaleMin = 0.9f,
+            ScaleMax = 2.0f,
+            Color = new Color(1f, 0.82f, 0.2f),   // egg-yolk yellow
+            AlphaCurve = FadeCurve(),
+        };
+        Spawn(parent, position, YolkMesh(), yolk, YolkMat(), count: 9, lifetime: 0.6f);
+
+        // 3) Sharp pop — a quick bright additive flash punch at the moment of the break.
+        var pop = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere,
+            EmissionSphereRadius = 0.05f,
+            Direction = Vector3.Up,
+            Spread = 90f,
+            Gravity = Vector3.Zero,
+            InitialVelocityMin = 5f,
+            InitialVelocityMax = 9f,
+            ScaleMin = 1.0f,
+            ScaleMax = 2.2f,
+            Color = new Color(1f, 0.96f, 0.82f),
+            AlphaCurve = FadeCurve(),
+        };
+        Spawn(parent, position, SparkMesh(), pop, AdditiveMat(), count: 10, lifetime: 0.22f);
+    }
+
     // Low grey dust kick where a knockback shove rams a body or wall.
     public static void BounceDust(Node parent, Vector3 position)
     {
@@ -120,6 +194,32 @@ public static class Particles
 
     private static SphereMesh PuffMesh() =>
         _puffMesh ??= new SphereMesh { Radius = 0.16f, Height = 0.32f, RadialSegments = 6, Rings = 3 };
+
+    // A flattened box reads as a curved shell fragment when it tumbles (Chunk 82).
+    private static BoxMesh ShardMesh() =>
+        _shardMesh ??= new BoxMesh { Size = new Vector3(0.16f, 0.05f, 0.16f) };
+
+    // A small low-poly blob for the yolk splat.
+    private static SphereMesh YolkMesh() =>
+        _yolkMesh ??= new SphereMesh { Radius = 0.1f, Height = 0.2f, RadialSegments = 6, Rings = 3 };
+
+    // Shell shards are LIT (not billboarded) so a tumbling fragment catches the light and reads
+    // as a solid 3D piece of shell; per-spawn shell colour comes from the process Color.
+    private static StandardMaterial3D ShellMat() => _shellMat ??= new StandardMaterial3D
+    {
+        VertexColorUseAsAlbedo = true,
+        Roughness = 0.85f,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,   // thin shards visible from both faces
+    };
+
+    // Yolk blobs: flat unshaded glossy-yellow goop, billboarded so the splat always faces camera.
+    private static StandardMaterial3D YolkMat() => _yolkMat ??= new StandardMaterial3D
+    {
+        ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+        VertexColorUseAsAlbedo = true,
+        BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
+        CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+    };
 
     // Shared additive billboard for sparks: glows over the bodies, per-particle colour from the
     // process material's Color (vertex colour), unshaded so it reads cartoony.
