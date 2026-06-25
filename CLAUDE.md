@@ -377,6 +377,17 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       w/ club, many zombies, many dogs, Roman Legion. WaveManager grows from one-type lines to a per-wave
       **composition table** so waves mix foes; bosses appear on a cadence. Co-op-Card-Brawl only — every other
       mode stays byte-identical (Chunks 83–93). Headless-test the spawn schedule; visuals are feel-checked.
+- [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
+      straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
+      only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
+      reads as a distinct move: **spear/pike = thrust** (keep today's poke), **sword = horizontal sweep arc**
+      (multi-hit across the front), **axe = overhead chop** (slow, heavy, single big hit), **mace = wide
+      circular swing** (round-house, multi-hit + strong knockback), **punch = quick jab**. Drive it from a
+      per-weapon `AttackStyle` on the `WeaponProfile` table and a style-dispatching swing state machine that
+      animates the weapon transform (pivot rotation + offset) AND shapes the active hitbox region (line vs arc)
+      so sweeps actually hit multiple foes in their arc. Player-first; optionally extend the same style to
+      ally/enemy weapon strikes. Keep it cheap (940MX) and headless-test the per-style hit logic (which foes a
+      sweep vs a thrust connects with). Builds on the M9 data-driven weapon plumbing (Chunks 94–98).
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -594,6 +605,57 @@ club, many zombies, many dogs, a Roman Legion.
 scene into a wave row. 84/85 are the requested hordes (zombies, dogs); 88 is the Roman Legion; 92 is the troll
 boss. Keep all changes scoped to `WaveManager` + the new enemy scenes + the brawl spawn schedule so every other
 mode stays byte-identical, and keep each enemy's logic headless-test-green.**
+
+---
+
+### ▶ QUEUED PLAN — M18 Weapon-specific attack motions (Chunks 94–98)
+
+**Queued behind M16 + M17.** Right now combat has ONE attack motion for every weapon: `Player.UpdateSwing`
+runs a thrust state machine that slides the weapon straight out along local -Z via `SetThrustOffset` and
+retracts it (a snappy poke), polling `_hitbox` overlaps during the lunge. Spear/sword/axe/mace/punch differ
+only in the `WeaponProfile` numbers (Damage/Knockback/Reach/ThrustDistance/SwingDuration/SwingCooldown) — they
+all *look and behave* like a jab. This milestone makes each weapon attack in its **own recognizable way**, so
+the move tells you which weapon you hold. **Player-first** (the captain's swing is where attacks are most
+visible); the same `AttackStyle` can later be threaded through ally/enemy weapon strikes if wanted. Builds on
+the M9 data-driven `WeaponType → WeaponProfile` plumbing. Keep it cheap for the 940MX and headless-test the
+per-style hit logic (which foes connect for a sweep vs a thrust vs a chop).
+
+**Per-weapon styles (the tell):**
+- **Spear / Pike — Thrust** (unchanged): straight jab out and back. The existing behaviour becomes the
+  `Thrust` style so the pike/spear stay byte-identical.
+- **Sword — Horizontal Sweep:** the blade arcs across the front (left→right), a wide cut that can hit
+  **multiple** foes standing in the arc. Moderate knockback.
+- **Axe — Overhead Chop:** a slow, heavy top-down swing that lands one big committed hit (long cooldown =
+  the heavy-weapon tax). High damage, narrow.
+- **Mace — Wide Circular Swing:** a round-house that sweeps a broad arc (even wider than the sword),
+  multi-hit with **strong knockback** — the crowd-clearer.
+- **Punch — Quick Jab:** a short, fast version of the thrust (the basic egg's weak unarmed poke).
+
+- [ ] **Chunk 94 — Attack-style framework.** Add an `AttackStyle` enum (`Thrust | Sweep | Chop | Swing | Jab`)
+  to `WeaponProfile` + one column in the weapon table (every existing weapon = `Thrust`/`Jab` so behaviour is
+  byte-identical at first). Refactor `UpdateSwing` from a hard-coded thrust into a **style dispatcher**: a
+  shared timed window (extend/retract `t`) feeds a per-style routine that sets the weapon pivot's transform
+  (translation + rotation) and the hitbox pose. Implement `Thrust`/`Jab` here as the current slide so spear +
+  punch are unchanged. Headless-test that a thrust still connects exactly as before.
+- [ ] **Chunk 95 — Sword horizontal sweep.** Drive the sword pivot through a left→right yaw arc over the
+  swing window (instead of sliding out), with the hitbox swept across the front so it can register
+  **multiple** enemies in the arc (each hit once per swing via `_hitThisSwing`). Sword = `Sweep`. Headless-test
+  that two foes flanking the front both take one hit from a single sweep.
+- [ ] **Chunk 96 — Axe overhead chop.** Drive the axe pivot through a top-down pitch arc (raise → chop) over
+  a slower window; single heavy hit in a narrow forward zone, long cooldown preserved. Axe = `Chop`.
+  Headless-test the chop damage + that it stays single-target/narrow.
+- [ ] **Chunk 97 — Mace wide circular swing.** A broad round-house yaw arc (wider than the sword), multi-hit
+  with the mace's strong knockback applied along each victim's hit direction. Mace = `Swing`. Headless-test
+  that a clustered group all get shoved by one mace swing.
+- [ ] **Chunk 98 — Hitbox shaping + polish.** Make the active hitbox region match each style (a forward line
+  for thrust/chop vs a swept arc for sweep/swing) rather than reusing the single thrust capsule, so hits read
+  fairly; tune per-style timing/arc widths and add the weapon-trail/transform read-outs the HUD shows. Confirm
+  all five weapons feel distinct and every headless hit test stays green. Feel-check by playing a level and
+  cycling weapons with Q.
+
+**Build order 94 → 98. Chunk 94 (the style dispatcher) is load-bearing — every later chunk just adds one
+style routine + flips its weapon's `AttackStyle`. Keep `Thrust`/`Jab` byte-identical so spear/pike/punch are
+untouched, and keep each style's hit logic headless-test-green.**
 
 ---
 
