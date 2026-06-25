@@ -358,6 +358,18 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       Chunk 79 done: billboarded `HealthBar3D` on every `Unit` (dark bg + team-coloured fill draining right→left),
       grown sized-off-the-egg in `_Ready`, hidden until hurt and on death; crowd-cheap (shared bg mesh + 3 unshaded
       billboard mats, only the fill quad per-instance). Feel-check pending.
+- [ ] **M17 — Enemy bestiary (10 foes, Co-op Card Brawl) ⭐:** the brawl only ever spawns one enemy
+      (Skeletons in a line). Replace that with a **varied 10-enemy roster, ordered by difficulty**, that
+      feeds the escalating waves so each round reads as a distinct, recognizable threat. Roster (easy→hard):
+      **Zombie** (slow horde) · **War Dog** (fast pack) · **Skeleton** (reused baseline) · **Goblin Cutter**
+      (small fast blade) · **Bandit Slinger** (ranged kiter) · **Roman Legionary** (shielded block that
+      marches as a Legion) · **Orc Brute** (heavy club WITH knockback) · **Necromancer** (ranged + summons
+      zombies) · **Roman Centurion** (elite Legion leader w/ rally aura) · **Cave Troll** (boss — giant club,
+      AOE slam shockwave). Each is **visually obvious** (silhouette + colour + held prop tell you what it does)
+      and built on the shared `Unit`/`Enemy` spine + EggMesh/toon look. Includes the four requested: big troll
+      w/ club, many zombies, many dogs, Roman Legion. WaveManager grows from one-type lines to a per-wave
+      **composition table** so waves mix foes; bosses appear on a cadence. Co-op-Card-Brawl only — every other
+      mode stays byte-identical (Chunks 83–93). Headless-test the spawn schedule; visuals are feel-checked.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -483,6 +495,90 @@ Each chunk is self-contained and testable by running one level.
 **Build order 75 → 82. 75 + 76 + 77 are load-bearing (environment + toon shade + outline). 78–82 layer the
 requested polish (ground dressing, health bars, particles, UI, violent egg-break deaths). Keep every shader
 Compatibility-safe and every change headless-test-green.**
+
+---
+
+### ▶ QUEUED PLAN — M17 Enemy Bestiary · 10 varied foes for the Co-op Card Brawl (Chunks 83–93)
+
+**Queued behind M16** (build M16's remaining chunks first). Today the Co-op Card Brawl's `WaveManager` only
+ever spawns ONE enemy type — Skeletons — in a marching line, so every wave looks the same. This milestone gives
+the brawl a **10-enemy roster ordered by difficulty**, varied in role + silhouette, each **visually obvious**
+about what it does, fed into the escalating waves via a per-wave **composition table** (so waves mix foes and
+ramp). Built on the shared `Unit`/`Enemy` spine + EggMesh/toon look (Chunk 76–77). **Co-op-Card-Brawl scope
+only** — `WaveManager` + the brawl's spawn schedule; the new enemy scenes opt in there and nowhere else, so
+every other mode stays byte-identical. Headless-test the spawn schedule + each enemy's logic; visuals are
+feel-checked by running the brawl (battle 6 on LevelSelect). Includes the four requested foes: big troll w/
+club, many zombies, many dogs, a Roman Legion.
+
+**Roster (easy → hard), with the visual tell + behaviour:**
+1. **Zombie** — slow horde shambler. Low HP, contact melee, no knockback. *Look:* hunched sickly-green egg,
+   arms thrust forward. Comes in big numbers.
+2. **War Dog** — fast pack hunter. Very low HP, very fast chase, quick bite. *Look:* small, low-to-ground,
+   four-legged brown silhouette. Comes in packs.
+3. **Skeleton** — baseline melee (the existing `Enemy`/`Skeleton`, slotted into the roster as a mid filler).
+   *Look:* bone-white upright egg.
+4. **Goblin Cutter** — small fast skirmisher with a crude blade; jittery, slightly tougher than a zombie.
+   *Look:* little green egg, dagger in hand.
+5. **Bandit Slinger** — ranged kiter; lobs rocks (reuse `Stone`/`Arrow` + `Ballistics`), backs off when an
+   egg closes to melee. *Look:* tan egg whirling a sling.
+6. **Roman Legionary** — armored shield infantry; frontal shield reduces incoming damage; **marches as a tight
+   Legion block** rather than spread. *Look:* red+steel egg, rectangular scutum shield + gladius.
+7. **Orc Brute** — heavy slow bruiser; club hit lands real **knockback** (`Unit.AddKnockback`), high HP.
+   *Look:* big dark-green egg hefting a club.
+8. **Necromancer** — fragile caster; ranged bolt + periodically **summons ~2 Zombies** near itself (ignore it
+   and the horde grows). *Look:* hooded purple egg with a staff.
+9. **Roman Centurion** — elite Legion leader; tanky, strong melee, **rally aura** that buffs nearby Legionaries
+   (speed/toughness). *Look:* larger egg with a red plumed crest.
+10. **Cave Troll (BOSS)** — giant, slow, massive HP; periodic **club SLAM = radial knockback shockwave** around
+    it. Spawns solo as a boss on a wave cadence. *Look:* huge grey-green egg with an oversized club.
+
+- [ ] **Chunk 83 — Wave bestiary framework.** Grow `WaveManager` from a single `EnemyScene` line into a
+  per-wave **composition table**: a small data structure mapping a (1-based) wave → a list of
+  `(PackedScene, count)` entries (+ a `formation` hint: spread line vs tight block vs solo boss), with a
+  fallback to today's Skeleton line so existing tests/behaviour hold. Keep `CountForWave` working (now =
+  sum of the table row) and add a headless test for the table (right foes, right counts, totals). No new
+  enemies yet — this just unblocks every later chunk dropping its foe into the rotation.
+- [ ] **Chunk 84 — Zombie (horde, tier 1).** `Zombie.cs` (extends `Enemy`: low `MoveSpeed`, low HP, contact
+  melee, no knockback) + `Zombie.tscn` (hunched green toon egg). Wire into the early waves as the bulk horde.
+  Headless-test its stats/spawn.
+- [ ] **Chunk 85 — War Dog (pack, tier 1).** `WarDog.cs` (very fast, very low HP, short bite cooldown) +
+  `Dog.tscn` (small, low, four-legged silhouette — squashed egg body + simple legs). Spawns in packs.
+  Headless-test.
+- [ ] **Chunk 86 — Goblin Cutter + Skeleton slot-in (tier 2).** `Goblin.cs` + `Goblin.tscn` (small fast blade
+  melee, a touch tougher than a zombie) AND register the existing `Skeleton.tscn` as a tier-2 roster entry in
+  the composition table. Headless-test.
+- [ ] **Chunk 87 — Bandit Slinger (ranged, tier 3).** Ranged kiter reusing `Stone`/`Arrow` + `Ballistics`
+  (lob at the eggs, retreat when a foe closes inside melee range). `Slinger.cs` + scene. Headless-test the
+  fire/kite logic.
+- [ ] **Chunk 88 — Roman Legionary + Legion block (tier 3).** `Legionary.cs` + scene: shield-front **damage
+  reduction**, marches as a cohesive **block formation** (WaveManager `formation = block`: tight rows, shared
+  facing) instead of an even spread. *Look:* scutum + gladius, red/steel. Headless-test the damage-reduction
+  + block spawn.
+- [ ] **Chunk 89 — Orc Brute (heavy club, tier 4).** Slow, high HP; melee hit routes **knockback** through
+  `Unit.AddKnockback` (the only non-player foe that shoves). `OrcBrute.cs` + scene with a club mesh.
+  Headless-test the knockback-on-hit.
+- [ ] **Chunk 90 — Necromancer (summoner, tier 4).** Fragile ranged caster: bolt on cooldown + periodically
+  **summons ~2 Zombies** adjacent to itself (capped so it can't runaway-flood). `Necromancer.cs` + scene
+  (hooded, staff). Headless-test the summon cadence + cap.
+- [ ] **Chunk 91 — Roman Centurion (elite leader, tier 5).** Tanky strong-melee Legion leader with a **rally
+  aura**: nearby `Legionary`s within a radius get a speed/toughness buff (re-applied each frame, expires when
+  out of range or the Centurion dies). `Centurion.cs` + scene (plumed crest, larger). Headless-test the aura
+  apply/expire.
+- [ ] **Chunk 92 — Cave Troll boss (tier 5, AOE slam).** Giant slow boss, huge HP; periodic **club SLAM** =
+  radial knockback shockwave hitting every egg/soldier within `SlamRadius` (`Unit.AddKnockback` + damage).
+  Spawns SOLO via the composition table's boss row. `Troll.cs` + scene (oversized egg + big club). Keep the
+  slam cheap (one overlap query, no particles required for logic). Headless-test the slam radius/knockback.
+- [ ] **Chunk 93 — Bestiary wave progression + balance.** Author the full **difficulty ramp**: which foes
+  enter at which wave (Zombies/Dogs early → Skeletons/Goblins → Slingers/Legion blocks mid → Brute/Necromancer
+  → Centurion-led Legions → **Cave Troll boss on a cadence**, e.g. every Nth wave), and tune counts / HP /
+  per-round energy so the curve is fair against two basic eggs + their cards. Headless-test the composition
+  schedule across a run of waves (boss cadence, no empty waves, monotonic-ish pressure). Feel-check by playing
+  the brawl.
+
+**Build order 83 → 93. Chunk 83 (composition table) is load-bearing — every later chunk just drops its enemy
+scene into a wave row. 84/85 are the requested hordes (zombies, dogs); 88 is the Roman Legion; 92 is the troll
+boss. Keep all changes scoped to `WaveManager` + the new enemy scenes + the brawl spawn schedule so every other
+mode stays byte-identical, and keep each enemy's logic headless-test-green.**
 
 ---
 
