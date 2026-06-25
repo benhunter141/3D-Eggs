@@ -487,6 +487,10 @@ public partial class CardBrawl : Node3D
 		_root = new Control();
 		_root.SetAnchorsPreset(Control.LayoutPreset.FullRect);
 		_root.MouseFilter = Control.MouseFilterEnum.Ignore;
+		// Shared toon UI theme (Chunk 81): the End-Turn button + any un-overridden Control inherit the
+		// cream-on-dark cel look. Cards / markers / ability slots set their own styleboxes (those win).
+		Theme toonTheme = GD.Load<Theme>("res://scenes/Shared/ToonTheme.tres");
+		if (toonTheme != null) _root.Theme = toonTheme;
 		ui.AddChild(_root);
 
 		_phaseLabel = MakeLabel(_root, Control.LayoutPreset.TopWide, 16, 56, 26, new Color(1f, 0.85f, 0.55f));

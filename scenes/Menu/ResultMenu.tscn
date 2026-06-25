@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://b3degg0result1"]
+[gd_scene load_steps=3 format=3 uid="uid://b3degg0result1"]
 
 [ext_resource type="Script" path="res://scripts/SceneButton.cs" id="1_btn"]
+[ext_resource type="Theme" path="res://scenes/Shared/ToonTheme.tres" id="2_theme"]
 
 [node name="ResultMenu" type="CanvasLayer"]
 
@@ -31,6 +32,7 @@ theme_override_colors/font_color = Color(0.2, 0.85, 0.3, 1)
 theme_override_font_sizes/font_size = 80
 
 [node name="Buttons" type="HBoxContainer" parent="." groups=["game_over", "victory"]]
+theme = ExtResource("2_theme")
 visible = false
 anchors_preset = 8
 anchor_left = 0.5

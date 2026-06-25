@@ -361,7 +361,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       `GpuParticles3D` bursts that self-free on `Finished`: `HitSpark` off any non-lethal `TakeDamage`
       (sword/fist/stone/fireball), `DeathPoof` in the unit's colour from `Die()` (parented to the container so it
       outlives the corpse), `BounceDust` when `ResolveKnockbackBounce` bounces; procedural, shared draw mats/meshes,
-      headless-safe (skips when `DisplayServer.GetName()=="headless"`). Feel-check pending.
+      headless-safe (skips when `DisplayServer.GetName()=="headless"`). Feel-check pending. Chunk 81 done: shared
+      `scenes/Shared/ToonTheme.tres` Theme (cream-on-dark, rounded Button styleboxes + Label/Panel defaults) applied
+      to LevelSelect / ResultMenu / PauseMenu / Hud and loaded onto CardBrawl's UI root so the whole front-end
+      coheres with the toon look. Chunk 82 (violent egg-break death) is the last M16 chunk.
 - [ ] **M17 — Enemy bestiary (10 foes, Co-op Card Brawl) ⭐:** the brawl only ever spawns one enemy
       (Skeletons in a line). Replace that with a **varied 10-enemy roster, ordered by difficulty**, that
       feeds the escalating waves so each round reads as a distinct, recognizable threat. Roster (easy→hard):
@@ -490,9 +493,12 @@ Each chunk is self-contained and testable by running one level.
   asset files), shared draw materials + meshes, counts 6–14 for the 940MX. **Headless-safe:** every spawn
   early-outs when `DisplayServer.GetName() == "headless"` (GPU particles need a device), so the logic tests
   stay green. Feel-check pending.
-- [ ] **Chunk 81 — Toon UI/HUD & card theme.** A shared `Theme` resource (font, accent palette, rounded
-  panel StyleBoxes) applied across `LevelSelect`, `Hud`, `ResultMenu`, `PauseMenu`, and the `CardBrawl`
-  hand/ability bars so the front-end matches the new in-game look. Test: menus + HUD + cards cohere.
+- [x] **Chunk 81 — Toon UI/HUD & card theme.** Shared `scenes/Shared/ToonTheme.tres` (a Godot `Theme`):
+  one cream-on-dark palette with chunky rounded **Button** StyleBoxes (normal/hover/pressed/disabled/focus),
+  default Label/Panel styles + font sizes. Applied to `LevelSelect` (root), `ResultMenu` (Buttons), `PauseMenu`
+  (Overlay), `Hud` (Controls panel), and loaded onto `CardBrawl`'s `_root` in code so the End-Turn button + bars
+  inherit it (cards/markers/ability slots keep their own explicit styleboxes). Compatibility-safe, headless-clean.
+  Feel-check pending.
 - [ ] **Chunk 82 — Violent egg-break on death.** When a unit (egg) dies, the egg shell should **shatter
   open violently** instead of just freeing/poofing — fling shell-shard fragments outward with knockback-
   scaled velocity + spin, a yolk splat/burst, and a sharp impact pop, so deaths read as eggs cracking
