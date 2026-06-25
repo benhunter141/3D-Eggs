@@ -357,7 +357,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       Pinball walls warmed to matte stone, CoopCardBrawl fences given wood, corner posts added to KotH + Brawl.
       Chunk 79 done: billboarded `HealthBar3D` on every `Unit` (dark bg + team-coloured fill draining right→left),
       grown sized-off-the-egg in `_Ready`, hidden until hurt and on death; crowd-cheap (shared bg mesh + 3 unshaded
-      billboard mats, only the fill quad per-instance). Feel-check pending.
+      billboard mats, only the fill quad per-instance). Chunk 80 done: `scripts/Particles.cs` — low-count one-shot
+      `GpuParticles3D` bursts that self-free on `Finished`: `HitSpark` off any non-lethal `TakeDamage`
+      (sword/fist/stone/fireball), `DeathPoof` in the unit's colour from `Die()` (parented to the container so it
+      outlives the corpse), `BounceDust` when `ResolveKnockbackBounce` bounces; procedural, shared draw mats/meshes,
+      headless-safe (skips when `DisplayServer.GetName()=="headless"`). Feel-check pending.
 - [ ] **M17 — Enemy bestiary (10 foes, Co-op Card Brawl) ⭐:** the brawl only ever spawns one enemy
       (Skeletons in a line). Replace that with a **varied 10-enemy roster, ordered by difficulty**, that
       feeds the escalating waves so each round reads as a distinct, recognizable threat. Roster (easy→hard):
@@ -478,9 +482,14 @@ Each chunk is self-contained and testable by running one level.
   priority so bars read over bodies), only the fill quad per-instance (resizable via `QuadMesh.CenterOffset`).
   The paired **hit-flash** already rides `TakeDamage` via the toon shader's `flash` uniform (Chunk 76).
   Resource-only build, `--headless`-safe (logic tests stay green). Feel-check pending.
-- [ ] **Chunk 80 — Combat juice particles.** Low-count `GPUParticles3D` one-shots: hit sparks on
-  sword/fist/fireball impact, a **death poof** on `Die`/`OnDeath`, dust on knockback bounce. Pooled or
-  one-shot-then-free; keep counts modest for the 940MX. Test: hits and deaths feel punchy.
+- [x] **Chunk 80 — Combat juice particles.** Shared `scripts/Particles.cs` helper — low-count one-shot
+  `GpuParticles3D` bursts that self-free on the `Finished` signal: `HitSpark` (bright additive motes flung
+  along the hit dir off any non-lethal `TakeDamage` — so sword/fist/stone/fireball all spark), `DeathPoof`
+  (a soft puff in the unit's own colour from `Die()`, parented to the unit's CONTAINER so it outlives the
+  corpse) and `BounceDust` (a pale kick-up when `ResolveKnockbackBounce` actually bounces). Procedural (no
+  asset files), shared draw materials + meshes, counts 6–14 for the 940MX. **Headless-safe:** every spawn
+  early-outs when `DisplayServer.GetName() == "headless"` (GPU particles need a device), so the logic tests
+  stay green. Feel-check pending.
 - [ ] **Chunk 81 — Toon UI/HUD & card theme.** A shared `Theme` resource (font, accent palette, rounded
   panel StyleBoxes) applied across `LevelSelect`, `Hud`, `ResultMenu`, `PauseMenu`, and the `CardBrawl`
   hand/ability bars so the front-end matches the new in-game look. Test: menus + HUD + cards cohere.

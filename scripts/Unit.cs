@@ -491,6 +491,9 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		{
 			Flash(0.85f);
 			PlaySound(1f);
+			// Spark burst flung the way we were shoved (juice, Chunk 80). Parented to our container
+			// so it survives even if this hit is one of several this frame. Headless-safe.
+			Particles.HitSpark(GetParent(), GlobalPosition + Vector3.Up * 0.8f, hitDirection, FlashColor);
 		}
 	}
 
@@ -559,6 +562,9 @@ public partial class Unit : CharacterBody3D, ICardUnit
 		RefreshHealthBar();   // hide the bar on death
 		Flash(1f);            // full white pop on death
 		PlaySound(0.7f);      // lower pitch reads as a heavier death thud
+		// Death poof in the unit's own colour (juice, Chunk 80). Parented to our CONTAINER, not
+		// self, so it outlives the corpse's QueueFree. Headless-safe.
+		Particles.DeathPoof(GetParent(), GlobalPosition + Vector3.Up * 0.6f, _baseColor);
 		OnDeath();
 	}
 
@@ -668,6 +674,11 @@ public partial class Unit : CharacterBody3D, ICardUnit
 				bounced = true;
 			}
 		}
+
+		// Kick up a dust puff at our feet when a real shove rams something (juice, Chunk 80).
+		// Headless-safe.
+		if (bounced)
+			Particles.BounceDust(GetParent(), GlobalPosition);
 	}
 
 	// True on the frames this unit should re-scan UnitRegistry for its nearest target. Call
