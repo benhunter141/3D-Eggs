@@ -114,6 +114,7 @@ public partial class CardBrawl : Node3D
 
 		_waves = GetNodeOrNull<WaveManager>("WaveManager");
 		if (_waves == null) { _waves = new WaveManager { Name = "WaveManager" }; AddChild(_waves); }
+		BuildWaveTable();
 
 		_round = new RoundLoop(RoundSeconds);
 		_round.PhaseChanged += OnPhaseChanged;
@@ -418,6 +419,25 @@ public partial class CardBrawl : Node3D
 	private void OnEndTurnButtonPressed() => RequestEndTurn();
 
 	// Foes-first: stage the coming wave DURING the pause so both eggs can SEE the threat and counter it.
+	// Author the brawl's per-wave bestiary (M17). Populated incrementally across Chunks 84–93 as each
+	// foe type lands; Chunk 93 finalizes the full difficulty ramp. For now the opener is a slow Zombie
+	// horde (Chunk 84), stiffened with a couple of Skeletons as it escalates. Waves past the table clamp
+	// to the last (hardest) row, so the run keeps pressuring until the ramp is authored.
+	private void BuildWaveTable()
+	{
+		if (_waves == null) return;
+		var zombie = GD.Load<PackedScene>("res://scenes/Zombie.tscn");
+		var skeleton = GD.Load<PackedScene>("res://scenes/Skeleton.tscn");
+
+		_waves.WaveTable.Clear();
+		// Wave 1 — a pure slow zombie horde: the gentle opener.
+		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 5));
+		// Wave 2 — a bigger horde with a couple of tougher Skeletons mixed in.
+		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 7).Add(skeleton, 2));
+		// Wave 3 — heavier still (later bestiary chunks layer in more foe types here).
+		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 9).Add(skeleton, 4));
+	}
+
 	private void SpawnPreviewWave()
 	{
 		int wave = _round.RoundNumber;

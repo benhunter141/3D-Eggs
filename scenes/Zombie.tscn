@@ -1,0 +1,47 @@
+[gd_scene load_steps=8 format=3 uid="uid://dzomb0eggs0001"]
+
+[ext_resource type="Script" path="res://scripts/Zombie.cs" id="1_zombie"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_zombie"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.42, 0.58, 0.3, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_zombie"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_arm"]
+size = Vector3(0.16, 0.16, 0.8)
+
+[sub_resource type="StandardMaterial3D" id="Mat_arm"]
+albedo_color = Color(0.34, 0.48, 0.24, 1)
+roughness = 0.9
+
+[node name="Zombie" type="CharacterBody3D"]
+script = ExtResource("1_zombie")
+MoveSpeed = 2.0
+AttackDamage = 8.0
+AttackCooldown = 1.2
+MaxHealth = 50.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.9689, -0.2474, 0, 0.2474, 0.9689, 0, 0, 0)
+material_override = SubResource("Mat_zombie")
+script = ExtResource("2_egg")
+Width = 1.0
+Height = 1.7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_zombie")
+
+[node name="ArmL" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.25, -0.5)
+mesh = SubResource("BoxMesh_arm")
+surface_material_override/0 = SubResource("Mat_arm")
+
+[node name="ArmR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.25, -0.5)
+mesh = SubResource("BoxMesh_arm")
+surface_material_override/0 = SubResource("Mat_arm")

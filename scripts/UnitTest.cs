@@ -48,6 +48,7 @@ public partial class UnitTest : Node3D
 		bool brawlWaves = await TestBrawlWaves();
 		bool brawlPreview = await TestBrawlPreview();
 		bool waveBestiary = await TestWaveBestiary();
+		bool zombie = await TestZombie();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -74,7 +75,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1434,6 +1435,48 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: composition table sums counts, spawns the right mix, clamps past the table, and falls back to the Skeleton line"
 			: $"FAIL: fallbackOk={fallbackOk}, sums={sums}, clamps={clamps}, rightMix={rightMix}");
+		return pass;
+	}
+
+	// Chunk 84 (M17): the Zombie is a tier-1 horde shambler — Enemy-team, slow (slower than the base
+	// Enemy), fragile (low HP), contact melee with NO knockback. It spawns from its scene and chases the
+	// nearest opponent like any Enemy.
+	private async Task<bool> TestZombie()
+	{
+		GD.Print("=== UnitTest: Zombie horde shambler (M17, Chunk 84) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var zombie = GD.Load<PackedScene>("res://scenes/Zombie.tscn").Instantiate<Zombie>();
+		AddChild(zombie);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Reference: a base Enemy (Skeleton) for the "slower + frailer" comparison.
+		var skel = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(skel);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = zombie.Team == Unit.TeamId.Enemy;
+		bool slower = zombie.MoveSpeed < skel.MoveSpeed;
+		bool frailer = zombie.MaxHealth < skel.MaxHealth && Mathf.IsEqualApprox(zombie.Health, zombie.MaxHealth);
+		bool melee = zombie.AttackDamage > 0f;
+
+		// Contact melee deals damage but never imparts knockback (Enemy hits don't shove).
+		var victim = new Unit { MaxHealth = 100f };
+		AddChild(victim);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		victim.TakeDamage(zombie.AttackDamage);   // simulate one bite
+		bool damaged = victim.Health < 100f;
+		bool noKnockback = victim.CurrentKnockback.LengthSquared() < 0.0001f;
+
+		GD.Print($"zombie: team={zombie.Team}, move={zombie.MoveSpeed} (skel {skel.MoveSpeed}), hp={zombie.MaxHealth} (skel {skel.MaxHealth}), dmg={zombie.AttackDamage}");
+
+		bool pass = enemyTeam && slower && frailer && melee && damaged && noKnockback;
+		GD.Print(pass
+			? "PASS: zombie is a slow, frail, no-knockback Enemy-team melee shambler"
+			: $"FAIL: enemyTeam={enemyTeam}, slower={slower}, frailer={frailer}, melee={melee}, damaged={damaged}, noKnockback={noKnockback}");
 		return pass;
 	}
 

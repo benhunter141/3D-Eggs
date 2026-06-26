@@ -382,7 +382,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       Chunk 83 done: `WaveManager` now carries a per-wave **composition table** (`WaveTable` of
       `WaveComposition` = `WaveEntry(scene, count)` list + `Formation` Spread/Block/Solo), `CompositionForWave`
       clamps past the table & falls back to the legacy Skeleton line (flat levels byte-identical), `CountForWave`
-      = row total, `SpawnWave` places the mix per formation. Headless-verified (`TestWaveBestiary`).
+      = row total, `SpawnWave` places the mix per formation. Headless-verified (`TestWaveBestiary`). Chunk 84
+      done: `Zombie` (tier-1 horde) — a hunched green toon egg with forward-thrust arms; slow (MoveSpeed 2),
+      frail (50 HP), no-knockback contact melee; `CardBrawl.BuildWaveTable()` makes it the bulk early horde
+      (incrementally authored, Chunk 93 finalizes the ramp). Headless-verified (`TestZombie`).
 - [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
@@ -575,9 +578,13 @@ club, many zombies, many dogs, a Roman Legion.
   in from Chunk 84 on. Headless-verified (`TestWaveBestiary` in `UnitTest.cs`): the table sums counts,
   `SpawnWave(2)` drops the exact mix (3 Skeletons + 2 Swordmen, all Enemy team), waves past the table clamp,
   and an unset table still falls back.
-- [ ] **Chunk 84 — Zombie (horde, tier 1).** `Zombie.cs` (extends `Enemy`: low `MoveSpeed`, low HP, contact
-  melee, no knockback) + `Zombie.tscn` (hunched green toon egg). Wire into the early waves as the bulk horde.
-  Headless-test its stats/spawn.
+- [x] **Chunk 84 — Zombie (horde, tier 1).** `Zombie.cs` (thin `Enemy` subclass for type identity) +
+  `Zombie.tscn` — a hunched (forward-tilted egg) sickly-green toon shambler with two forward-thrust arms;
+  archetype stats on the scene root (`MoveSpeed` 2, `MaxHealth` 50, `AttackDamage` 8) so it's a slow, frail,
+  no-knockback contact-melee Enemy. Wired into `CardBrawl.BuildWaveTable()` as the bulk early horde (wave 1 =
+  5 zombies; waves 2–3 add Skeletons), the incrementally-authored brawl bestiary table (Chunk 93 finalizes the
+  ramp). Headless-verified (`TestZombie`): Enemy-team, slower + frailer than the Skeleton, melee damage with
+  zero knockback.
 - [ ] **Chunk 85 — War Dog (pack, tier 1).** `WarDog.cs` (very fast, very low HP, short bite cooldown) +
   `Dog.tscn` (small, low, four-legged silhouette — squashed egg body + simple legs). Spawns in packs.
   Headless-test.
