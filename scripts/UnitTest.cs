@@ -47,6 +47,7 @@ public partial class UnitTest : Node3D
 		bool brawlHand = TestBrawlHandRouting();
 		bool brawlWaves = await TestBrawlWaves();
 		bool brawlPreview = await TestBrawlPreview();
+		bool waveBestiary = await TestWaveBestiary();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -73,7 +74,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1379,6 +1380,60 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: staged foes sit inert while paused, then chase once the wave begins"
 			: $"FAIL: staged={staged}, inertWhilePaused={inertWhilePaused}, activeOnUnfreeze={activeOnUnfreeze}");
+		return pass;
+	}
+
+	// Chunk 83 (M17): the wave bestiary composition table. WaveManager now maps each (1-based) wave to a
+	// WaveComposition — a mix of (scene, count) entries + a Formation hint. We verify: an authored table makes
+	// CountForWave report the SUM of the row's entries; SpawnWave drops exactly that mix (right foes, right
+	// counts) into the parent; waves past the end of the table reuse the last (hardest) row; and an UNSET
+	// table still falls back to the legacy single-Skeleton line (so existing brawl behaviour is unchanged).
+	private async Task<bool> TestWaveBestiary()
+	{
+		GD.Print("=== UnitTest: wave bestiary composition table (M17, Chunk 83) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var skelScene = GD.Load<PackedScene>("res://scenes/Skeleton.tscn");
+		var swordScene = GD.Load<PackedScene>("res://scenes/Swordman.tscn");
+
+		// Fallback first: no table set -> legacy formula, single Skeleton type.
+		var fallback = new WaveManager { BaseCount = 3, PerWave = 2 };
+		AddChild(fallback);
+		bool fallbackOk = fallback.CompositionForWave(1).TotalCount == 3 && fallback.CountForWave(3) == 7;
+
+		// Authored table: wave 1 = 2 Skeletons (Spread); wave 2 = 3 Skeletons + 2 Swordmen (Block).
+		var wm = new WaveManager();
+		AddChild(wm);
+		wm.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(skelScene, 2));
+		wm.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Block)
+			.Add(skelScene, 3).Add(swordScene, 2));
+
+		bool sums = wm.CountForWave(1) == 2 && wm.CountForWave(2) == 5;
+		// Wave 3 is past the table -> clamps to the last (wave-2) row of 5.
+		bool clamps = wm.CountForWave(3) == 5;
+
+		var parent = new Node3D();
+		AddChild(parent);
+		int spawned = wm.SpawnWave(2, parent, Vector3.Zero);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		int skels = 0, swords = 0, enemyTeam = 0;
+		foreach (Node n in parent.GetChildren())
+		{
+			if (n is Swordman) swords++;
+			else if (n is Enemy) skels++;            // Skeleton is the base Enemy class
+			if (n is Unit u && u.Team == Unit.TeamId.Enemy) enemyTeam++;
+		}
+		bool rightMix = spawned == 5 && skels == 3 && swords == 2 && enemyTeam == 5;
+		GD.Print($"fallbackOk={fallbackOk}, sums={sums}, clamps={clamps}, spawned={spawned} (skel={skels}, sword={swords}, enemyTeam={enemyTeam})");
+
+		bool pass = fallbackOk && sums && clamps && rightMix;
+		GD.Print(pass
+			? "PASS: composition table sums counts, spawns the right mix, clamps past the table, and falls back to the Skeleton line"
+			: $"FAIL: fallbackOk={fallbackOk}, sums={sums}, clamps={clamps}, rightMix={rightMix}");
 		return pass;
 	}
 

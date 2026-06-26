@@ -367,7 +367,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       coheres with the toon look. Chunk 82 done: `Die()` now fires `Particles.EggBurst` — the egg shell SHATTERS
       violently (tumbling shell shards + a yolk splat + a sharp pop, biased/scaled by the killing shove) instead of
       the soft death poof. **All M16 chunks (75–82) built; feel-checks pending.**
-- [ ] **M17 — Enemy bestiary (10 foes, Co-op Card Brawl) ⭐:** the brawl only ever spawns one enemy
+- [~] **M17 — Enemy bestiary (10 foes, Co-op Card Brawl) ⭐:** the brawl only ever spawns one enemy
       (Skeletons in a line). Replace that with a **varied 10-enemy roster, ordered by difficulty**, that
       feeds the escalating waves so each round reads as a distinct, recognizable threat. Roster (easy→hard):
       **Zombie** (slow horde) · **War Dog** (fast pack) · **Skeleton** (reused baseline) · **Goblin Cutter**
@@ -379,6 +379,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       w/ club, many zombies, many dogs, Roman Legion. WaveManager grows from one-type lines to a per-wave
       **composition table** so waves mix foes; bosses appear on a cadence. Co-op-Card-Brawl only — every other
       mode stays byte-identical (Chunks 83–93). Headless-test the spawn schedule; visuals are feel-checked.
+      Chunk 83 done: `WaveManager` now carries a per-wave **composition table** (`WaveTable` of
+      `WaveComposition` = `WaveEntry(scene, count)` list + `Formation` Spread/Block/Solo), `CompositionForWave`
+      clamps past the table & falls back to the legacy Skeleton line (flat levels byte-identical), `CountForWave`
+      = row total, `SpawnWave` places the mix per formation. Headless-verified (`TestWaveBestiary`).
 - [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
@@ -561,12 +565,16 @@ club, many zombies, many dogs, a Roman Legion.
 10. **Cave Troll (BOSS)** — giant, slow, massive HP; periodic **club SLAM = radial knockback shockwave** around
     it. Spawns solo as a boss on a wave cadence. *Look:* huge grey-green egg with an oversized club.
 
-- [ ] **Chunk 83 — Wave bestiary framework.** Grow `WaveManager` from a single `EnemyScene` line into a
-  per-wave **composition table**: a small data structure mapping a (1-based) wave → a list of
-  `(PackedScene, count)` entries (+ a `formation` hint: spread line vs tight block vs solo boss), with a
-  fallback to today's Skeleton line so existing tests/behaviour hold. Keep `CountForWave` working (now =
-  sum of the table row) and add a headless test for the table (right foes, right counts, totals). No new
-  enemies yet — this just unblocks every later chunk dropping its foe into the rotation.
+- [x] **Chunk 83 — Wave bestiary framework.** `WaveManager` grew from a single `EnemyScene` line into a
+  per-wave **composition table** (`WaveTable`): each (1-based) wave → a `WaveComposition` = a list of
+  `WaveEntry(scene, count)` + a `Formation` hint (`Spread` line / tight `Block` / `Solo` boss).
+  `CompositionForWave(wave)` pulls from the table (clamped to the last/hardest row past its end) or falls
+  back to today's single-Skeleton Spread line sized by `BaseCount + (wave-1)*PerWave`; `CountForWave` now =
+  the row's `TotalCount`; `SpawnWave` flattens the mix and places foes via `PlaceFoe` per formation. **No
+  table set = byte-identical** to the old Skeleton line (existing brawl + tests unchanged). New enemies opt
+  in from Chunk 84 on. Headless-verified (`TestWaveBestiary` in `UnitTest.cs`): the table sums counts,
+  `SpawnWave(2)` drops the exact mix (3 Skeletons + 2 Swordmen, all Enemy team), waves past the table clamp,
+  and an unset table still falls back.
 - [ ] **Chunk 84 — Zombie (horde, tier 1).** `Zombie.cs` (extends `Enemy`: low `MoveSpeed`, low HP, contact
   melee, no knockback) + `Zombie.tscn` (hunched green toon egg). Wire into the early waves as the bulk horde.
   Headless-test its stats/spawn.
