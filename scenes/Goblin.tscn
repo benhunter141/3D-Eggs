@@ -1,0 +1,55 @@
+[gd_scene load_steps=10 format=3 uid="uid://dgobl0eggs0001"]
+
+[ext_resource type="Script" path="res://scripts/Goblin.cs" id="1_goblin"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_goblin"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.36, 0.62, 0.26, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_goblin"]
+radius = 0.32
+height = 1.3
+
+[sub_resource type="BoxMesh" id="BoxMesh_arm"]
+size = Vector3(0.13, 0.13, 0.5)
+
+[sub_resource type="StandardMaterial3D" id="Mat_arm"]
+albedo_color = Color(0.3, 0.5, 0.2, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_blade"]
+size = Vector3(0.07, 0.07, 0.55)
+
+[sub_resource type="StandardMaterial3D" id="Mat_blade"]
+albedo_color = Color(0.72, 0.74, 0.78, 1)
+metallic = 0.6
+roughness = 0.35
+
+[node name="Goblin" type="CharacterBody3D"]
+script = ExtResource("1_goblin")
+MoveSpeed = 5.5
+AttackRange = 1.4
+AttackDamage = 9.0
+AttackCooldown = 0.8
+MaxHealth = 65.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_goblin")
+script = ExtResource("2_egg")
+Width = 0.8
+Height = 1.3
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_goblin")
+
+[node name="ArmR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 0.05, -0.32)
+mesh = SubResource("BoxMesh_arm")
+surface_material_override/0 = SubResource("Mat_arm")
+
+[node name="Blade" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 0.08, -0.68)
+mesh = SubResource("BoxMesh_blade")
+surface_material_override/0 = SubResource("Mat_blade")

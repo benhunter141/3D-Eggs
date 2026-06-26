@@ -594,10 +594,17 @@ club, many zombies, many dogs, a Roman Legion.
   `AttackCooldown` 0.5): a swarm out-damages by closing fast and biting often, not by any one dog. Wired into
   `CardBrawl.BuildWaveTable()` as a pack (wave 2 = 4 zombies + 3 dogs; wave 3 = 6 zombies + 4 dogs + 3
   skeletons). Headless-verified (`TestWarDog`): Enemy-team, faster + frailer than the Skeleton, shorter bite
-  cooldown, melee damage with zero knockback.
-- [ ] **Chunk 86 — Goblin Cutter + Skeleton slot-in (tier 2).** `Goblin.cs` + `Goblin.tscn` (small fast blade
-  melee, a touch tougher than a zombie) AND register the existing `Skeleton.tscn` as a tier-2 roster entry in
-  the composition table. Headless-test.
+  cooldown, melee damage with zero knockback. Chunk 86 done: `Goblin` (tier-2 skirmisher) — a small vivid-green
+  toon egg with a steel blade; fast (MoveSpeed 5.5, > Skeleton's 4) and tougher than a Zombie (65 HP vs 50) but
+  frailer than a Skeleton (100), darting no-knockback blade melee; added a tier-2 wave row (wave 4 = 4 Goblins +
+  4 Skeletons + 4 Zombies), slotting the existing Skeleton in as the tier-2 anchor. Headless-verified (`TestGoblin`).
+- [x] **Chunk 86 — Goblin Cutter + Skeleton slot-in (tier 2).** `Goblin.cs` (thin `Enemy` subclass) +
+  `Goblin.tscn` — a small (Width 0.8/Height 1.3) vivid-green toon egg with a crude steel blade held forward;
+  the fast-skirmisher stat block on the scene root (`MoveSpeed` 5.5 > Skeleton's 4, `MaxHealth` 65 > Zombie's
+  50 but < Skeleton's 100, `AttackDamage` 9, `AttackCooldown` 0.8): darts in to slash, no-knockback contact
+  melee. Added a tier-2 brawl wave row (wave 4 = 4 Goblins + 4 Skeletons + 4 Zombies), slotting the existing
+  `Skeleton.tscn` in as the tier-2 anchor. Headless-verified (`TestGoblin`): Enemy-team, faster than the
+  Skeleton, tougher than a Zombie yet frailer than a Skeleton, melee damage with zero knockback.
 - [ ] **Chunk 87 — Bandit Slinger (ranged, tier 3).** Ranged kiter reusing `Stone`/`Arrow` + `Ballistics`
   (lob at the eggs, retreat when a foe closes inside melee range). `Slinger.cs` + scene. Headless-test the
   fire/kite logic.

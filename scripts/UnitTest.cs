@@ -50,6 +50,7 @@ public partial class UnitTest : Node3D
 		bool waveBestiary = await TestWaveBestiary();
 		bool zombie = await TestZombie();
 		bool warDog = await TestWarDog();
+		bool goblin = await TestGoblin();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -76,7 +77,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1521,6 +1522,51 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: war dog is a fast, frail, quick-biting, no-knockback Enemy-team pack hunter"
 			: $"FAIL: enemyTeam={enemyTeam}, faster={faster}, frailer={frailer}, quickBite={quickBite}, melee={melee}, damaged={damaged}, noKnockback={noKnockback}");
+		return pass;
+	}
+
+	// Chunk 86 (M17): the Goblin Cutter is a tier-2 skirmisher — Enemy-team, faster than the base Enemy
+	// (it darts in to slash) yet a touch tougher than the frail Zombie. Like all melee foes its blade
+	// deals damage but no knockback. Also confirms the existing Skeleton still loads as a roster entry.
+	private async Task<bool> TestGoblin()
+	{
+		GD.Print("=== UnitTest: Goblin Cutter skirmisher (M17, Chunk 86) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var goblin = GD.Load<PackedScene>("res://scenes/Goblin.tscn").Instantiate<Goblin>();
+		AddChild(goblin);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Reference: a base Enemy (Skeleton) and a Zombie for the "faster than skel, tougher than zombie" comparison.
+		var skel = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(skel);
+		var zombie = GD.Load<PackedScene>("res://scenes/Zombie.tscn").Instantiate<Zombie>();
+		AddChild(zombie);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = goblin.Team == Unit.TeamId.Enemy;
+		bool faster = goblin.MoveSpeed > skel.MoveSpeed;
+		bool tougherThanZombie = goblin.MaxHealth > zombie.MaxHealth && Mathf.IsEqualApprox(goblin.Health, goblin.MaxHealth);
+		bool frailerThanSkel = goblin.MaxHealth < skel.MaxHealth;
+		bool melee = goblin.AttackDamage > 0f;
+
+		// Crude-blade slash deals damage but never imparts knockback (Enemy hits don't shove).
+		var victim = new Unit { MaxHealth = 100f };
+		AddChild(victim);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		victim.TakeDamage(goblin.AttackDamage);   // simulate one slash
+		bool damaged = victim.Health < 100f;
+		bool noKnockback = victim.CurrentKnockback.LengthSquared() < 0.0001f;
+
+		GD.Print($"goblin: team={goblin.Team}, move={goblin.MoveSpeed} (skel {skel.MoveSpeed}), hp={goblin.MaxHealth} (zombie {zombie.MaxHealth}, skel {skel.MaxHealth}), dmg={goblin.AttackDamage}");
+
+		bool pass = enemyTeam && faster && tougherThanZombie && frailerThanSkel && melee && damaged && noKnockback;
+		GD.Print(pass
+			? "PASS: goblin is a fast Enemy-team skirmisher, tougher than a zombie, no-knockback blade melee"
+			: $"FAIL: enemyTeam={enemyTeam}, faster={faster}, tougherThanZombie={tougherThanZombie}, frailerThanSkel={frailerThanSkel}, melee={melee}, damaged={damaged}, noKnockback={noKnockback}");
 		return pass;
 	}
 

@@ -429,6 +429,7 @@ public partial class CardBrawl : Node3D
 		var zombie = GD.Load<PackedScene>("res://scenes/Zombie.tscn");
 		var dog = GD.Load<PackedScene>("res://scenes/Dog.tscn");
 		var skeleton = GD.Load<PackedScene>("res://scenes/Skeleton.tscn");
+		var goblin = GD.Load<PackedScene>("res://scenes/Goblin.tscn");
 
 		_waves.WaveTable.Clear();
 		// Wave 1 — a pure slow zombie horde: the gentle opener.
@@ -437,6 +438,8 @@ public partial class CardBrawl : Node3D
 		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 4).Add(dog, 3));
 		// Wave 3 — a bigger horde, a larger dog pack, and a couple of tougher Skeletons mixed in.
 		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 6).Add(dog, 4).Add(skeleton, 3));
+		// Wave 4 — tier-2 arrives: darting Goblin Cutters with crude blades flank the horde, Skeletons anchoring.
+		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(goblin, 4).Add(skeleton, 4).Add(zombie, 4));
 	}
 
 	private void SpawnPreviewWave()
