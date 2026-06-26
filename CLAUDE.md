@@ -385,7 +385,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       = row total, `SpawnWave` places the mix per formation. Headless-verified (`TestWaveBestiary`). Chunk 84
       done: `Zombie` (tier-1 horde) — a hunched green toon egg with forward-thrust arms; slow (MoveSpeed 2),
       frail (50 HP), no-knockback contact melee; `CardBrawl.BuildWaveTable()` makes it the bulk early horde
-      (incrementally authored, Chunk 93 finalizes the ramp). Headless-verified (`TestZombie`).
+      (incrementally authored, Chunk 93 finalizes the ramp). Headless-verified (`TestZombie`). Chunk 85 done:
+      `WarDog` (tier-1 PACK hunter) — a small, low, four-legged brown toon egg (horizontal body + 4 legs + head
+      + tail); fast (MoveSpeed 7), very frail (25 HP), short bite cooldown (0.5), no-knockback contact melee;
+      added to the brawl wave table as a fast pack beside the zombie horde. Headless-verified (`TestWarDog`).
 - [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
@@ -585,9 +588,13 @@ club, many zombies, many dogs, a Roman Legion.
   5 zombies; waves 2–3 add Skeletons), the incrementally-authored brawl bestiary table (Chunk 93 finalizes the
   ramp). Headless-verified (`TestZombie`): Enemy-team, slower + frailer than the Skeleton, melee damage with
   zero knockback.
-- [ ] **Chunk 85 — War Dog (pack, tier 1).** `WarDog.cs` (very fast, very low HP, short bite cooldown) +
-  `Dog.tscn` (small, low, four-legged silhouette — squashed egg body + simple legs). Spawns in packs.
-  Headless-test.
+- [x] **Chunk 85 — War Dog (pack, tier 1).** `WarDog.cs` (thin `Enemy` subclass) + `Dog.tscn` — a small,
+  low-to-ground, four-legged brown silhouette (horizontal squashed egg body + 4 box legs + head + tail) with
+  the fast-fragile-fast-bite stat block on the scene root (`MoveSpeed` 7, `MaxHealth` 25, `AttackDamage` 6,
+  `AttackCooldown` 0.5): a swarm out-damages by closing fast and biting often, not by any one dog. Wired into
+  `CardBrawl.BuildWaveTable()` as a pack (wave 2 = 4 zombies + 3 dogs; wave 3 = 6 zombies + 4 dogs + 3
+  skeletons). Headless-verified (`TestWarDog`): Enemy-team, faster + frailer than the Skeleton, shorter bite
+  cooldown, melee damage with zero knockback.
 - [ ] **Chunk 86 — Goblin Cutter + Skeleton slot-in (tier 2).** `Goblin.cs` + `Goblin.tscn` (small fast blade
   melee, a touch tougher than a zombie) AND register the existing `Skeleton.tscn` as a tier-2 roster entry in
   the composition table. Headless-test.

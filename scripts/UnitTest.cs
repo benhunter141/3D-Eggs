@@ -49,6 +49,7 @@ public partial class UnitTest : Node3D
 		bool brawlPreview = await TestBrawlPreview();
 		bool waveBestiary = await TestWaveBestiary();
 		bool zombie = await TestZombie();
+		bool warDog = await TestWarDog();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -75,7 +76,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1477,6 +1478,49 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: zombie is a slow, frail, no-knockback Enemy-team melee shambler"
 			: $"FAIL: enemyTeam={enemyTeam}, slower={slower}, frailer={frailer}, melee={melee}, damaged={damaged}, noKnockback={noKnockback}");
+		return pass;
+	}
+
+	// Chunk 85 (M17): the War Dog is a tier-1 PACK hunter — Enemy-team, very fast (faster than the base
+	// Enemy), very fragile (low HP), with a SHORT bite cooldown so a pack out-damages by swarming. Like all
+	// melee foes its bite deals damage but no knockback.
+	private async Task<bool> TestWarDog()
+	{
+		GD.Print("=== UnitTest: War Dog pack hunter (M17, Chunk 85) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var dog = GD.Load<PackedScene>("res://scenes/Dog.tscn").Instantiate<WarDog>();
+		AddChild(dog);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Reference: a base Enemy (Skeleton) for the "faster + frailer + bites quicker" comparison.
+		var skel = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(skel);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = dog.Team == Unit.TeamId.Enemy;
+		bool faster = dog.MoveSpeed > skel.MoveSpeed;
+		bool frailer = dog.MaxHealth < skel.MaxHealth && Mathf.IsEqualApprox(dog.Health, dog.MaxHealth);
+		bool quickBite = dog.AttackCooldown < skel.AttackCooldown;
+		bool melee = dog.AttackDamage > 0f;
+
+		// Contact bite deals damage but never imparts knockback (Enemy hits don't shove).
+		var victim = new Unit { MaxHealth = 100f };
+		AddChild(victim);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		victim.TakeDamage(dog.AttackDamage);   // simulate one bite
+		bool damaged = victim.Health < 100f;
+		bool noKnockback = victim.CurrentKnockback.LengthSquared() < 0.0001f;
+
+		GD.Print($"dog: team={dog.Team}, move={dog.MoveSpeed} (skel {skel.MoveSpeed}), hp={dog.MaxHealth} (skel {skel.MaxHealth}), cooldown={dog.AttackCooldown} (skel {skel.AttackCooldown})");
+
+		bool pass = enemyTeam && faster && frailer && quickBite && melee && damaged && noKnockback;
+		GD.Print(pass
+			? "PASS: war dog is a fast, frail, quick-biting, no-knockback Enemy-team pack hunter"
+			: $"FAIL: enemyTeam={enemyTeam}, faster={faster}, frailer={frailer}, quickBite={quickBite}, melee={melee}, damaged={damaged}, noKnockback={noKnockback}");
 		return pass;
 	}
 
