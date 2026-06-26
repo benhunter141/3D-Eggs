@@ -219,10 +219,13 @@ script = ExtResource("8_gm")
 [node name="ObjectiveLabel" type="Label" parent="ObjectiveLayer"]
 anchors_preset = 10
 anchor_right = 1.0
+offset_left = 120.0
 offset_top = 22.0
-offset_bottom = 58.0
+offset_right = -120.0
+offset_bottom = 84.0
 grow_horizontal = 2
 text = "HIGHLAND CLASH — march your phalanx across the open hills and rout the enemy host among the trees. Clear them all to win."
 horizontal_alignment = 1
+autowrap_mode = 3
 theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
 theme_override_font_sizes/font_size = 20

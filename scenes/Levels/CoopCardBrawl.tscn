@@ -210,10 +210,13 @@ DisableWin = true
 [node name="ObjectiveLabel" type="Label" parent="ObjectiveLayer"]
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 96.0
-offset_bottom = 132.0
+offset_left = 200.0
+offset_top = 128.0
+offset_right = -200.0
+offset_bottom = 186.0
 grow_horizontal = 2
-text = "CO-OP CARD BRAWL — two eggs share one deck but spend their OWN energy. The pause stages the next wave's foes: pick a card, then choose WHERE it lands — weapons/abilities attach to one of your eggs, soldiers slot in beside an egg you control. Abilities last ONLY for that wave: cast from your ability bar (P1 keys 1–4, aim+click targeted ones; P2 gamepad buttons). Selected cards stay in hand; click to unselect. End Turn runs a 3-2-1, then the 15s wave. Lose only when BOTH eggs fall."
+text = "Survive escalating waves. In the PAUSE, spend energy on cards (weapons & abilities buff whoever plays them; soldiers join your squad), then End Turn. Lose only when BOTH eggs fall."
 horizontal_alignment = 1
+autowrap_mode = 3
 theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 15

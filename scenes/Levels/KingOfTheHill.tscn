@@ -231,15 +231,15 @@ theme_override_font_sizes/font_size = 18
 [node name="ObjectiveLayer" type="CanvasLayer" parent="."]
 
 [node name="ObjectiveLabel" type="Label" parent="ObjectiveLayer"]
-anchors_preset = 12
-anchor_top = 1.0
+anchors_preset = 10
 anchor_right = 1.0
-anchor_bottom = 1.0
-offset_top = -56.0
-offset_bottom = -20.0
+offset_left = 130.0
+offset_top = 140.0
+offset_right = -130.0
+offset_bottom = 196.0
 grow_horizontal = 2
-grow_vertical = 0
 text = "KING OF THE HILL — push your phalanx onto the centre disc and hold it ALONE when each period ends. First to 3 periods wins."
 horizontal_alignment = 1
+autowrap_mode = 3
 theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
 theme_override_font_sizes/font_size = 18
