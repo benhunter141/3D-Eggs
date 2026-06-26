@@ -400,6 +400,13 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       so sweeps actually hit multiple foes in their arc. Player-first; optionally extend the same style to
       ally/enemy weapon strikes. Keep it cheap (940MX) and headless-test the per-style hit logic (which foes a
       sweep vs a thrust connects with). Builds on the M9 data-driven weapon plumbing (Chunks 94–98).
+- [ ] **M19 — Co-op Phalanx level ⭐ ACTIVE:** a *local 2-player* set-piece battle — each captain leads
+      **two rows of 5 long-pikemen** (a pike's visual length = egg-unit height × 3) plus **2 archers beside the
+      captain**, every subordinate holding formation on its captain (the CoopStand slot mechanism); the enemy
+      is **one large, slow-moving slime horde** that shambles in as a single mass. New `Pikeman_Long.tscn`
+      (5.1-long pike variant) + a `Slime` enemy (slow squashed green blob) + `CoopPhalanx.tscn`, added to
+      LevelSelect. Win = wipe the horde; lose only when BOTH captains fall. Cloned from `CoopStand`, so every
+      other mode stays byte-identical (Chunks 99–102).
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -458,7 +465,57 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
 
 ---
 
-### ▶ ACTIVE PLAN — M16 Visual Overhaul · toon/cel look (Chunks 75–81)
+### ▶ ACTIVE PLAN — M19 Co-op Phalanx level · twin phalanxes vs a slime horde (Chunks 99–102)
+
+**The only active plan — build this on "go".** A new *local same-screen 2-player* set-piece, cloned from
+`CoopStand.tscn` (P1 keyboard+mouse `Control=1`, P2 gamepad `Control=2 DeviceId=0`; shared `FollowCamera` with
+`Target`/`Target2`; `GameManager RequireAllPlayersDead=true`; ResultMenu/Hud/PauseMenu/ObjectiveLabel). Each
+captain commands **two rows of 5 long-pikemen + 2 flanking archers**, all bound to that captain so they hold
+formation (the `Ally` `FormationOffset` + `CaptainPath` slot system — offsets are LOCAL, forward is -Z, +Z
+trails). The foe is **one large slow slime horde** that advances as a mass via the stock `Enemy` chase AI.
+**Hard rule:** make NEW scenes — do NOT edit `Pikeman.tscn` or any shared scene — so every other mode stays
+byte-identical. Win when the horde is cleared (stock `GameManager`); lose only when BOTH captains fall.
+
+**Grounding facts (already verified):** egg-unit height = `EggMesh.Height` = **1.7** → pike length = **5.1**.
+Today's `Pikeman.tscn` pike = a 3.0 shaft + 0.5 cone head along local -Z (Pike node at `(0.28,0.45,-1.3)`),
+`Ally.cs` with `Weapon=2` (Pike), `PikeReach` 3.0. `Archer.tscn` exists (used in CoopStand). CoopStand's pike
+rows use `FormationOffset (x, 0, -2.5)` for x in -2.5..2.5, archers `(±1.2, 0, 2)`. `LevelSelect.tscn` currently
+has ONE `SceneButton` (the Card Brawl). No Slime exists yet; `Zombie.cs`/`Zombie.tscn` is the closest pattern
+(thin `Enemy` subclass + scene-root stat overrides).
+
+- [ ] **Chunk 99 — Long-pike pikeman variant.** `scenes/Pikeman_Long.tscn` — a copy of `Pikeman.tscn` whose
+  pike is **5.1 long = egg height (1.7) × 3**: shaft `CylinderMesh` height ≈ 4.6 + the 0.5 cone head = ~5.1,
+  with the `Pike` node / shaft / head repositioned along local -Z so the butt sits at the egg and the tip
+  reaches ~5.1 ahead. NEW scene (do NOT edit `Pikeman.tscn`) so `CoopStand` + every other mode stay
+  byte-identical. Bump these instances' `PikeReach` 3.0 → ~4.5 so gameplay reach matches the new visual length.
+  Headless-load it clean.
+- [ ] **Chunk 100 — Slime enemy.** `scripts/Slime.cs` (thin `Enemy` subclass for type identity, mirroring
+  `Zombie.cs`) + `scenes/Slime.tscn`: a **wide, squashed, glossy-green egg blob** (`EggMesh` large `Width` ≈ 1.4,
+  short `Height` ≈ 1.0, green toon `base_color`; capsule collider sized to match), **slow** `MoveSpeed` ≈ 1.6,
+  `MaxHealth` ≈ 60, `AttackDamage` ≈ 8, `AttackCooldown` ≈ 1.2, contact melee, NO knockback (inherits the
+  `Enemy` chase AI). Headless-verify (a `TestSlime` in `UnitTest.cs`): Enemy-team, slower than a Skeleton,
+  melee damage with zero knockback.
+- [ ] **Chunk 101 — Co-op Phalanx level.** `scenes/Levels/CoopPhalanx.tscn` cloned from `CoopStand.tscn`,
+  larger field (~40 × 50 ground + fences + posts, camera zoom retuned for two captains). Two captains as above.
+  **Each captain** leads **two rows of 5 `Pikeman_Long` (10 each, 20 total)** — `CaptainPath` bound,
+  `FormationOffset` x = -2,-1,0,1,2 (1 m spacing), front row z = -2.5, back row z = -4.0 (back pikes reach
+  between the front row) — **plus 2 `Archer.tscn` beside the captain** (`CaptainPath` bound, `FormationOffset`
+  ≈ (±2.5, 0, 0)). Give P1's squad x-offsets around the P1 captain and P2's around the P2 captain (mirror
+  CoopStand's two-captain layout). Enemy = **one large slow slime horde**: ~30–36 `Slime.tscn` in a dense block
+  at far -Z that shambles in as one mass. `GameManager RequireAllPlayersDead=true` (NOT `DisableWin` — clearing
+  the horde wins). ObjectiveLabel describing the fight. Headless-load clean.
+- [ ] **Chunk 102 — Menu + verify.** Add a `SceneButton` ("Co-op Phalanx  (2P)") to `scenes/Menu/LevelSelect.tscn`
+  → `res://scenes/Levels/CoopPhalanx.tscn` (above the Card Brawl button; copy the existing button's pattern).
+  Confirm `dotnet build` 0 errors + headless-load the new scene with no parse/wiring errors. Feel-check is the
+  user's (needs a gamepad for P2).
+
+**Build order 99 → 102. 99 + 100 are the two new assets (long pike + slime); 101 assembles the level from the
+CoopStand template; 102 wires the menu. Keep every change in NEW files (+ the one menu button) so all existing
+modes stay byte-identical.**
+
+---
+
+### ✅ BUILT — M16 Visual Overhaul · toon/cel look (Chunks 75–82, feel-checks pending)
 
 **The only active plan.** The game looks like an untextured prototype: flat solid-colour egg meshes, a drab
 single-colour ground plane, a grey procedural sky, box fences, one light — no outlines, AO, rim/toon shading,
