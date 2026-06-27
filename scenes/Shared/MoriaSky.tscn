@@ -1,0 +1,23 @@
+[gd_scene load_steps=2 format=3 uid="uid://b3degg0moriasky01"]
+
+; Dark cavern sky+key kit for Khazad-dum. A DIM cool overhead key (a far-off
+; shaft of light through the mountain's cracks) so shapes still read; the warm
+; light is the per-level torch OmniLights. New file -> the warm ToonSky used by
+; every other level is untouched.
+
+[ext_resource type="Environment" path="res://scenes/Shared/MoriaEnvironment.tres" id="1_env"]
+
+[node name="MoriaSky" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = ExtResource("1_env")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866025, -0.4, 0.3, 0, 0.6, 0.8, -0.5, -0.69282, 0.519615, 0, 14, 0)
+light_color = Color(0.6, 0.68, 0.85, 1)
+light_energy = 0.55
+shadow_enabled = true
+shadow_blur = 2.0
+directional_shadow_mode = 1
+directional_shadow_max_distance = 70.0
+directional_shadow_split_1 = 0.12

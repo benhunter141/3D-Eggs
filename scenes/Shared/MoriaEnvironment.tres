@@ -1,0 +1,43 @@
+[gd_resource type="Environment" load_steps=3 format=3 uid="uid://b3degg0moriaenv01"]
+
+; Dark underground "deep places of the world" environment for Khazad-dum.
+; Compatibility-renderer safe: near-black cavern sky + dense cool fog + glow
+; (so torch flames bloom) + ACES tonemap + dim cool ambient. New file so the
+; warm daylight ToonEnvironment (every other level) stays byte-identical.
+
+[sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
+sky_top_color = Color(0.015, 0.015, 0.025, 1)
+sky_horizon_color = Color(0.05, 0.05, 0.075, 1)
+sky_curve = 0.2
+sky_energy_multiplier = 0.6
+ground_bottom_color = Color(0.01, 0.01, 0.015, 1)
+ground_horizon_color = Color(0.04, 0.04, 0.06, 1)
+ground_curve = 0.1
+ground_energy_multiplier = 0.5
+
+[sub_resource type="Sky" id="Sky"]
+sky_material = SubResource("SkyMat")
+
+[resource]
+background_mode = 2
+sky = SubResource("Sky")
+ambient_light_source = 3
+ambient_light_color = Color(0.34, 0.38, 0.5, 1)
+ambient_light_sky_contribution = 0.2
+ambient_light_energy = 0.4
+tonemap_mode = 3
+tonemap_exposure = 1.05
+tonemap_white = 1.0
+glow_enabled = true
+glow_normalized = true
+glow_intensity = 0.6
+glow_strength = 1.05
+glow_bloom = 0.12
+glow_blend_mode = 1
+glow_hdr_threshold = 0.85
+glow_hdr_scale = 2.4
+fog_enabled = true
+fog_light_color = Color(0.16, 0.18, 0.24, 1)
+fog_density = 0.012
+fog_sky_affect = 0.5
+fog_aerial_perspective = 0.5

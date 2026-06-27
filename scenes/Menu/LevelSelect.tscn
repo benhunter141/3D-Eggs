@@ -71,6 +71,15 @@ theme_override_font_sizes/font_size = 28
 script = ExtResource("1_btn")
 ScenePath = "res://scenes/Levels/CoopPhalanx.tscn"
 
+[node name="KhazadButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
+custom_minimum_size = Vector2(440, 58)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "Co-op Khazad-dum  (2P)"
+theme_override_font_sizes/font_size = 28
+script = ExtResource("1_btn")
+ScenePath = "res://scenes/Levels/CoopKhazadDum.tscn"
+
 [node name="BrawlButton" type="Button" parent="Margin/VBox/PageScroll/Page/LevelList"]
 custom_minimum_size = Vector2(440, 58)
 layout_mode = 2

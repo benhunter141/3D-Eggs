@@ -1,0 +1,544 @@
+[gd_scene load_steps=27 format=3 uid="uid://b3degg0coopkhazad"]
+
+; CO-OP KHAZAD-DUM (M19-style co-op set-piece, cloned from CoopPhalanx/CoopStand).
+; Two captains (P1 keyboard+mouse, P2 gamepad) hold the great pillared hall of
+; Dwarrowdelm against a horde of Moria goblins and the restless dead. Shared
+; FollowCamera frames BOTH captains (Target + Target2 + DynamicZoom). Win = clear
+; the horde; lose only when BOTH captains fall (GameManager RequireAllPlayersDead).
+; Built entirely from NEW assets (dark Moria sky kit) + existing prefabs, so every
+; other mode stays byte-identical.
+
+[ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="1_camera"]
+[ext_resource type="PackedScene" path="res://scenes/Shared/MoriaSky.tscn" id="2_sky"]
+[ext_resource type="Shader" path="res://materials/ground.gdshader" id="3_ground"]
+[ext_resource type="PackedScene" path="res://scenes/Captain.tscn" id="4_captain"]
+[ext_resource type="PackedScene" path="res://scenes/Pikeman.tscn" id="5_pikeman"]
+[ext_resource type="PackedScene" path="res://scenes/Archer.tscn" id="6_archer"]
+[ext_resource type="PackedScene" path="res://scenes/Goblin.tscn" id="7_goblin"]
+[ext_resource type="PackedScene" path="res://scenes/Skeleton.tscn" id="8_skeleton"]
+[ext_resource type="PackedScene" path="res://scenes/Menu/ResultMenu.tscn" id="9_result"]
+[ext_resource type="Script" path="res://scripts/GameManager.cs" id="10_gm"]
+[ext_resource type="PackedScene" path="res://scenes/Hud.tscn" id="11_hud"]
+[ext_resource type="PackedScene" path="res://scenes/PauseMenu.tscn" id="12_pause"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(40, 60)
+
+[sub_resource type="ShaderMaterial" id="Mat_ground"]
+shader = ExtResource("3_ground")
+shader_parameter/base_color = Color(0.17, 0.17, 0.2, 1)
+shader_parameter/alt_color = Color(0.21, 0.21, 0.25, 1)
+shader_parameter/grid_color = Color(0.1, 0.1, 0.12, 1)
+shader_parameter/cell_size = 4.0
+shader_parameter/line_width = 0.05
+shader_parameter/grid_strength = 0.5
+shader_parameter/checker_strength = 0.35
+shader_parameter/band_floor = 0.55
+shader_parameter/edge = 0.5
+
+[sub_resource type="BoxShape3D" id="BoxShape_ground"]
+size = Vector3(40, 0.2, 60)
+
+[sub_resource type="StandardMaterial3D" id="Mat_stone"]
+albedo_color = Color(0.28, 0.28, 0.32, 1)
+roughness = 0.95
+
+[sub_resource type="StandardMaterial3D" id="Mat_stoneDark"]
+albedo_color = Color(0.18, 0.18, 0.21, 1)
+roughness = 1.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_wallNS"]
+size = Vector3(38, 3.2, 0.8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_wallEW"]
+size = Vector3(0.8, 3.2, 58)
+
+[sub_resource type="BoxShape3D" id="BoxShape_wallNS"]
+size = Vector3(38, 3.2, 0.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape_wallEW"]
+size = Vector3(0.8, 3.2, 58)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pillar"]
+top_radius = 1.0
+bottom_radius = 1.15
+height = 10.0
+
+[sub_resource type="BoxMesh" id="BoxMesh_pillarBase"]
+size = Vector3(3, 1, 3)
+
+[sub_resource type="BoxMesh" id="BoxMesh_pillarCap"]
+size = Vector3(3.3, 0.9, 3.3)
+
+[sub_resource type="StandardMaterial3D" id="Mat_flame"]
+albedo_color = Color(1, 0.62, 0.22, 1)
+emission_enabled = true
+emission = Color(1, 0.55, 0.18, 1)
+emission_energy_multiplier = 4.0
+
+[sub_resource type="SphereMesh" id="SphereMesh_flame"]
+radius = 0.35
+height = 0.7
+
+[node name="CoopKhazadDum" type="Node3D"]
+
+[node name="MoriaSky" parent="." instance=ExtResource("2_sky")]
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("PlaneMesh_ground")
+surface_material_override/0 = SubResource("Mat_ground")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape_ground")
+
+[node name="WallN" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, -30)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallN"]
+mesh = SubResource("BoxMesh_wallNS")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallN"]
+shape = SubResource("BoxShape_wallNS")
+
+[node name="WallS" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 30)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallS"]
+mesh = SubResource("BoxMesh_wallNS")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallS"]
+shape = SubResource("BoxShape_wallNS")
+
+[node name="WallE" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 20, 1.6, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallE"]
+mesh = SubResource("BoxMesh_wallEW")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallE"]
+shape = SubResource("BoxShape_wallEW")
+
+[node name="WallW" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -20, 1.6, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="WallW"]
+mesh = SubResource("BoxMesh_wallEW")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WallW"]
+shape = SubResource("BoxShape_wallEW")
+
+[node name="Pillars" type="Node3D" parent="."]
+
+[node name="PillarWL1" type="Node3D" parent="Pillars"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, -16)
+
+[node name="Base" type="MeshInstance3D" parent="Pillars/PillarWL1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pillarBase")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Shaft" type="MeshInstance3D" parent="Pillars/PillarWL1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+mesh = SubResource("CylinderMesh_pillar")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="Cap" type="MeshInstance3D" parent="Pillars/PillarWL1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.4, 0)
+mesh = SubResource("BoxMesh_pillarCap")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="PillarWL2" type="Node3D" parent="Pillars"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, -4)
+
+[node name="Base" type="MeshInstance3D" parent="Pillars/PillarWL2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pillarBase")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Shaft" type="MeshInstance3D" parent="Pillars/PillarWL2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+mesh = SubResource("CylinderMesh_pillar")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="Cap" type="MeshInstance3D" parent="Pillars/PillarWL2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.4, 0)
+mesh = SubResource("BoxMesh_pillarCap")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="PillarWL3" type="Node3D" parent="Pillars"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 8)
+
+[node name="Base" type="MeshInstance3D" parent="Pillars/PillarWL3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pillarBase")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Shaft" type="MeshInstance3D" parent="Pillars/PillarWL3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+mesh = SubResource("CylinderMesh_pillar")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="Cap" type="MeshInstance3D" parent="Pillars/PillarWL3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.4, 0)
+mesh = SubResource("BoxMesh_pillarCap")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="PillarWL4" type="Node3D" parent="Pillars"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 0, 20)
+
+[node name="Base" type="MeshInstance3D" parent="Pillars/PillarWL4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pillarBase")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Shaft" type="MeshInstance3D" parent="Pillars/PillarWL4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+mesh = SubResource("CylinderMesh_pillar")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="Cap" type="MeshInstance3D" parent="Pillars/PillarWL4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.4, 0)
+mesh = SubResource("BoxMesh_pillarCap")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="PillarWR1" type="Node3D" parent="Pillars"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, -16)
+
+[node name="Base" type="MeshInstance3D" parent="Pillars/PillarWR1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pillarBase")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Shaft" type="MeshInstance3D" parent="Pillars/PillarWR1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+mesh = SubResource("CylinderMesh_pillar")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="Cap" type="MeshInstance3D" parent="Pillars/PillarWR1"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.4, 0)
+mesh = SubResource("BoxMesh_pillarCap")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="PillarWR2" type="Node3D" parent="Pillars"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, -4)
+
+[node name="Base" type="MeshInstance3D" parent="Pillars/PillarWR2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pillarBase")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Shaft" type="MeshInstance3D" parent="Pillars/PillarWR2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+mesh = SubResource("CylinderMesh_pillar")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="Cap" type="MeshInstance3D" parent="Pillars/PillarWR2"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.4, 0)
+mesh = SubResource("BoxMesh_pillarCap")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="PillarWR3" type="Node3D" parent="Pillars"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, 8)
+
+[node name="Base" type="MeshInstance3D" parent="Pillars/PillarWR3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pillarBase")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Shaft" type="MeshInstance3D" parent="Pillars/PillarWR3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+mesh = SubResource("CylinderMesh_pillar")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="Cap" type="MeshInstance3D" parent="Pillars/PillarWR3"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.4, 0)
+mesh = SubResource("BoxMesh_pillarCap")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="PillarWR4" type="Node3D" parent="Pillars"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 0, 20)
+
+[node name="Base" type="MeshInstance3D" parent="Pillars/PillarWR4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("BoxMesh_pillarBase")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Shaft" type="MeshInstance3D" parent="Pillars/PillarWR4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0)
+mesh = SubResource("CylinderMesh_pillar")
+surface_material_override/0 = SubResource("Mat_stone")
+
+[node name="Cap" type="MeshInstance3D" parent="Pillars/PillarWR4"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 11.4, 0)
+mesh = SubResource("BoxMesh_pillarCap")
+surface_material_override/0 = SubResource("Mat_stoneDark")
+
+[node name="Torches" type="Node3D" parent="."]
+
+[node name="TorchWL" type="OmniLight3D" parent="Torches"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 6, -4)
+light_color = Color(1, 0.62, 0.26, 1)
+light_energy = 3.2
+omni_range = 20.0
+
+[node name="FlameWL" type="MeshInstance3D" parent="Torches/TorchWL"]
+mesh = SubResource("SphereMesh_flame")
+surface_material_override/0 = SubResource("Mat_flame")
+
+[node name="TorchWR" type="OmniLight3D" parent="Torches"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 6, -4)
+light_color = Color(1, 0.62, 0.26, 1)
+light_energy = 3.2
+omni_range = 20.0
+
+[node name="FlameWR" type="MeshInstance3D" parent="Torches/TorchWR"]
+mesh = SubResource("SphereMesh_flame")
+surface_material_override/0 = SubResource("Mat_flame")
+
+[node name="TorchSL" type="OmniLight3D" parent="Torches"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14, 6, 20)
+light_color = Color(1, 0.62, 0.26, 1)
+light_energy = 3.2
+omni_range = 20.0
+
+[node name="FlameSL" type="MeshInstance3D" parent="Torches/TorchSL"]
+mesh = SubResource("SphereMesh_flame")
+surface_material_override/0 = SubResource("Mat_flame")
+
+[node name="TorchSR" type="OmniLight3D" parent="Torches"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14, 6, 20)
+light_color = Color(1, 0.62, 0.26, 1)
+light_energy = 3.2
+omni_range = 20.0
+
+[node name="FlameSR" type="MeshInstance3D" parent="Torches/TorchSR"]
+mesh = SubResource("SphereMesh_flame")
+surface_material_override/0 = SubResource("Mat_flame")
+
+[node name="Captain1" parent="." instance=ExtResource("4_captain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1, 20)
+Control = 1
+ShowGameOverOnDeath = false
+
+[node name="Captain2" parent="." instance=ExtResource("4_captain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 1, 20)
+Control = 2
+DeviceId = 0
+ShowGameOverOnDeath = false
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 20, 20)
+script = ExtResource("1_camera")
+Target = NodePath("../Captain1")
+Target2 = NodePath("../Captain2")
+Offset = Vector3(0, 21, 17)
+DynamicZoom = true
+MinDistance = 22.0
+MaxDistance = 48.0
+FitScale = 0.6
+ZoomMargin = 12.0
+ZoomBiasMin = -18.0
+ZoomBiasMax = 14.0
+
+[node name="P1_Pike1" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 1, 17.5)
+FormationOffset = Vector3(-2.5, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Pike2" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.5, 1, 17.5)
+FormationOffset = Vector3(-1.5, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Pike3" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 1, 17.5)
+FormationOffset = Vector3(-0.5, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Pike4" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.5, 1, 17.5)
+FormationOffset = Vector3(0.5, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Pike5" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.5, 1, 17.5)
+FormationOffset = Vector3(1.5, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Pike6" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1, 17.5)
+FormationOffset = Vector3(2.5, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Archer1" parent="." instance=ExtResource("6_archer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.2, 1, 22)
+FormationOffset = Vector3(-1.2, 0, 2)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Archer2" parent="." instance=ExtResource("6_archer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.8, 1, 22)
+FormationOffset = Vector3(1.2, 0, 2)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P2_Pike1" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, 17.5)
+FormationOffset = Vector3(-2.5, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Pike2" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.5, 1, 17.5)
+FormationOffset = Vector3(-1.5, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Pike3" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 1, 17.5)
+FormationOffset = Vector3(-0.5, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Pike4" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 1, 17.5)
+FormationOffset = Vector3(0.5, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Pike5" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.5, 1, 17.5)
+FormationOffset = Vector3(1.5, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Pike6" parent="." instance=ExtResource("5_pikeman")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.5, 1, 17.5)
+FormationOffset = Vector3(2.5, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Archer1" parent="." instance=ExtResource("6_archer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.8, 1, 22)
+FormationOffset = Vector3(-1.2, 0, 2)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Archer2" parent="." instance=ExtResource("6_archer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.2, 1, 22)
+FormationOffset = Vector3(1.2, 0, 2)
+CaptainPath = NodePath("../Captain2")
+
+[node name="Goblin1" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1, -18)
+
+[node name="Goblin2" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1, -18)
+
+[node name="Goblin3" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1, -18)
+
+[node name="Goblin4" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -18)
+
+[node name="Goblin5" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, -18)
+
+[node name="Goblin6" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1, -18)
+
+[node name="Goblin7" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, -18)
+
+[node name="Goblin8" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12, 1, -21)
+
+[node name="Goblin9" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1, -21)
+
+[node name="Goblin10" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 1, -21)
+
+[node name="Goblin11" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -21)
+
+[node name="Goblin12" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1, -21)
+
+[node name="Goblin13" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1, -21)
+
+[node name="Goblin14" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 1, -21)
+
+[node name="Goblin15" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, -24)
+
+[node name="Goblin16" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -24)
+
+[node name="Goblin17" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, -24)
+
+[node name="Goblin18" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, -24)
+
+[node name="Goblin19" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, -24)
+
+[node name="Goblin20" parent="." instance=ExtResource("7_goblin")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1, -24)
+
+[node name="Skeleton1" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, -27)
+
+[node name="Skeleton2" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6, 1, -27)
+
+[node name="Skeleton3" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1, -27)
+
+[node name="Skeleton4" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1, -27)
+
+[node name="Skeleton5" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6, 1, -27)
+
+[node name="Skeleton6" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1, -27)
+
+[node name="Skeleton7" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1, -29)
+
+[node name="Skeleton8" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 1, -29)
+
+[node name="Skeleton9" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 1, -29)
+
+[node name="Skeleton10" parent="." instance=ExtResource("8_skeleton")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1, -29)
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("10_gm")
+RequireAllPlayersDead = true
+
+[node name="ResultMenu" parent="." instance=ExtResource("9_result")]
+
+[node name="Hud" parent="." instance=ExtResource("11_hud")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("12_pause")]
+
+[node name="ObjectiveLayer" type="CanvasLayer" parent="."]
+
+[node name="ObjectiveLabel" type="Label" parent="ObjectiveLayer"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 120.0
+offset_top = 22.0
+offset_right = -120.0
+offset_bottom = 84.0
+grow_horizontal = 2
+text = "KHAZAD-DUM (CO-OP) - P1 (keyboard + mouse) & P2 (gamepad) hold the great pillared hall. Drums in the deep: a horde of Moria goblins and the dead pours in from the dark. Wipe them out. You lose only when BOTH captains fall."
+horizontal_alignment = 1
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
+theme_override_font_sizes/font_size = 20
