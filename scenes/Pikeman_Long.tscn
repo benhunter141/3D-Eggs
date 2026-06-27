@@ -1,0 +1,63 @@
+[gd_scene load_steps=10 format=3 uid="uid://dpikemanlong0eggs1"]
+
+[ext_resource type="Script" path="res://scripts/Ally.cs" id="1_ally"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_pike"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.36, 0.42, 0.5, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_pike"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_pikeshaft"]
+top_radius = 0.045
+bottom_radius = 0.045
+height = 4.6
+radial_segments = 8
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.45, 0.32, 0.18, 1)
+roughness = 0.85
+
+[sub_resource type="CylinderMesh" id="ConeMesh_pikehead"]
+top_radius = 0.0
+bottom_radius = 0.12
+height = 0.5
+radial_segments = 8
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Mat_metal"]
+albedo_color = Color(0.75, 0.78, 0.82, 1)
+metallic = 0.6
+roughness = 0.35
+
+[node name="Pikeman" type="CharacterBody3D"]
+script = ExtResource("1_ally")
+Weapon = 2
+PikeReach = 4.5
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_pike")
+script = ExtResource("2_egg")
+Width = 1.0
+Height = 1.7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_pike")
+
+[node name="Pike" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.28, 0.45, -2.2)
+
+[node name="Shaft" type="MeshInstance3D" parent="Pike"]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+mesh = SubResource("CylinderMesh_pikeshaft")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="Head" type="MeshInstance3D" parent="Pike"]
+transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, -2.55)
+mesh = SubResource("ConeMesh_pikehead")
+surface_material_override/0 = SubResource("Mat_metal")
