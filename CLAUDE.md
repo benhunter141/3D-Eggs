@@ -406,7 +406,9 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       is **one large, slow-moving slime horde** that shambles in as a single mass. New `Pikeman_Long.tscn`
       (5.1-long pike variant) + a `Slime` enemy (slow squashed green blob) + `CoopPhalanx.tscn`, added to
       LevelSelect. Win = wipe the horde; lose only when BOTH captains fall. Cloned from `CoopStand`, so every
-      other mode stays byte-identical (Chunks 99–102).
+      other mode stays byte-identical (Chunks 99–102). Chunk 99 done: `Pikeman_Long.tscn` — a NEW clone of
+      `Pikeman.tscn` with a 5.1-long pike (4.6 shaft + 0.5 cone head, butt at the egg → tip ~5.1 ahead) and
+      `PikeReach` 3.0→4.5; shared scenes untouched.
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -483,7 +485,7 @@ rows use `FormationOffset (x, 0, -2.5)` for x in -2.5..2.5, archers `(±1.2, 0, 
 has ONE `SceneButton` (the Card Brawl). No Slime exists yet; `Zombie.cs`/`Zombie.tscn` is the closest pattern
 (thin `Enemy` subclass + scene-root stat overrides).
 
-- [ ] **Chunk 99 — Long-pike pikeman variant.** `scenes/Pikeman_Long.tscn` — a copy of `Pikeman.tscn` whose
+- [x] **Chunk 99 — Long-pike pikeman variant.** `scenes/Pikeman_Long.tscn` — a copy of `Pikeman.tscn` whose
   pike is **5.1 long = egg height (1.7) × 3**: shaft `CylinderMesh` height ≈ 4.6 + the 0.5 cone head = ~5.1,
   with the `Pike` node / shaft / head repositioned along local -Z so the butt sits at the egg and the tip
   reaches ~5.1 ahead. NEW scene (do NOT edit `Pikeman.tscn`) so `CoopStand` + every other mode stay
