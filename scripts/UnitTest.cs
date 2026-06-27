@@ -51,6 +51,7 @@ public partial class UnitTest : Node3D
 		bool zombie = await TestZombie();
 		bool warDog = await TestWarDog();
 		bool goblin = await TestGoblin();
+		bool slime = await TestSlime();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -77,7 +78,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1567,6 +1568,48 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: goblin is a fast Enemy-team skirmisher, tougher than a zombie, no-knockback blade melee"
 			: $"FAIL: enemyTeam={enemyTeam}, faster={faster}, tougherThanZombie={tougherThanZombie}, frailerThanSkel={frailerThanSkel}, melee={melee}, damaged={damaged}, noKnockback={noKnockback}");
+		return pass;
+	}
+
+	// Chunk 100 (M19): the Slime is the slow blob horde of the Co-op Phalanx level — Enemy-team, slower
+	// than the base Enemy (it shambles in as a single mass), with a contact melee that deals damage but no
+	// knockback (Enemy hits don't shove).
+	private async Task<bool> TestSlime()
+	{
+		GD.Print("=== UnitTest: Slime blob horde (M19, Chunk 100) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var slime = GD.Load<PackedScene>("res://scenes/Slime.tscn").Instantiate<Slime>();
+		AddChild(slime);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Reference: a base Enemy (Skeleton) for the "slower" comparison.
+		var skel = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(skel);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = slime.Team == Unit.TeamId.Enemy;
+		bool slower = slime.MoveSpeed < skel.MoveSpeed;
+		bool fullHealth = Mathf.IsEqualApprox(slime.Health, slime.MaxHealth);
+		bool melee = slime.AttackDamage > 0f;
+
+		// Contact melee deals damage but never imparts knockback (Enemy hits don't shove).
+		var victim = new Unit { MaxHealth = 100f };
+		AddChild(victim);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		victim.TakeDamage(slime.AttackDamage);   // simulate one blob hit
+		bool damaged = victim.Health < 100f;
+		bool noKnockback = victim.CurrentKnockback.LengthSquared() < 0.0001f;
+
+		GD.Print($"slime: team={slime.Team}, move={slime.MoveSpeed} (skel {skel.MoveSpeed}), hp={slime.MaxHealth}, dmg={slime.AttackDamage}");
+
+		bool pass = enemyTeam && slower && fullHealth && melee && damaged && noKnockback;
+		GD.Print(pass
+			? "PASS: slime is a slow, no-knockback Enemy-team melee blob"
+			: $"FAIL: enemyTeam={enemyTeam}, slower={slower}, fullHealth={fullHealth}, melee={melee}, damaged={damaged}, noKnockback={noKnockback}");
 		return pass;
 	}
 

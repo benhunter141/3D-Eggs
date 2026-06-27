@@ -1,0 +1,30 @@
+[gd_scene load_steps=6 format=3 uid="uid://dslime0eggs0001"]
+
+[ext_resource type="Script" path="res://scripts/Slime.cs" id="1_slime"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_slime"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.3, 0.72, 0.32, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_slime"]
+radius = 0.6
+height = 1.2
+
+[node name="Slime" type="CharacterBody3D"]
+script = ExtResource("1_slime")
+MoveSpeed = 1.6
+AttackDamage = 8.0
+AttackCooldown = 1.2
+MaxHealth = 60.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.35, 0)
+material_override = SubResource("Mat_slime")
+script = ExtResource("2_egg")
+Width = 1.4
+Height = 1.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_slime")
