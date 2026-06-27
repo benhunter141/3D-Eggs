@@ -1,0 +1,393 @@
+[gd_scene load_steps=20 format=3 uid="uid://b3degg0coopphalanx"]
+
+[ext_resource type="Script" path="res://scripts/FollowCamera.cs" id="1_camera"]
+[ext_resource type="PackedScene" path="res://scenes/Shared/ToonSky.tscn" id="2_sky"]
+[ext_resource type="Shader" path="res://materials/ground.gdshader" id="3_ground"]
+[ext_resource type="PackedScene" path="res://scenes/Captain.tscn" id="4_captain"]
+[ext_resource type="PackedScene" path="res://scenes/Pikeman_Long.tscn" id="5_pikelong"]
+[ext_resource type="PackedScene" path="res://scenes/Archer.tscn" id="6_archer"]
+[ext_resource type="PackedScene" path="res://scenes/Slime.tscn" id="7_slime"]
+[ext_resource type="PackedScene" path="res://scenes/Menu/ResultMenu.tscn" id="8_result"]
+[ext_resource type="Script" path="res://scripts/GameManager.cs" id="9_gm"]
+[ext_resource type="PackedScene" path="res://scenes/Hud.tscn" id="10_hud"]
+[ext_resource type="PackedScene" path="res://scenes/PauseMenu.tscn" id="11_pause"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(44, 54)
+
+[sub_resource type="ShaderMaterial" id="Mat_ground"]
+shader = ExtResource("3_ground")
+shader_parameter/base_color = Color(0.3, 0.45, 0.25, 1)
+shader_parameter/alt_color = Color(0.34, 0.5, 0.28, 1)
+shader_parameter/grid_color = Color(0.22, 0.34, 0.18, 1)
+shader_parameter/cell_size = 4.0
+shader_parameter/line_width = 0.04
+shader_parameter/grid_strength = 0.35
+shader_parameter/checker_strength = 0.4
+shader_parameter/band_floor = 0.62
+shader_parameter/edge = 0.5
+
+[sub_resource type="BoxShape3D" id="BoxShape_ground"]
+size = Vector3(44, 0.2, 54)
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.45, 0.3, 0.16, 1)
+roughness = 0.9
+
+[sub_resource type="StandardMaterial3D" id="Mat_woodDark"]
+albedo_color = Color(0.31, 0.19, 0.1, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_fenceNS"]
+size = Vector3(42, 2, 0.7)
+
+[sub_resource type="BoxMesh" id="BoxMesh_fenceEW"]
+size = Vector3(0.7, 2, 52)
+
+[sub_resource type="BoxShape3D" id="BoxShape_fenceNS"]
+size = Vector3(42, 2, 0.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape_fenceEW"]
+size = Vector3(0.7, 2, 52)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_post"]
+top_radius = 0.35
+bottom_radius = 0.35
+height = 2.6
+
+[node name="CoopPhalanx" type="Node3D"]
+
+[node name="ToonSky" parent="." instance=ExtResource("2_sky")]
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("PlaneMesh_ground")
+surface_material_override/0 = SubResource("Mat_ground")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape_ground")
+
+[node name="FenceN" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, -26)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FenceN"]
+mesh = SubResource("BoxMesh_fenceNS")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FenceN"]
+shape = SubResource("BoxShape_fenceNS")
+
+[node name="FenceS" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 26)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FenceS"]
+mesh = SubResource("BoxMesh_fenceNS")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FenceS"]
+shape = SubResource("BoxShape_fenceNS")
+
+[node name="FenceE" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 1, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FenceE"]
+mesh = SubResource("BoxMesh_fenceEW")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FenceE"]
+shape = SubResource("BoxShape_fenceEW")
+
+[node name="FenceW" type="StaticBody3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 1, 0)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="FenceW"]
+mesh = SubResource("BoxMesh_fenceEW")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FenceW"]
+shape = SubResource("BoxShape_fenceEW")
+
+[node name="Decor" type="Node3D" parent="."]
+
+[node name="Post1" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 1.3, -26)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="Post2" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 1.3, -26)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="Post3" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21, 1.3, 26)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="Post4" type="MeshInstance3D" parent="Decor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21, 1.3, 26)
+mesh = SubResource("CylinderMesh_post")
+surface_material_override/0 = SubResource("Mat_woodDark")
+
+[node name="Captain1" parent="." instance=ExtResource("4_captain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1, 15)
+Control = 1
+ShowGameOverOnDeath = false
+
+[node name="Captain2" parent="." instance=ExtResource("4_captain")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1, 15)
+Control = 2
+DeviceId = 0
+ShowGameOverOnDeath = false
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 18, 18)
+script = ExtResource("1_camera")
+Target = NodePath("../Captain1")
+Target2 = NodePath("../Captain2")
+Offset = Vector3(0, 20, 16)
+DynamicZoom = true
+MinDistance = 20.0
+MaxDistance = 44.0
+FitScale = 0.6
+ZoomMargin = 12.0
+ZoomBiasMin = -16.0
+ZoomBiasMax = 12.0
+
+[node name="P1_PikeFront1" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 1, 12.5)
+FormationOffset = Vector3(-2, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeFront2" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, 12.5)
+FormationOffset = Vector3(-1, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeFront3" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1, 12.5)
+FormationOffset = Vector3(0, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeFront4" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1, 12.5)
+FormationOffset = Vector3(1, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeFront5" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1, 12.5)
+FormationOffset = Vector3(2, 0, -2.5)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeBack1" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11, 1, 11)
+FormationOffset = Vector3(-2, 0, -4)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeBack2" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 1, 11)
+FormationOffset = Vector3(-1, 0, -4)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeBack3" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1, 11)
+FormationOffset = Vector3(0, 0, -4)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeBack4" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8, 1, 11)
+FormationOffset = Vector3(1, 0, -4)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_PikeBack5" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 1, 11)
+FormationOffset = Vector3(2, 0, -4)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Archer1" parent="." instance=ExtResource("6_archer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.5, 1, 15)
+FormationOffset = Vector3(-2.5, 0, 0)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P1_Archer2" parent="." instance=ExtResource("6_archer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.5, 1, 15)
+FormationOffset = Vector3(2.5, 0, 0)
+CaptainPath = NodePath("../Captain1")
+
+[node name="P2_PikeFront1" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 1, 12.5)
+FormationOffset = Vector3(-2, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeFront2" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1, 12.5)
+FormationOffset = Vector3(-1, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeFront3" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1, 12.5)
+FormationOffset = Vector3(0, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeFront4" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1, 12.5)
+FormationOffset = Vector3(1, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeFront5" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 1, 12.5)
+FormationOffset = Vector3(2, 0, -2.5)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeBack1" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7, 1, 11)
+FormationOffset = Vector3(-2, 0, -4)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeBack2" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8, 1, 11)
+FormationOffset = Vector3(-1, 0, -4)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeBack3" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9, 1, 11)
+FormationOffset = Vector3(0, 0, -4)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeBack4" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1, 11)
+FormationOffset = Vector3(1, 0, -4)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_PikeBack5" parent="." instance=ExtResource("5_pikelong")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11, 1, 11)
+FormationOffset = Vector3(2, 0, -4)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Archer1" parent="." instance=ExtResource("6_archer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 1, 15)
+FormationOffset = Vector3(-2.5, 0, 0)
+CaptainPath = NodePath("../Captain2")
+
+[node name="P2_Archer2" parent="." instance=ExtResource("6_archer")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.5, 1, 15)
+FormationOffset = Vector3(2.5, 0, 0)
+CaptainPath = NodePath("../Captain2")
+
+[node name="Slime1" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 1, -22)
+
+[node name="Slime2" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1, -22)
+
+[node name="Slime3" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, -22)
+
+[node name="Slime4" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -22)
+
+[node name="Slime5" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, -22)
+
+[node name="Slime6" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 1, -22)
+
+[node name="Slime7" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 1, -19)
+
+[node name="Slime8" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1, -19)
+
+[node name="Slime9" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, -19)
+
+[node name="Slime10" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -19)
+
+[node name="Slime11" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, -19)
+
+[node name="Slime12" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 1, -19)
+
+[node name="Slime13" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 1, -16)
+
+[node name="Slime14" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1, -16)
+
+[node name="Slime15" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, -16)
+
+[node name="Slime16" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -16)
+
+[node name="Slime17" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, -16)
+
+[node name="Slime18" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 1, -16)
+
+[node name="Slime19" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 1, -13)
+
+[node name="Slime20" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1, -13)
+
+[node name="Slime21" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, -13)
+
+[node name="Slime22" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -13)
+
+[node name="Slime23" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, -13)
+
+[node name="Slime24" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 1, -13)
+
+[node name="Slime25" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 1, -10)
+
+[node name="Slime26" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4.5, 1, -10)
+
+[node name="Slime27" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 1, -10)
+
+[node name="Slime28" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 1, -10)
+
+[node name="Slime29" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.5, 1, -10)
+
+[node name="Slime30" parent="." instance=ExtResource("7_slime")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.5, 1, -10)
+
+[node name="GameManager" type="Node" parent="."]
+script = ExtResource("9_gm")
+RequireAllPlayersDead = true
+
+[node name="ResultMenu" parent="." instance=ExtResource("8_result")]
+
+[node name="Hud" parent="." instance=ExtResource("10_hud")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("11_pause")]
+
+[node name="ObjectiveLayer" type="CanvasLayer" parent="."]
+
+[node name="ObjectiveLabel" type="Label" parent="ObjectiveLayer"]
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 120.0
+offset_top = 22.0
+offset_right = -120.0
+offset_bottom = 84.0
+grow_horizontal = 2
+text = "CO-OP PHALANX (2P) - P1 (keyboard + mouse) & P2 (gamepad) each lead two rows of long pikes + 2 archers. Hold the wall and wipe the slime horde. You lose only when BOTH captains fall."
+horizontal_alignment = 1
+autowrap_mode = 3
+theme_override_colors/font_color = Color(0.92, 0.88, 0.72, 1)
+theme_override_font_sizes/font_size = 20
