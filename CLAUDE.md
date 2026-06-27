@@ -400,15 +400,19 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       so sweeps actually hit multiple foes in their arc. Player-first; optionally extend the same style to
       ally/enemy weapon strikes. Keep it cheap (940MX) and headless-test the per-style hit logic (which foes a
       sweep vs a thrust connects with). Builds on the M9 data-driven weapon plumbing (Chunks 94–98).
-- [ ] **M19 — Co-op Phalanx level ⭐ ACTIVE:** a *local 2-player* set-piece battle — each captain leads
+- [x] **M19 — Co-op Phalanx level ⭐:** a *local 2-player* set-piece battle — each captain leads
       **two rows of 5 long-pikemen** (a pike's visual length = egg-unit height × 3) plus **2 archers beside the
       captain**, every subordinate holding formation on its captain (the CoopStand slot mechanism); the enemy
       is **one large, slow-moving slime horde** that shambles in as a single mass. New `Pikeman_Long.tscn`
       (5.1-long pike variant) + a `Slime` enemy (slow squashed green blob) + `CoopPhalanx.tscn`, added to
       LevelSelect. Win = wipe the horde; lose only when BOTH captains fall. Cloned from `CoopStand`, so every
-      other mode stays byte-identical (Chunks 99–102). Chunk 99 done: `Pikeman_Long.tscn` — a NEW clone of
-      `Pikeman.tscn` with a 5.1-long pike (4.6 shaft + 0.5 cone head, butt at the egg → tip ~5.1 ahead) and
-      `PikeReach` 3.0→4.5; shared scenes untouched.
+      other mode stays byte-identical (Chunks 99–102, all built). Chunk 99: `Pikeman_Long.tscn` — a clone of
+      `Pikeman.tscn` with a 5.1-long pike (4.6 shaft + 0.5 cone head) + `PikeReach` 4.5. Chunk 100: `Slime.cs`
+      (thin `Enemy` subclass) + `Slime.tscn` — a wide squashed glossy-green blob (slow MoveSpeed 1.6, 60 HP,
+      contact melee, no knockback); `TestSlime`-verified. Chunk 101: `scenes/Levels/CoopPhalanx.tscn` (44×54
+      walled field, two captains each with two rows of 5 `Pikeman_Long` + 2 `Archer` bound to their
+      `CaptainPath`, a 30-Slime block at far -Z, `GameManager RequireAllPlayersDead`); loads clean. Chunk 102:
+      added the "Co-op Phalanx (2P)" `SceneButton` to LevelSelect. **Feel-check pending (needs a gamepad for P2).**
 
 ## 7. Build Plan (chunks)  ← start here when user says "go"
 
@@ -491,13 +495,13 @@ has ONE `SceneButton` (the Card Brawl). No Slime exists yet; `Zombie.cs`/`Zombie
   reaches ~5.1 ahead. NEW scene (do NOT edit `Pikeman.tscn`) so `CoopStand` + every other mode stay
   byte-identical. Bump these instances' `PikeReach` 3.0 → ~4.5 so gameplay reach matches the new visual length.
   Headless-load it clean.
-- [ ] **Chunk 100 — Slime enemy.** `scripts/Slime.cs` (thin `Enemy` subclass for type identity, mirroring
+- [x] **Chunk 100 — Slime enemy.** `scripts/Slime.cs` (thin `Enemy` subclass for type identity, mirroring
   `Zombie.cs`) + `scenes/Slime.tscn`: a **wide, squashed, glossy-green egg blob** (`EggMesh` large `Width` ≈ 1.4,
   short `Height` ≈ 1.0, green toon `base_color`; capsule collider sized to match), **slow** `MoveSpeed` ≈ 1.6,
   `MaxHealth` ≈ 60, `AttackDamage` ≈ 8, `AttackCooldown` ≈ 1.2, contact melee, NO knockback (inherits the
   `Enemy` chase AI). Headless-verify (a `TestSlime` in `UnitTest.cs`): Enemy-team, slower than a Skeleton,
   melee damage with zero knockback.
-- [ ] **Chunk 101 — Co-op Phalanx level.** `scenes/Levels/CoopPhalanx.tscn` cloned from `CoopStand.tscn`,
+- [x] **Chunk 101 — Co-op Phalanx level.** `scenes/Levels/CoopPhalanx.tscn` cloned from `CoopStand.tscn`,
   larger field (~40 × 50 ground + fences + posts, camera zoom retuned for two captains). Two captains as above.
   **Each captain** leads **two rows of 5 `Pikeman_Long` (10 each, 20 total)** — `CaptainPath` bound,
   `FormationOffset` x = -2,-1,0,1,2 (1 m spacing), front row z = -2.5, back row z = -4.0 (back pikes reach
@@ -506,7 +510,7 @@ has ONE `SceneButton` (the Card Brawl). No Slime exists yet; `Zombie.cs`/`Zombie
   CoopStand's two-captain layout). Enemy = **one large slow slime horde**: ~30–36 `Slime.tscn` in a dense block
   at far -Z that shambles in as one mass. `GameManager RequireAllPlayersDead=true` (NOT `DisableWin` — clearing
   the horde wins). ObjectiveLabel describing the fight. Headless-load clean.
-- [ ] **Chunk 102 — Menu + verify.** Add a `SceneButton` ("Co-op Phalanx  (2P)") to `scenes/Menu/LevelSelect.tscn`
+- [x] **Chunk 102 — Menu + verify.** Add a `SceneButton` ("Co-op Phalanx  (2P)") to `scenes/Menu/LevelSelect.tscn`
   → `res://scenes/Levels/CoopPhalanx.tscn` (above the Card Brawl button; copy the existing button's pattern).
   Confirm `dotnet build` 0 errors + headless-load the new scene with no parse/wiring errors. Feel-check is the
   user's (needs a gamepad for P2).
