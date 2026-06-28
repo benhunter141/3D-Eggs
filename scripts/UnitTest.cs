@@ -55,6 +55,10 @@ public partial class UnitTest : Node3D
 		bool slinger = await TestSlinger();
 		bool legionary = await TestLegionary();
 		bool orcBrute = await TestOrcBrute();
+		bool necromancer = await TestNecromancer();
+		bool centurion = await TestCenturion();
+		bool troll = await TestTroll();
+		bool bestiarySchedule = TestBestiarySchedule();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -81,7 +85,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1796,6 +1800,197 @@ public partial class UnitTest : Node3D
 			? "PASS: orc brute is a slow, tanky Enemy whose club lands real flat knockback"
 			: $"FAIL: enemyTeam={enemyTeam}, slower={slower}, tankier={tankier}, damaged={damaged}, shoved={shoved}, flat={flat}");
 		return pass;
+	}
+
+	// Chunk 90 (M17): the Necromancer raises the dead on a cadence — each cast spawns SummonCount Zombies
+	// (Enemy team), but the running total of LIVING summons is capped at SummonCap so it can't flood the
+	// field. Confirms it's an Enemy, a cast raises the expected count, and repeated casts clamp at the cap.
+	private async Task<bool> TestNecromancer()
+	{
+		GD.Print("=== UnitTest: Necromancer summon cadence + cap (M17, Chunk 90) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var necro = GD.Load<PackedScene>("res://scenes/Necromancer.tscn").Instantiate<Necromancer>();
+		AddChild(necro);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = necro.Team == Unit.TeamId.Enemy;
+
+		int first = necro.RaiseDead();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool raisedSome = first == necro.SummonCount && necro.LivingMinions() == necro.SummonCount;
+
+		// Keep raising until it tops out, then confirm one more cast raises NONE (the cap holds).
+		int guard = 0;
+		while (necro.LivingMinions() < necro.SummonCap && guard < 20)
+		{
+			necro.RaiseDead();
+			await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+			guard++;
+		}
+		int atCap = necro.LivingMinions();
+		int over = necro.RaiseDead();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		bool capped = atCap == necro.SummonCap && over == 0 && necro.LivingMinions() == necro.SummonCap;
+
+		// Every minion is an Enemy-team Zombie.
+		int zombies = 0;
+		foreach (Node n in GetChildren())
+			if (n is Zombie z && z.Team == Unit.TeamId.Enemy)
+				zombies++;
+		bool spawnedZombies = zombies == necro.SummonCap;
+
+		GD.Print($"necro: team={necro.Team}, first={first}/{necro.SummonCount}, atCap={atCap}/{necro.SummonCap}, over={over}, zombies={zombies}");
+		bool pass = enemyTeam && raisedSome && capped && spawnedZombies;
+		GD.Print(pass
+			? "PASS: necromancer raises zombies on cast and clamps living summons at the cap"
+			: $"FAIL: enemyTeam={enemyTeam}, raisedSome={raisedSome}, capped={capped}, spawnedZombies={spawnedZombies}");
+		return pass;
+	}
+
+	// Chunk 91 (M17): the Centurion projects a rally aura — a nearby friendly Legionary gets buffed each
+	// frame while in range, and the buff EXPIRES on its own once the Centurion stops refreshing it (the
+	// legionary leaves the radius). Confirms apply (rallied in range) and expire (lapses out of range).
+	private async Task<bool> TestCenturion()
+	{
+		GD.Print("=== UnitTest: Centurion rally aura apply/expire (M17, Chunk 91) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cent = GD.Load<PackedScene>("res://scenes/Centurion.tscn").Instantiate<Centurion>();
+		AddChild(cent);
+		cent.GlobalPosition = Vector3.Zero;
+		var leg = GD.Load<PackedScene>("res://scenes/Legionary.tscn").Instantiate<Legionary>();
+		AddChild(leg);
+		leg.GlobalPosition = new Vector3(2f, 0f, 0f);   // well inside RallyRadius
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = cent.Team == Unit.TeamId.Enemy;
+		bool isLegionary = cent is Legionary;   // a Centurion shares the scutum
+
+		// A couple of physics frames so the Centurion's aura pulse lands on the legionary.
+		for (int i = 0; i < 3; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		bool rallied = leg.IsRallied;
+
+		// Behead the leader: with no Centurion refreshing it, the buff should lapse within RallyRefresh
+		// seconds (the timer decays on the legionary's own _PhysicsProcess). Also move it clear so a
+		// stray re-pulse can't keep it alive.
+		leg.GlobalPosition = new Vector3(60f, 0f, 0f);
+		cent.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		int frames = 0;
+		while (leg.IsRallied && frames < 120)
+		{
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			frames++;
+		}
+		bool expired = !leg.IsRallied;
+
+		GD.Print($"centurion: team={cent.Team}, isLegionary={isLegionary}, rallied={rallied}, expired after {frames} frames={expired}");
+		bool pass = enemyTeam && isLegionary && rallied && expired;
+		GD.Print(pass
+			? "PASS: centurion rallies a nearby legionary and the buff expires out of range"
+			: $"FAIL: enemyTeam={enemyTeam}, isLegionary={isLegionary}, rallied={rallied}, expired={expired}");
+		return pass;
+	}
+
+	// Chunk 92 (M17): the Cave Troll's SLAM is a radial shockwave — every opposing unit within SlamRadius
+	// takes damage + a shove pointing straight away from the troll, while a unit outside the radius is
+	// untouched. Confirms the troll is a slow/tanky Enemy and the slam's radius + radial knockback.
+	private async Task<bool> TestTroll()
+	{
+		GD.Print("=== UnitTest: Cave Troll radial slam (M17, Chunk 92) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var troll = GD.Load<PackedScene>("res://scenes/Troll.tscn").Instantiate<Troll>();
+		AddChild(troll);
+		troll.GlobalPosition = Vector3.Zero;
+
+		var skel = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(skel);   // reference for slow + tanky
+
+		// Two victims inside the slam radius, one well outside it.
+		var near1 = new Unit { Team = Unit.TeamId.Player, MaxHealth = 300f };
+		var near2 = new Unit { Team = Unit.TeamId.Player, MaxHealth = 300f };
+		var far = new Unit { Team = Unit.TeamId.Player, MaxHealth = 300f };
+		AddChild(near1); AddChild(near2); AddChild(far);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		Vector3 d1 = new Vector3(3f, 0f, 0f), d2 = new Vector3(0f, 0f, 4f);
+		near1.GlobalPosition = d1;
+		near2.GlobalPosition = d2;
+		far.GlobalPosition = new Vector3(troll.SlamRadius + 8f, 0f, 0f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = troll.Team == Unit.TeamId.Enemy;
+		bool slower = troll.MoveSpeed < skel.MoveSpeed;
+		bool tankier = troll.MaxHealth > skel.MaxHealth;
+
+		int caught = troll.Slam();
+		bool hurtNear = near1.Health < 300f && near2.Health < 300f;
+		bool farSafe = Mathf.IsEqualApprox(far.Health, 300f) && far.CurrentKnockback.LengthSquared() < 0.0001f;
+		// Knockback points radially outward (away from the troll at origin = the victim's own offset dir).
+		bool radial = near1.CurrentKnockback.Normalized().Dot(d1.Normalized()) > 0.9f
+			&& near2.CurrentKnockback.Normalized().Dot(d2.Normalized()) > 0.9f;
+
+		GD.Print($"troll: team={troll.Team}, move={troll.MoveSpeed} (skel {skel.MoveSpeed}), hp={troll.MaxHealth} (skel {skel.MaxHealth}), caught={caught}");
+		bool pass = enemyTeam && slower && tankier && caught == 2 && hurtNear && farSafe && radial;
+		GD.Print(pass
+			? "PASS: cave troll slam damages + radially punts foes in radius, sparing those outside"
+			: $"FAIL: enemyTeam={enemyTeam}, slower={slower}, tankier={tankier}, caught={caught}, hurtNear={hurtNear}, farSafe={farSafe}, radial={radial}");
+		return pass;
+	}
+
+	// Chunk 93 (M17): the full brawl difficulty ramp. Confirms the authored schedule has no empty waves, the
+	// Cave Troll boss appears on cadence (solo at wave 10, recurring in the clamped finale), and pressure
+	// escalates from the gentle opener to the late horde. Builds the exact same table the brawl plays.
+	private bool TestBestiarySchedule()
+	{
+		GD.Print("=== UnitTest: brawl bestiary wave ramp (M17, Chunk 93) ===");
+
+		var wm = new WaveManager();
+		CardBrawl.BuildBrawlWaveTable(wm);
+		var troll = GD.Load<PackedScene>("res://scenes/Troll.tscn");
+
+		bool authored = wm.WaveTable.Count >= 10;
+
+		// No empty waves across a long run (well past the table, exercising the clamp).
+		bool noEmpty = true;
+		for (int w = 1; w <= 16; w++)
+			if (wm.CountForWave(w) <= 0) noEmpty = false;
+
+		// Boss cadence: wave 10 is a SOLO single Troll; the troll also recurs in the clamped finale.
+		var w10 = wm.CompositionForWave(10);
+		bool soloBoss = w10.Arrangement == WaveManager.Formation.Solo && w10.TotalCount == 1
+			&& WaveHas(w10, troll);
+		bool bossRecurs = WaveHas(wm.CompositionForWave(12), troll) && WaveHas(wm.CompositionForWave(15), troll);
+
+		// Opener is the gentle 5-zombie horde; pressure grows by the late waves.
+		bool opener = wm.CountForWave(1) == 5;
+		bool escalates = wm.CountForWave(11) > wm.CountForWave(1);
+
+		GD.Print($"ramp: rows={wm.WaveTable.Count}, w1={wm.CountForWave(1)}, w10(solo boss)={soloBoss}, w11={wm.CountForWave(11)}, bossRecurs={bossRecurs}");
+		bool pass = authored && noEmpty && soloBoss && bossRecurs && opener && escalates;
+		GD.Print(pass
+			? "PASS: bestiary ramp has no empty waves, a solo Troll boss on cadence, and escalating pressure"
+			: $"FAIL: authored={authored}, noEmpty={noEmpty}, soloBoss={soloBoss}, bossRecurs={bossRecurs}, opener={opener}, escalates={escalates}");
+		return pass;
+	}
+
+	// True if a wave composition includes at least one of `scene`.
+	private static bool WaveHas(WaveManager.WaveComposition comp, PackedScene scene)
+	{
+		foreach (var e in comp.Entries)
+			if (e.Scene == scene && e.Count > 0) return true;
+		return false;
 	}
 
 	// M15 redesign: the squad placement grid. A soldier card attaches in one of the four cardinal

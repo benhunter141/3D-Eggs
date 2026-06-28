@@ -418,32 +418,58 @@ public partial class CardBrawl : Node3D
 
 	private void OnEndTurnButtonPressed() => RequestEndTurn();
 
-	// Foes-first: stage the coming wave DURING the pause so both eggs can SEE the threat and counter it.
-	// Author the brawl's per-wave bestiary (M17). Populated incrementally across Chunks 84–93 as each
-	// foe type lands; Chunk 93 finalizes the full difficulty ramp. For now the opener is a slow Zombie
-	// horde (Chunk 84), stiffened with a couple of Skeletons as it escalates. Waves past the table clamp
-	// to the last (hardest) row, so the run keeps pressuring until the ramp is authored.
 	private void BuildWaveTable()
 	{
 		if (_waves == null) return;
+		BuildBrawlWaveTable(_waves);
+	}
+
+	// Author the brawl's full per-wave bestiary difficulty ramp (M17, Chunk 93). Static + parameterized on
+	// the WaveManager so the headless test can build the exact same schedule and assert it (boss cadence, no
+	// empty waves, escalating pressure). The ramp walks the roster easy→hard: pure Zombie horde → Dogs →
+	// Skeletons → Goblins (tier 2) → Slingers + a Legion shield-block (tier 3) → Orc Brutes + Necromancers
+	// (tier 4) → a Centurion-led Legion (tier 5) → the Cave Troll BOSS (Solo). Waves past the table clamp to
+	// the LAST row (a recurring Troll-led horde), so the boss returns on cadence and the run never runs dry.
+	public static void BuildBrawlWaveTable(WaveManager waves)
+	{
+		if (waves == null) return;
 		var zombie = GD.Load<PackedScene>("res://scenes/Zombie.tscn");
 		var dog = GD.Load<PackedScene>("res://scenes/Dog.tscn");
 		var skeleton = GD.Load<PackedScene>("res://scenes/Skeleton.tscn");
 		var goblin = GD.Load<PackedScene>("res://scenes/Goblin.tscn");
+		var slinger = GD.Load<PackedScene>("res://scenes/Slinger.tscn");
 		var legionary = GD.Load<PackedScene>("res://scenes/Legionary.tscn");
+		var orcBrute = GD.Load<PackedScene>("res://scenes/OrcBrute.tscn");
+		var necromancer = GD.Load<PackedScene>("res://scenes/Necromancer.tscn");
+		var centurion = GD.Load<PackedScene>("res://scenes/Centurion.tscn");
+		var troll = GD.Load<PackedScene>("res://scenes/Troll.tscn");
 
-		_waves.WaveTable.Clear();
-		// Wave 1 — a pure slow zombie horde: the gentle opener.
-		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 5));
-		// Wave 2 — a fast War Dog pack rushes in among the shamblers (frail but quick — close the gap).
-		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 4).Add(dog, 3));
-		// Wave 3 — a bigger horde, a larger dog pack, and a couple of tougher Skeletons mixed in.
-		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 6).Add(dog, 4).Add(skeleton, 3));
-		// Wave 4 — tier-2 arrives: darting Goblin Cutters with crude blades flank the horde, Skeletons anchoring.
-		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(goblin, 4).Add(skeleton, 4).Add(zombie, 4));
-		// Wave 5 — tier 3: a Roman LEGION marches in as a tight shield-block (Formation.Block). Their
-		// frontal scutums soak head-on blows, so they must be flanked, not bulldozed.
-		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Block).Add(legionary, 8));
+		var t = waves.WaveTable;
+		t.Clear();
+		// 1 — pure slow zombie horde: the gentle opener.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 5));
+		// 2 — a fast War Dog pack rushes in among the shamblers (frail but quick — close the gap).
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 5).Add(dog, 3));
+		// 3 — bigger horde, larger dog pack, a few tougher Skeletons mixed in.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 6).Add(dog, 4).Add(skeleton, 3));
+		// 4 — tier-2: darting Goblin Cutters flank the horde, Skeletons anchoring.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(goblin, 4).Add(skeleton, 4).Add(zombie, 5));
+		// 5 — tier-3 ranged threat: Bandit Slingers kite from the back of a Skeleton/Goblin push.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(slinger, 3).Add(skeleton, 4).Add(goblin, 4));
+		// 6 — a Roman LEGION marches in as a tight shield-block: flank it, don't bulldoze it.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Block).Add(legionary, 8));
+		// 7 — tier-4: Orc Brutes (the only foes that SHOVE) bull through a dog-screened horde.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(orcBrute, 2).Add(zombie, 7).Add(dog, 4));
+		// 8 — tier-4: Necromancers raise zombies behind a Slinger line — kill the casters or drown.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(necromancer, 2).Add(slinger, 3).Add(zombie, 4));
+		// 9 — tier-5: a Centurion-led Legion block — the rally aura makes the wall move + soak harder.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Block).Add(centurion, 1).Add(legionary, 7));
+		// 10 — BOSS: the Cave Troll spawns SOLO, slamming a radial shockwave that scatters your line.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Solo).Add(troll, 1));
+		// 11 — the field reopens harder: Brutes + a Necromancer behind a Goblin swarm (catch your breath).
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(orcBrute, 3).Add(necromancer, 1).Add(goblin, 6).Add(zombie, 6));
+		// 12 (+, recurring finale via the clamp) — a Troll leads a heavy mixed horde every wave from here on.
+		t.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(troll, 1).Add(orcBrute, 2).Add(skeleton, 6).Add(zombie, 6));
 	}
 
 	private void SpawnPreviewWave()

@@ -402,7 +402,26 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       melee now dispatches through a `protected virtual MeleeStrike(Unit)` hook (default byte-identical), and the
       Brute overrides it to club its victim with real **knockback** (12 m/s along the swing) — the only non-player
       foe that shoves. Slow + tanky (MoveSpeed 2.2, MaxHealth 220, AttackDamage 18). Headless-verified
-      (`TestOrcBrute`); wave-table wiring lands in Chunk 93.
+      (`TestOrcBrute`); wave-table wiring lands in Chunk 93. Chunk 90 done: `Necromancer` (tier-4 summoner) — a
+      hooded purple egg with a glowing-orb staff; a fragile ranged caster that lobs a reused `Stone` bolt (no
+      knockback) on cooldown AND periodically RAISES `Zombie`s beside itself (`RaiseDead`/`SummonCount` 2 every
+      `SummonCooldown`), capped at `SummonCap` 6 LIVING tracked minions so it can't flood. Headless-verified
+      (`TestNecromancer`). Chunk 91 done: `Centurion` (tier-5 elite Legion leader, a `Legionary` subclass so it
+      keeps the scutum) — bigger/tankier/stronger melee with a red plumed crest, projecting a **rally aura** that
+      every frame refreshes a short-lived speed+toughness buff on friendly `Legionary`s within `RallyRadius`
+      (`ApplyRally` → `EffectiveMoveSpeed` + extra `TakeDamage` reduction); the buff lapses on its own once the
+      Centurion stops refreshing it (out of range or dead). `Enemy` gained a `protected virtual EffectiveMoveSpeed`
+      hook (default = MoveSpeed, byte-identical) so the rally can fold into the shared chase code. Headless-verified
+      (`TestCenturion`, apply + expire). Chunk 92 done: `Troll` (tier-5 BOSS) — a giant slow grey-green egg with an
+      oversized club (MoveSpeed 1.5, MaxHealth 600); chases + clubs like any `Enemy` but on a cadence fires a radial
+      `Slam` shockwave (`SlamRadius` 6) that damages + RADIALLY punts every opposing unit in range (one cheap
+      `UnitRegistry` walk, no overlap query). Spawns SOLO via `Formation.Solo`. Headless-verified (`TestTroll`).
+      Chunk 93 done: the full difficulty ramp authored in `CardBrawl.BuildBrawlWaveTable` (now static + headless-
+      testable) — 12 waves easy→hard (Zombies → Dogs → Skeletons → Goblins → Slingers + a Legion block → Brutes +
+      Necromancers → a Centurion-led Legion → the Cave Troll boss SOLO at wave 10 → a recurring Troll-led horde
+      finale via the clamp). Headless-verified (`TestBestiarySchedule`: no empty waves, solo boss on cadence,
+      escalating pressure). **All M17 chunks (83–93) built; brawl balance + visual feel-check pending (needs a
+      gamepad for P2).**
 - [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
@@ -706,23 +725,39 @@ club, many zombies, many dogs, a Roman Legion.
   (`TestOrcBrute`): Enemy-team, slower + tankier than a Skeleton, and its club punts a parked victim with a
   flat ~12 m/s shove (every other foe's hit imparts none). *Not yet wired into the brawl wave table — Chunk
   93 authors the full ramp.*
-- [ ] **Chunk 90 — Necromancer (summoner, tier 4).** Fragile ranged caster: bolt on cooldown + periodically
-  **summons ~2 Zombies** adjacent to itself (capped so it can't runaway-flood). `Necromancer.cs` + scene
-  (hooded, staff). Headless-test the summon cadence + cap.
-- [ ] **Chunk 91 — Roman Centurion (elite leader, tier 5).** Tanky strong-melee Legion leader with a **rally
-  aura**: nearby `Legionary`s within a radius get a speed/toughness buff (re-applied each frame, expires when
-  out of range or the Centurion dies). `Centurion.cs` + scene (plumed crest, larger). Headless-test the aura
-  apply/expire.
-- [ ] **Chunk 92 — Cave Troll boss (tier 5, AOE slam).** Giant slow boss, huge HP; periodic **club SLAM** =
-  radial knockback shockwave hitting every egg/soldier within `SlamRadius` (`Unit.AddKnockback` + damage).
-  Spawns SOLO via the composition table's boss row. `Troll.cs` + scene (oversized egg + big club). Keep the
-  slam cheap (one overlap query, no particles required for logic). Headless-test the slam radius/knockback.
-- [ ] **Chunk 93 — Bestiary wave progression + balance.** Author the full **difficulty ramp**: which foes
-  enter at which wave (Zombies/Dogs early → Skeletons/Goblins → Slingers/Legion blocks mid → Brute/Necromancer
-  → Centurion-led Legions → **Cave Troll boss on a cadence**, e.g. every Nth wave), and tune counts / HP /
-  per-round energy so the curve is fair against two basic eggs + their cards. Headless-test the composition
-  schedule across a run of waves (boss cadence, no empty waves, monotonic-ish pressure). Feel-check by playing
-  the brawl.
+- [x] **Chunk 90 — Necromancer (summoner, tier 4).** `Necromancer.cs` + `Necromancer.tscn` — a hooded purple
+  egg with a glowing-orb staff. A fragile ranged caster (`MaxHealth` 60) that holds a loose 9–14 m band (never
+  panics — the horde screens it), lobs a reused `Stone` bolt (no knockback) on `BoltCooldown`, AND on its own
+  `SummonCooldown` (first cast at half-cooldown) calls `RaiseDead()` to spawn `SummonCount` (2) `Zombie`s in a
+  ring beside itself — CAPPED at `SummonCap` (6) LIVING tracked minions (`LivingMinions()` prunes dead/freed)
+  so it can't runaway-flood. Ignore it and the horde regrows; reach it and the bleeding stops. Headless-verified
+  (`TestNecromancer`): Enemy-team, a cast raises 2, repeated casts clamp at 6 (`over=0`), minions are Enemy
+  Zombies.
+- [x] **Chunk 91 — Roman Centurion (elite leader, tier 5).** `Centurion.cs` (a `Legionary` subclass, so it keeps
+  the frontal scutum) + `Centurion.tscn` — bigger/tankier/stronger-melee (`MaxHealth` 200, `AttackDamage` 16)
+  red egg with a red plumed crest. Each frame it `RallyNearbyLegionaries()` — refreshing a short-lived buff on
+  every friendly `Legionary` within `RallyRadius` (8) via `ApplyRally(duration, speedMult, reduction)`: rallied
+  legionaries move at `EffectiveMoveSpeed = MoveSpeed × RallySpeedMultiplier` (1.4) and soak `RallyDamageReduction`
+  (0.25) extra in `TakeDamage`. The buff is re-applied continuously (`RallyRefresh` 0.5 s window) so it lapses on
+  its own out of range or when the Centurion dies. `Enemy` gained a `protected virtual EffectiveMoveSpeed` hook
+  (default = `MoveSpeed`, byte-identical) so the rally folds into the shared chase code without touching other
+  foes. Headless-verified (`TestCenturion`): aura applies in range, expires ~0.5 s after the leader falls.
+- [x] **Chunk 92 — Cave Troll boss (tier 5, AOE slam).** `Troll.cs` (an `Enemy` subclass) + `Troll.tscn` — a giant
+  slow grey-green egg with an oversized club (`MoveSpeed` 1.5, `MaxHealth` 600, `AttackDamage` 30). Chases + clubs
+  like any `Enemy`, but on `SlamCooldown` (when a foe is within `SlamRange`) fires `Slam()` — a radial shockwave
+  that deals `SlamDamage` (24) + a `SlamKnockback` (16) shove pointing straight OUTWARD to every opposing unit
+  within `SlamRadius` (6), scattering a clustered line. One cheap `UnitRegistry.Opponents` walk (no physics
+  overlap, no particles needed for logic). Spawns SOLO via `Formation.Solo`. Headless-verified (`TestTroll`):
+  slow/tanky Enemy, slam catches the two foes in radius (radial knockback) and spares the one outside.
+- [x] **Chunk 93 — Bestiary wave progression + balance.** Authored the full **difficulty ramp** in
+  `CardBrawl.BuildBrawlWaveTable` (refactored to a `public static` taking a `WaveManager` so the schedule is
+  headless-testable): 12 waves easy→hard — (1) Zombie horde → (2) +War Dogs → (3) +Skeletons → (4) tier-2
+  Goblins → (5) tier-3 Slingers kiting behind a push → (6) a Roman Legion **Block** → (7) tier-4 Orc Brutes
+  through a dog-screened horde → (8) Necromancers raising zombies behind Slingers → (9) a **Centurion-led
+  Legion** Block (rally aura) → (10) the **Cave Troll BOSS** SOLO → (11) Brutes+Necromancer over a Goblin swarm
+  → (12, recurring via the clamp) a **Troll-led** heavy mixed horde every wave thereafter. Headless-verified
+  (`TestBestiarySchedule`): no empty waves across a long run, a solo Troll boss on cadence, recurring boss past
+  the table, escalating pressure. Brawl feel-check by playing battle 6 (needs a gamepad for P2).
 
 **Build order 83 → 93. Chunk 83 (composition table) is load-bearing — every later chunk just drops its enemy
 scene into a wave row. 84/85 are the requested hordes (zombies, dogs); 88 is the Roman Legion; 92 is the troll
