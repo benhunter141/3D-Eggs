@@ -1,0 +1,72 @@
+[gd_scene load_steps=12 format=3 uid="uid://dnecro0eggs001"]
+
+[ext_resource type="Script" path="res://scripts/Necromancer.cs" id="1_necro"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_necro"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.36, 0.22, 0.5, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_necro"]
+radius = 0.36
+height = 1.6
+
+[sub_resource type="SphereMesh" id="SphereMesh_hood"]
+radius = 0.34
+height = 0.55
+radial_segments = 10
+rings = 6
+
+[sub_resource type="StandardMaterial3D" id="Mat_hood"]
+albedo_color = Color(0.22, 0.13, 0.32, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="Cyl_staff"]
+top_radius = 0.04
+bottom_radius = 0.04
+height = 1.5
+
+[sub_resource type="StandardMaterial3D" id="Mat_staff"]
+albedo_color = Color(0.3, 0.2, 0.12, 1)
+roughness = 0.9
+
+[sub_resource type="SphereMesh" id="SphereMesh_orb"]
+radius = 0.13
+height = 0.26
+radial_segments = 10
+rings = 6
+
+[sub_resource type="StandardMaterial3D" id="Mat_orb"]
+albedo_color = Color(0.6, 0.3, 0.9, 1)
+emission_enabled = true
+emission = Color(0.5, 0.2, 0.85, 1)
+emission_energy_multiplier = 2.0
+
+[node name="Necromancer" type="CharacterBody3D"]
+script = ExtResource("1_necro")
+MaxHealth = 60.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_necro")
+script = ExtResource("2_egg")
+Width = 0.9
+Height = 1.6
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_necro")
+
+[node name="Hood" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, -0.04)
+mesh = SubResource("SphereMesh_hood")
+surface_material_override/0 = SubResource("Mat_hood")
+
+[node name="Staff" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42, 0.35, -0.16)
+mesh = SubResource("Cyl_staff")
+surface_material_override/0 = SubResource("Mat_staff")
+
+[node name="Orb" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.42, 1.08, -0.16)
+mesh = SubResource("SphereMesh_orb")
+surface_material_override/0 = SubResource("Mat_orb")
