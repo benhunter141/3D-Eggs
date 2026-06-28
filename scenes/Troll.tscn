@@ -1,0 +1,64 @@
+[gd_scene load_steps=11 format=3 uid="uid://dtroll0eggs0001"]
+
+[ext_resource type="Script" path="res://scripts/Troll.cs" id="1_troll"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_troll"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.34, 0.4, 0.3, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_troll"]
+radius = 0.95
+height = 3.4
+
+[sub_resource type="BoxMesh" id="BoxMesh_arm"]
+size = Vector3(0.4, 0.4, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="Mat_skin"]
+albedo_color = Color(0.3, 0.36, 0.27, 1)
+roughness = 0.95
+
+[sub_resource type="CylinderMesh" id="Cyl_haft"]
+top_radius = 0.16
+bottom_radius = 0.16
+height = 2.0
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.32, 0.22, 0.12, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+size = Vector3(0.7, 0.7, 0.8)
+
+[node name="Troll" type="CharacterBody3D"]
+script = ExtResource("1_troll")
+MoveSpeed = 1.5
+AttackRange = 2.6
+AttackDamage = 30.0
+AttackCooldown = 2.0
+MaxHealth = 600.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_troll")
+script = ExtResource("2_egg")
+Width = 2.2
+Height = 3.4
+
+[node name="ArmR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9, 0.4, -0.7)
+mesh = SubResource("BoxMesh_arm")
+surface_material_override/0 = SubResource("Mat_skin")
+
+[node name="ClubHaft" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 1.0, 0.6, -1.5)
+mesh = SubResource("Cyl_haft")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="ClubHead" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.0, 0.6, -2.5)
+mesh = SubResource("BoxMesh_head")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_troll")
