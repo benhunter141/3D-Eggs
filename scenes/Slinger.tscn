@@ -1,0 +1,70 @@
+[gd_scene load_steps=12 format=3 uid="uid://dsling0eggs0001"]
+
+[ext_resource type="Script" path="res://scripts/Slinger.cs" id="1_sling"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_sling"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.78, 0.66, 0.45, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_sling"]
+radius = 0.36
+height = 1.55
+
+[sub_resource type="BoxMesh" id="BoxMesh_arm"]
+size = Vector3(0.13, 0.5, 0.13)
+
+[sub_resource type="StandardMaterial3D" id="Mat_arm"]
+albedo_color = Color(0.62, 0.5, 0.34, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_cord"]
+top_radius = 0.012
+bottom_radius = 0.012
+height = 0.4
+radial_segments = 6
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Mat_cord"]
+albedo_color = Color(0.45, 0.36, 0.25, 1)
+roughness = 0.85
+
+[sub_resource type="SphereMesh" id="SphereMesh_pouch"]
+radius = 0.1
+height = 0.2
+radial_segments = 8
+rings = 5
+
+[sub_resource type="StandardMaterial3D" id="Mat_pouch"]
+albedo_color = Color(0.4, 0.4, 0.42, 1)
+roughness = 0.8
+
+[node name="Slinger" type="CharacterBody3D"]
+script = ExtResource("1_sling")
+MoveSpeed = 3.5
+MaxHealth = 55.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_sling")
+script = ExtResource("2_egg")
+Width = 0.9
+Height = 1.55
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_sling")
+
+[node name="ArmR" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.7071, 0.7071, 0, -0.7071, 0.7071, 0, 0, 0, 1, 0.34, 0.42, -0.18)
+mesh = SubResource("BoxMesh_arm")
+surface_material_override/0 = SubResource("Mat_arm")
+
+[node name="SlingCord" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.7071, 0.7071, 0, -0.7071, 0.7071, 0.5, 0.72, -0.28)
+mesh = SubResource("CylinderMesh_cord")
+surface_material_override/0 = SubResource("Mat_cord")
+
+[node name="SlingPouch" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 0.82, -0.52)
+mesh = SubResource("SphereMesh_pouch")
+surface_material_override/0 = SubResource("Mat_pouch")

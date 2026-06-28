@@ -389,6 +389,12 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       `WarDog` (tier-1 PACK hunter) — a small, low, four-legged brown toon egg (horizontal body + 4 legs + head
       + tail); fast (MoveSpeed 7), very frail (25 HP), short bite cooldown (0.5), no-knockback contact melee;
       added to the brawl wave table as a fast pack beside the zombie horde. Headless-verified (`TestWarDog`).
+      Chunk 86 done: `Goblin` (tier-2 skirmisher) — a small vivid-green toon egg with a steel blade; fast
+      (MoveSpeed 5.5 > Skeleton's 4), tougher than a Zombie (65 HP) but frailer than a Skeleton, no-knockback
+      blade melee; tier-2 wave row added (`TestGoblin`). Chunk 87 done: `Slinger` (tier-3 ranged kiter) — a tan
+      toon egg whirling a sling; holds an 8–12 m band and lobs a reused `Stone` (no knockback) on cooldown,
+      fleeing when a foe closes inside `FleeRange`; ballistic arc when `Grounded`, flat skim otherwise.
+      Headless-verified (`TestSlinger`).
 - [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
@@ -668,9 +674,13 @@ club, many zombies, many dogs, a Roman Legion.
   melee. Added a tier-2 brawl wave row (wave 4 = 4 Goblins + 4 Skeletons + 4 Zombies), slotting the existing
   `Skeleton.tscn` in as the tier-2 anchor. Headless-verified (`TestGoblin`): Enemy-team, faster than the
   Skeleton, tougher than a Zombie yet frailer than a Skeleton, melee damage with zero knockback.
-- [ ] **Chunk 87 — Bandit Slinger (ranged, tier 3).** Ranged kiter reusing `Stone`/`Arrow` + `Ballistics`
-  (lob at the eggs, retreat when a foe closes inside melee range). `Slinger.cs` + scene. Headless-test the
-  fire/kite logic.
+- [x] **Chunk 87 — Bandit Slinger (ranged, tier 3).** `Slinger.cs` (a standalone ranged kiter mirroring the
+  `Bowman` kite, but lobbing a reused `Stone` projectile instead of an arrow) + `Slinger.tscn` (a tan toon egg
+  whirling a sling — raised arm + cord + stone pouch). Holds an 8–12 m range band (advance if too far, back off
+  if too close), slings a Stone on `FireCooldown` at any target in range (ballistic arc when `Grounded`, flat
+  skim otherwise), and FLEES straight away when a foe closes inside `FleeRange` (4 m). `Team = Enemy`; its slung
+  stones deal damage with NO knockback. Headless-verified (`TestSlinger`): holds its band + lands a 9-dmg stone
+  (no shove), and retreats when charged.
 - [ ] **Chunk 88 — Roman Legionary + Legion block (tier 3).** `Legionary.cs` + scene: shield-front **damage
   reduction**, marches as a cohesive **block formation** (WaveManager `formation = block`: tight rows, shared
   facing) instead of an even spread. *Look:* scutum + gladius, red/steel. Headless-test the damage-reduction

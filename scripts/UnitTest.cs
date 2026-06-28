@@ -52,6 +52,7 @@ public partial class UnitTest : Node3D
 		bool warDog = await TestWarDog();
 		bool goblin = await TestGoblin();
 		bool slime = await TestSlime();
+		bool slinger = await TestSlinger();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -78,7 +79,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1610,6 +1611,69 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: slime is a slow, no-knockback Enemy-team melee blob"
 			: $"FAIL: enemyTeam={enemyTeam}, slower={slower}, fullHealth={fullHealth}, melee={melee}, damaged={damaged}, noKnockback={noKnockback}");
+		return pass;
+	}
+
+	// Chunk 87 (M17): the Bandit Slinger is a tier-3 ranged kiter — it slings Stones from a range band
+	// and never melees. Confirms it (a) HOLDS its band + lands a stone on a target parked in firing range
+	// (a Stone projectile spawns and damages the foe), and (b) FLEES when a foe charges inside FleeRange
+	// (backpedals to re-open the gap). Plain stationary Units stand in for the player-team targets so only
+	// the slinger moves.
+	private async Task<bool> TestSlinger()
+	{
+		GD.Print("=== UnitTest: Bandit Slinger ranged kiter (M17, Chunk 87) ===");
+
+		// (a) Hold range + sling: target parked at 10 m (inside the 8–12 m band).
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var holdTarget = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(holdTarget);
+		holdTarget.GlobalPosition = new Vector3(0f, 0f, 10f);
+
+		var holdSling = GD.Load<PackedScene>("res://scenes/Slinger.tscn").Instantiate<Slinger>();
+		AddChild(holdSling);
+		holdSling.GlobalPosition = Vector3.Zero;
+		float holdStartDist = holdSling.GlobalPosition.DistanceTo(holdTarget.GlobalPosition);
+		bool enemyTeam = holdSling.Team == Unit.TeamId.Enemy;
+		GD.Print($"hold: start {holdStartDist:0.00} m (band {holdSling.PreferredRangeMin}–{holdSling.PreferredRangeMax}) -> should hold + sling");
+
+		for (int i = 0; i < 180; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float holdEndDist = holdSling.GlobalPosition.DistanceTo(holdTarget.GlobalPosition);
+		bool stayedInBand = holdEndDist >= holdSling.FleeRange && holdEndDist <= holdSling.PreferredRangeMax + 1.0f;
+		bool slungAndHit = holdTarget.Health < holdTarget.MaxHealth;        // a Stone connected
+		bool noKnockback = holdTarget.CurrentKnockback.LengthSquared() < 0.0001f; // slung stones don't shove
+		GD.Print($"hold: end {holdEndDist:0.00} m (stayedInBand={stayedInBand}), target HP={holdTarget.Health}/{holdTarget.MaxHealth} (hit={slungAndHit})");
+
+		// (b) Flee: target right on top of the slinger (inside FleeRange).
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var meleeTarget = new Unit { Team = Unit.TeamId.Player, MaxHealth = 100f };
+		AddChild(meleeTarget);
+		meleeTarget.GlobalPosition = Vector3.Zero;
+
+		var fleeSling = GD.Load<PackedScene>("res://scenes/Slinger.tscn").Instantiate<Slinger>();
+		AddChild(fleeSling);
+		fleeSling.GlobalPosition = new Vector3(0f, 0f, 2.5f);   // 2.5 m < FleeRange
+		float fleeStartDist = fleeSling.GlobalPosition.DistanceTo(meleeTarget.GlobalPosition);
+		GD.Print($"flee: start {fleeStartDist:0.00} m (fleeRange={fleeSling.FleeRange}) -> should back off");
+
+		for (int i = 0; i < 90; i++)
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+
+		float fleeEndDist = fleeSling.GlobalPosition.DistanceTo(meleeTarget.GlobalPosition);
+		bool retreated = fleeEndDist > fleeStartDist + 1.0f;
+		GD.Print($"flee: end {fleeEndDist:0.00} m (retreated={retreated})");
+
+		bool pass = enemyTeam && stayedInBand && slungAndHit && noKnockback && retreated;
+		GD.Print(pass
+			? "PASS: slinger holds its band and slings stones (no knockback), and flees when charged"
+			: $"FAIL: enemyTeam={enemyTeam}, stayedInBand={stayedInBand}, slungAndHit={slungAndHit}, noKnockback={noKnockback}, retreated={retreated}");
 		return pass;
 	}
 
