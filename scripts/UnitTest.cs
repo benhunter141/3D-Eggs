@@ -40,6 +40,7 @@ public partial class UnitTest : Node3D
 		bool bumper = await TestBumperKick();
 		bool weaponSwap = await TestWeaponSwap();
 		bool archetypes = await TestWeaponArchetypes();
+		bool attackStyle = await TestAttackStyle();
 		bool basicEgg = await TestBasicEgg();
 		bool fireball = await TestFireballAbility();
 		bool abilityBar = await TestAbilityBar();
@@ -85,7 +86,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && attackStyle && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -973,6 +974,85 @@ public partial class UnitTest : Node3D
 		return pass;
 	}
 
+	// Chunk 94 (M18): the attack-style framework. Two checks:
+	//   (a) STYLE TABLE — each weapon reports its AttackStyle: spear/sword/axe/mace = Thrust, punch = Jab.
+	//       (Sword/Axe/Mace flip to Sweep/Chop/Swing in later chunks; for now everything is the slide.)
+	//   (b) THRUST CONNECTS — refactoring UpdateSwing into the style dispatcher must keep the thrust
+	//       byte-identical, so an AI-driven captain still lands a thrust on an enemy parked in front.
+	private async Task<bool> TestAttackStyle()
+	{
+		GD.Print("=== UnitTest: attack-style framework (M18) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// (a) The style column resolves per weapon.
+		var styleCap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(styleCap);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var wantStyle = new System.Collections.Generic.Dictionary<Player.WeaponType, Player.AttackStyle>
+		{
+			[Player.WeaponType.Spear] = Player.AttackStyle.Thrust,
+			[Player.WeaponType.Sword] = Player.AttackStyle.Thrust,
+			[Player.WeaponType.Axe]   = Player.AttackStyle.Thrust,
+			[Player.WeaponType.Mace]  = Player.AttackStyle.Thrust,
+			[Player.WeaponType.Punch] = Player.AttackStyle.Jab,
+		};
+		bool stylesOk = true;
+		foreach (var (w, want) in wantStyle)
+		{
+			styleCap.SetWeapon(w);
+			Player.AttackStyle got = styleCap.CurrentAttackStyle;
+			if (got != want) stylesOk = false;
+			GD.Print($"  {w}: style={got} (want {want})");
+		}
+		styleCap.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// (b) An AI-driven captain (no device) thrusts an enemy parked just in front and connects.
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		cap.StartingWeapon = Player.WeaponType.Spear;     // a clean Thrust weapon
+		cap.Control = Player.ControlScheme.Ai;            // synthetic move/aim/attack — drives a real swing
+		AddChild(cap);
+		cap.GlobalPosition = Vector3.Zero;
+		cap.Speed = 0f;   // pin the captain in place so its AI aims + thrusts but can't walk into / climb the dummy
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Enemy dummy (real scene -> has a collider the hitbox Area3D can register) straight ahead (-Z),
+		// inside the spear's hitbox reach (3.0 m) AND the AI's hold range, so the captain stands and pokes
+		// it head-on. We FREEZE the dummy's own AI (SetPhysicsProcess false) so it can't shamble into the
+		// captain and let the two capsules climb/stack — keeping it a clean, on-axis target in front.
+		var dummy = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(dummy);
+		dummy.GlobalPosition = new Vector3(0f, 0f, -2.0f);
+		dummy.SetPhysicsProcess(false);
+		float startHp = dummy.MaxHealth;
+		GD.Print($"dummy {dummy.GlobalPosition} (reach {cap.EffectiveReach:0.0} m), HP {startHp}");
+
+		// ~1.5 s: several thrust windows + cooldowns — plenty to land at least one hit. We HARD-PIN the
+		// captain at the origin facing -Z at the start of every physics frame: with two CharacterBody3D
+		// capsules the solver otherwise rides the attacker up onto its target, lifting the forward hitbox
+		// off the foe. Re-seating it each frame keeps the thrust poking the dummy head-on (the swing/hit
+		// pipeline itself runs untouched inside _PhysicsProcess).
+		for (int i = 0; i < 90 && !dummy.IsDead; i++)
+		{
+			cap.GlobalPosition = Vector3.Zero;
+			cap.Rotation = Vector3.Zero;
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		}
+
+		bool connected = dummy.IsDead || dummy.Health < startHp;
+		GD.Print($"after thrusts: dummy HP={(dummy.IsDead ? 0f : dummy.Health)}/{startHp} (connected={connected}); cap={cap.GlobalPosition}, dummy={dummy.GlobalPosition}");
+
+		bool pass = stylesOk && connected;
+		GD.Print(pass
+			? "PASS: style table resolves per weapon and a dispatched thrust still connects"
+			: $"FAIL: stylesOk={stylesOk}, connected={connected}");
+		return pass;
+	}
+
 	// Chunk 66 (M15): the basic egg loadout. A captain spawned with StartUnarmed wields the weak Punch —
 	// low damage, NO knockback, reach UNDER the sword — and EquipWeapon arms it at runtime: switching to
 	// the sword raises reach + damage and restores knockback, proving the egg gets stronger only via cards.
@@ -1763,9 +1843,11 @@ public partial class UnitTest : Node3D
 		brute.GlobalPosition = new Vector3(0f, 0f, 1.2f);
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
-		// Reference: a base Enemy (Skeleton) for the slow + tanky comparison.
+		// Reference: a base Enemy (Skeleton) for the slow + tanky comparison. Parked far off so it
+		// can't wander into the brute/victim duel below (it's only read for MoveSpeed/MaxHealth).
 		var skel = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
 		AddChild(skel);
+		skel.GlobalPosition = new Vector3(100f, 0f, 100f);
 		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
 		bool enemyTeam = brute.Team == Unit.TeamId.Enemy;
@@ -1777,18 +1859,20 @@ public partial class UnitTest : Node3D
 		var victim = new Unit { Team = Unit.TeamId.Player, MaxHealth = 200f };
 		AddChild(victim);
 		victim.GlobalPosition = Vector3.Zero;
-		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
 
-		// Step physics frames until the brute strikes (or give up).
-		float startHp = victim.Health;
+		// Step physics frames until the brute lands its club, grabbing the shove on the EXACT frame the
+		// damage appears (so the knockback read is fresh, not decayed, and the test isn't timing-flaky:
+		// capture full HP up front rather than after a frame the brute may already have struck in).
+		float startHp = victim.MaxHealth;
 		int frames = 0;
-		while (victim.Health >= startHp && frames < 30)
+		bool damaged = false;
+		Vector3 kb = Vector3.Zero;
+		while (frames < 60)
 		{
 			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
 			frames++;
+			if (victim.Health < startHp) { damaged = true; kb = victim.CurrentKnockback; break; }
 		}
-		bool damaged = victim.Health < startHp;
-		Vector3 kb = victim.CurrentKnockback;
 		bool shoved = kb.LengthSquared() > 1f;          // a real club shove, not a stray nudge
 		bool flat = Mathf.IsZeroApprox(kb.Y);
 

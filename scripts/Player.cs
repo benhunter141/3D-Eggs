@@ -24,6 +24,19 @@ public partial class Player : Unit, ICardPlayer
 {
 	public enum WeaponType { Spear, Sword, Axe, Mace, Punch }
 
+	// How a weapon SWINGS (M18, Chunk 94). Today every weapon pokes with the same straight thrust;
+	// this gives each its own recognizable motion so the move tells you which weapon you hold. The
+	// style is a per-weapon column on the WeaponProfile table and drives `AnimateSwing` (the swing
+	// pose) — later chunks add Sweep/Chop/Swing routines + shape the hitbox per style. For now every
+	// weapon is Thrust (spear/sword/axe/mace) or Jab (punch), both the existing slide, so behaviour is
+	// byte-identical until each later chunk flips its weapon's style.
+	//   • Thrust — straight jab out and back (spear/pike): today's poke.
+	//   • Sweep  — horizontal left→right arc across the front (sword): multi-hit.   [Chunk 95]
+	//   • Chop   — slow overhead top-down swing (axe): one big committed hit.         [Chunk 96]
+	//   • Swing  — wide circular round-house (mace): broad multi-hit + strong shove.  [Chunk 97]
+	//   • Jab    — short fast thrust (unarmed punch): the basic egg's weak poke.
+	public enum AttackStyle { Thrust, Sweep, Chop, Swing, Jab }
+
 	// Castable abilities the egg can be GRANTED at runtime (M15). `None` (the default) = nothing, so
 	// every existing captain spawns exactly as before — only a card-granted egg in the Co-op Card Brawl
 	// ever carries any. An egg holds a BAR of these (granted by cards, replayable each turn); each maps to
@@ -94,10 +107,12 @@ public partial class Player : Unit, ICardPlayer
 	private readonly struct WeaponProfile
 	{
 		public readonly float Damage, Knockback, Reach, ThrustDistance, SwingDuration, SwingCooldown;
-		public WeaponProfile(float damage, float knockback, float reach, float thrustDistance, float swingDuration, float swingCooldown)
+		public readonly AttackStyle Style;   // how this weapon swings (M18, Chunk 94)
+		public WeaponProfile(float damage, float knockback, float reach, float thrustDistance, float swingDuration, float swingCooldown, AttackStyle style)
 		{
 			Damage = damage; Knockback = knockback; Reach = reach;
 			ThrustDistance = thrustDistance; SwingDuration = swingDuration; SwingCooldown = swingCooldown;
+			Style = style;
 		}
 	}
 
@@ -226,6 +241,7 @@ public partial class Player : Unit, ICardPlayer
 	private float _thrustDistance;
 	private float _swingDuration;
 	private float _swingCooldown;
+	private AttackStyle _style;   // active weapon's swing motion (M18, Chunk 94)
 
 	// The weapon table + the mesh per weapon, built in _Ready.
 	private Dictionary<WeaponType, WeaponProfile> _profiles;
@@ -239,6 +255,7 @@ public partial class Player : Unit, ICardPlayer
 	public float CurrentWeaponKnockback => _knockback;   // NOTE: Unit.CurrentKnockback is the live shove Vector3
 	public float CurrentReach => _reach;
 	public float CurrentSwingCooldown => _swingCooldown;                // higher = slower (the axe's tax)
+	public AttackStyle CurrentAttackStyle => _style;                    // how the active weapon swings (M18)
 	public float EffectiveReach => _reach + _thrustDistance;            // how far the tip lands at full lunge
 	public float HitboxLength => _hitboxShape?.Shape is BoxShape3D b ? b.Size.Z : 0f;
 	public static int WeaponCount => System.Enum.GetValues<WeaponType>().Length;
@@ -292,11 +309,13 @@ public partial class Player : Unit, ICardPlayer
 		// (missing ones are fine — GetNodeOrNull keeps a weapon usable even without its mesh).
 		_profiles = new Dictionary<WeaponType, WeaponProfile>
 		{
-			[WeaponType.Spear] = new WeaponProfile(SpearDamage, SpearKnockback, SpearReach, SpearThrustDistance, SpearSwingDuration, SpearSwingCooldown),
-			[WeaponType.Sword] = new WeaponProfile(SwordDamage, SwordKnockback, SwordReach, SwordThrustDistance, SwordSwingDuration, SwordSwingCooldown),
-			[WeaponType.Axe]   = new WeaponProfile(AxeDamage,   AxeKnockback,   AxeReach,   AxeThrustDistance,   AxeSwingDuration,   AxeSwingCooldown),
-			[WeaponType.Mace]  = new WeaponProfile(MaceDamage,  MaceKnockback,  MaceReach,  MaceThrustDistance,  MaceSwingDuration,  MaceSwingCooldown),
-			[WeaponType.Punch] = new WeaponProfile(PunchDamage, PunchKnockback, PunchReach, PunchThrustDistance, PunchSwingDuration, PunchSwingCooldown),
+			// The Style column (M18, Chunk 94) starts every weapon on Thrust/Jab so the swing is byte-identical;
+			// later chunks flip Sword→Sweep, Axe→Chop, Mace→Swing as each style routine lands.
+			[WeaponType.Spear] = new WeaponProfile(SpearDamage, SpearKnockback, SpearReach, SpearThrustDistance, SpearSwingDuration, SpearSwingCooldown, AttackStyle.Thrust),
+			[WeaponType.Sword] = new WeaponProfile(SwordDamage, SwordKnockback, SwordReach, SwordThrustDistance, SwordSwingDuration, SwordSwingCooldown, AttackStyle.Thrust),
+			[WeaponType.Axe]   = new WeaponProfile(AxeDamage,   AxeKnockback,   AxeReach,   AxeThrustDistance,   AxeSwingDuration,   AxeSwingCooldown,   AttackStyle.Thrust),
+			[WeaponType.Mace]  = new WeaponProfile(MaceDamage,  MaceKnockback,  MaceReach,  MaceThrustDistance,  MaceSwingDuration,  MaceSwingCooldown,  AttackStyle.Thrust),
+			[WeaponType.Punch] = new WeaponProfile(PunchDamage, PunchKnockback, PunchReach, PunchThrustDistance, PunchSwingDuration, PunchSwingCooldown, AttackStyle.Jab),
 		};
 		_weaponMeshes = new Dictionary<WeaponType, Node3D>
 		{
@@ -800,6 +819,7 @@ public partial class Player : Unit, ICardPlayer
 		_thrustDistance = p.ThrustDistance;
 		_swingDuration  = p.SwingDuration;
 		_swingCooldown  = p.SwingCooldown;
+		_style          = p.Style;
 
 		// Show only the active weapon's mesh.
 		foreach (var (type, mesh) in _weaponMeshes)
@@ -917,13 +937,9 @@ public partial class Player : Unit, ICardPlayer
 
 		_swingTimer += dt;
 		float t = Mathf.Clamp(_swingTimer / _swingDuration, 0f, 1f);
-		// Jab out quickly over the first ThrustExtendFrac of the window, then retract
-		// over the remainder — a snappy poke, not a wide sweep.
-		float extend = Mathf.Clamp(ThrustExtendFrac, 0.05f, 0.95f);
-		float reach = t < extend
-			? t / extend                       // 0 -> 1 (lunging out)
-			: 1f - (t - extend) / (1f - extend); // 1 -> 0 (pulling back)
-		SetThrustOffset(reach * _thrustDistance);
+		// Pose the weapon for this style's motion (M18, Chunk 94). The hit-polling below stays
+		// shared across styles for now; later chunks shape the hitbox region per style.
+		AnimateSwing(t);
 
 		// Poll overlaps each frame — bodies can enter as the pike extends.
 		// Each body is struck at most once per thrust; only damage enemy-team Units.
@@ -960,6 +976,33 @@ public partial class Player : Unit, ICardPlayer
 		_cooldownTimer = _swingCooldown;
 		SetHitboxActive(false);
 		// Offset is ~0 where the thrust ended (fully retracted); the idle branch eases out any residual.
+	}
+
+	// === Attack-style dispatcher (M18, Chunk 94) ========================================
+	// Pose the weapon pivot for the active weapon's AttackStyle over the swing window `t` (0..1).
+	// Each style is its own routine that sets the pivot transform (translation + rotation). For now
+	// every weapon resolves to the straight Thrust slide (spear/sword/axe/mace = Thrust, punch = Jab),
+	// so the motion is byte-identical to before; later chunks add the Sweep/Chop/Swing routines and
+	// flip each weapon's style. The default arm keeps any not-yet-implemented style on the thrust.
+	private void AnimateSwing(float t)
+	{
+		switch (_style)
+		{
+			// Sweep / Chop / Swing land in Chunks 95–97; until then they fall through to the thrust.
+			default: AnimateThrust(t); break;   // Thrust + Jab (and any unimplemented style)
+		}
+	}
+
+	// Thrust / Jab: jab the weapon straight out along -Z over the first ThrustExtendFrac of the
+	// window, then retract over the remainder — a snappy poke, not a wide sweep. (The original
+	// inline swing math, lifted verbatim so spear + punch stay byte-identical.)
+	private void AnimateThrust(float t)
+	{
+		float extend = Mathf.Clamp(ThrustExtendFrac, 0.05f, 0.95f);
+		float reach = t < extend
+			? t / extend                       // 0 -> 1 (lunging out)
+			: 1f - (t - extend) / (1f - extend); // 1 -> 0 (pulling back)
+		SetThrustOffset(reach * _thrustDistance);
 	}
 
 	// Slide the whole pike (mesh + hitbox) forward along our local -Z by `offset` metres.
