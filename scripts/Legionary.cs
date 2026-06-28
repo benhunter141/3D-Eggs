@@ -13,6 +13,36 @@ public partial class Legionary : Enemy
 	[Export] public float ShieldReduction = 0.6f;   // fraction of a FRONTAL blow the scutum soaks (0..1)
 	[Export] public float ShieldArcDegrees = 200f;  // total frontal cone the shield covers (>180 = a touch past the sides)
 
+	// Rally aura (Chunk 91): a nearby Centurion re-applies a short-lived buff each frame. While the timer is
+	// up the legionary moves faster (EffectiveMoveSpeed) and shrugs off extra damage (TakeDamage). It expires
+	// on its own once the Centurion stops refreshing it (out of range or dead), so no cleanup is needed.
+	private float _rallyTimer;
+	private float _rallySpeedMult = 1f;
+	private float _rallyExtraReduction;
+
+	// True while a Centurion's rally is active on this legionary. Public so the headless test can assert
+	// the aura's apply/expire directly.
+	public bool IsRallied => _rallyTimer > 0f;
+
+	// Receive (or refresh) a rally pulse. The Centurion calls this every frame for each legionary in range;
+	// the timer takes the longer of the existing/new duration so the buff lingers a beat after leaving range.
+	public void ApplyRally(float duration, float speedMultiplier, float extraReduction)
+	{
+		_rallyTimer = Mathf.Max(_rallyTimer, duration);
+		_rallySpeedMult = speedMultiplier;
+		_rallyExtraReduction = extraReduction;
+	}
+
+	// Rallied legionaries march faster; otherwise plain MoveSpeed (byte-identical to the base Enemy).
+	protected override float EffectiveMoveSpeed => MoveSpeed * (_rallyTimer > 0f ? _rallySpeedMult : 1f);
+
+	public override void _PhysicsProcess(double delta)
+	{
+		if (_rallyTimer > 0f)
+			_rallyTimer -= (float)delta;
+		base._PhysicsProcess(delta);
+	}
+
 	// Soak frontal damage with the scutum before the base Unit logic resolves the hit. `hitDirection`
 	// points the way we'd be shoved (attacker→us), so the attacker lies along −hitDirection; the hit is
 	// FRONTAL when that direction falls inside the shield arc around our facing (−Z is forward). A
@@ -22,6 +52,8 @@ public partial class Legionary : Enemy
 	{
 		if (BlocksFrontal(hitDirection))
 			amount *= 1f - Mathf.Clamp(ShieldReduction, 0f, 1f);
+		if (_rallyTimer > 0f)
+			amount *= 1f - Mathf.Clamp(_rallyExtraReduction, 0f, 1f);   // rally toughness
 		base.TakeDamage(amount, hitDirection, knockbackStrength);
 	}
 

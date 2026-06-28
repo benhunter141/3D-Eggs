@@ -13,6 +13,11 @@ public partial class Enemy : Unit
 
 	private float _attackTimer; // counts down; > 0 blocks the next melee hit
 
+	// The speed this enemy actually moves at this frame. Defaults to the plain MoveSpeed (so every existing
+	// foe is byte-identical), but a buffable archetype like the rallied Legionary (Chunk 91) overrides it to
+	// fold in a temporary aura without touching the shared chase code. Used for both chase + march velocity.
+	protected virtual float EffectiveMoveSpeed => MoveSpeed;
+
 	public override void _Ready()
 	{
 		Team = TeamId.Enemy;   // a skeleton is always on the enemy team
@@ -52,7 +57,7 @@ public partial class Enemy : Unit
 
 			if (dist > AttackRange)
 			{
-				chase = toTarget.Normalized() * MoveSpeed;
+				chase = toTarget.Normalized() * EffectiveMoveSpeed;
 			}
 			else if (_attackTimer <= 0f)
 			{
@@ -64,7 +69,7 @@ public partial class Enemy : Unit
 		else if (MarchMode)
 		{
 			// Football-pitch auto-battler (Chunk 42): no foe in aggro range — advance to the enemy endzone.
-			chase = MarchVelocity(MoveSpeed);
+			chase = MarchVelocity(EffectiveMoveSpeed);
 			FaceTowards(GlobalPosition + MarchGoalDirection, dt);
 		}
 
