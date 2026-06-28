@@ -398,6 +398,11 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       with a scutum + gladius; its frontal scutum SOAKS damage (`TakeDamage` reduces any hit inside the 200° shield
       arc by `ShieldReduction` 0.6 via `BlocksFrontal`, flank/rear hits land full), tanky-but-slow (MoveSpeed 3,
       130 HP), and a Legion marches in as a tight `Formation.Block` (wave 5 = 8). Headless-verified (`TestLegionary`).
+      Chunk 89 done: `OrcBrute` (tier-4 heavy bruiser) — a big dark-green egg hefting a club; the base `Enemy`
+      melee now dispatches through a `protected virtual MeleeStrike(Unit)` hook (default byte-identical), and the
+      Brute overrides it to club its victim with real **knockback** (12 m/s along the swing) — the only non-player
+      foe that shoves. Slow + tanky (MoveSpeed 2.2, MaxHealth 220, AttackDamage 18). Headless-verified
+      (`TestOrcBrute`); wave-table wiring lands in Chunk 93.
 - [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
@@ -692,9 +697,15 @@ club, many zombies, many dogs, a Roman Legion.
   (`MoveSpeed` 3, `MaxHealth` 130). Marches as a cohesive **Block** (wave 5 = `Formation.Block` of 8 Legionaries
   in `CardBrawl.BuildWaveTable`), not a spread. Headless-verified (`TestLegionary`): frontal hit reduced
   (114 vs 90 HP), rear full, no knockback, and 8 spawn as a tight block (±3 m, vs the spread's ±17 m).
-- [ ] **Chunk 89 — Orc Brute (heavy club, tier 4).** Slow, high HP; melee hit routes **knockback** through
-  `Unit.AddKnockback` (the only non-player foe that shoves). `OrcBrute.cs` + scene with a club mesh.
-  Headless-test the knockback-on-hit.
+- [x] **Chunk 89 — Orc Brute (heavy club, tier 4).** `OrcBrute.cs` (an `Enemy` subclass) + `OrcBrute.tscn`
+  — a big dark-green egg hefting a club. The base `Enemy` melee was refactored behind a `protected virtual
+  MeleeStrike(Unit)` hook (default = plain damage + the same `[Enemy]` print, byte-identical), and the Brute
+  overrides it to route the hit through `target.TakeDamage(AttackDamage, dir, ClubKnockback)` — real
+  **knockback** (12 m/s) along the swing direction, the only non-player foe that shoves. Slow + tanky
+  (`MoveSpeed` 2.2, `MaxHealth` 220, `AttackDamage` 18, `AttackCooldown` 1.6). Headless-verified
+  (`TestOrcBrute`): Enemy-team, slower + tankier than a Skeleton, and its club punts a parked victim with a
+  flat ~12 m/s shove (every other foe's hit imparts none). *Not yet wired into the brawl wave table — Chunk
+  93 authors the full ramp.*
 - [ ] **Chunk 90 — Necromancer (summoner, tier 4).** Fragile ranged caster: bolt on cooldown + periodically
   **summons ~2 Zombies** adjacent to itself (capped so it can't runaway-flood). `Necromancer.cs` + scene
   (hooded, staff). Headless-test the summon cadence + cap.

@@ -1,0 +1,65 @@
+[gd_scene load_steps=11 format=3 uid="uid://dorcb0eggs0001"]
+
+[ext_resource type="Script" path="res://scripts/OrcBrute.cs" id="1_orc"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_orc"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.2, 0.34, 0.16, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_orc"]
+radius = 0.55
+height = 2.1
+
+[sub_resource type="BoxMesh" id="BoxMesh_arm"]
+size = Vector3(0.22, 0.22, 0.6)
+
+[sub_resource type="StandardMaterial3D" id="Mat_skin"]
+albedo_color = Color(0.18, 0.3, 0.14, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="Cyl_haft"]
+top_radius = 0.09
+bottom_radius = 0.09
+height = 1.1
+
+[sub_resource type="StandardMaterial3D" id="Mat_wood"]
+albedo_color = Color(0.36, 0.24, 0.13, 1)
+roughness = 0.95
+
+[sub_resource type="BoxMesh" id="BoxMesh_head"]
+size = Vector3(0.34, 0.34, 0.42)
+
+[node name="OrcBrute" type="CharacterBody3D"]
+script = ExtResource("1_orc")
+MoveSpeed = 2.2
+AttackRange = 1.9
+AttackDamage = 18.0
+AttackCooldown = 1.6
+MaxHealth = 220.0
+ClubKnockback = 12.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_orc")
+script = ExtResource("2_egg")
+Width = 1.3
+Height = 2.1
+
+[node name="ArmR" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0.2, -0.45)
+mesh = SubResource("BoxMesh_arm")
+surface_material_override/0 = SubResource("Mat_skin")
+
+[node name="ClubHaft" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0.55, 0.35, -0.95)
+mesh = SubResource("Cyl_haft")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="ClubHead" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.55, 0.35, -1.5)
+mesh = SubResource("BoxMesh_head")
+surface_material_override/0 = SubResource("Mat_wood")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_orc")

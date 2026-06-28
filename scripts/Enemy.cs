@@ -56,10 +56,9 @@ public partial class Enemy : Unit
 			}
 			else if (_attackTimer <= 0f)
 			{
-				// In range: melee on cooldown. No knockback for skeleton hits.
-				target.TakeDamage(AttackDamage);
+				// In range: melee on cooldown.
+				MeleeStrike(target);
 				_attackTimer = AttackCooldown;
-				GD.Print($"[Enemy] {Name} hit {target.Name} for {AttackDamage}");
 			}
 		}
 		else if (MarchMode)
@@ -75,6 +74,15 @@ public partial class Enemy : Unit
 		Velocity = ComposeMovement(chase * OwnMovementScale + KnockbackVelocity, dt);
 		MoveAndSlide();
 		ResolveKnockbackBounce();   // pinball: pass on / bounce a real shove off whatever we rammed
+	}
+
+	// The actual melee hit, once in range and off cooldown. Default = plain damage, no knockback
+	// (the skeleton rule — only the player's sword shoves). Virtual so a heavy archetype like the
+	// Orc Brute (Chunk 89) can override it to club its victim back. Kept byte-identical for the base.
+	protected virtual void MeleeStrike(Unit target)
+	{
+		target.TakeDamage(AttackDamage);
+		GD.Print($"[Enemy] {Name} hit {target.Name} for {AttackDamage}");
 	}
 
 	// Smoothly rotate to face a world point on the flat plane (forward is -Z).

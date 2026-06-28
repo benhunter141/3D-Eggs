@@ -54,6 +54,7 @@ public partial class UnitTest : Node3D
 		bool slime = await TestSlime();
 		bool slinger = await TestSlinger();
 		bool legionary = await TestLegionary();
+		bool orcBrute = await TestOrcBrute();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -80,7 +81,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1738,6 +1739,62 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: legionary soaks frontal hits, takes flank/rear in full, and a Legion spawns as a tight block"
 			: $"FAIL: enemyTeam={enemyTeam}, blocksFront={blocksFront}, exposesRear={exposesRear}, frontShielded={frontShielded}, noKnockback={noKnockback}, blockSpawn={blockSpawn}");
+		return pass;
+	}
+
+	// Chunk 89 (M17): the Orc Brute is the tier-4 heavy bruiser — the ONLY non-player foe that shoves.
+	// Confirms it's a slow, high-HP Enemy and that its club melee lands real knockback (routed through
+	// AddKnockback) along the swing direction, unlike every other foe whose hits never shove. Driven
+	// through physics: a Player-team victim parked inside the brute's reach gets clubbed and punted.
+	private async Task<bool> TestOrcBrute()
+	{
+		GD.Print("=== UnitTest: Orc Brute heavy club knockback (M17, Chunk 89) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var brute = GD.Load<PackedScene>("res://scenes/OrcBrute.tscn").Instantiate<OrcBrute>();
+		AddChild(brute);
+		brute.GlobalPosition = new Vector3(0f, 0f, 1.2f);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Reference: a base Enemy (Skeleton) for the slow + tanky comparison.
+		var skel = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(skel);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = brute.Team == Unit.TeamId.Enemy;
+		bool slower = brute.MoveSpeed < skel.MoveSpeed;
+		bool tankier = brute.MaxHealth > skel.MaxHealth;
+
+		// A Player-team victim parked just in front of the brute (inside AttackRange): the brute should
+		// face it, club it, and PUNT it. The shove points the way the club swings (brute -> victim = -Z).
+		var victim = new Unit { Team = Unit.TeamId.Player, MaxHealth = 200f };
+		AddChild(victim);
+		victim.GlobalPosition = Vector3.Zero;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Step physics frames until the brute strikes (or give up).
+		float startHp = victim.Health;
+		int frames = 0;
+		while (victim.Health >= startHp && frames < 30)
+		{
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+			frames++;
+		}
+		bool damaged = victim.Health < startHp;
+		Vector3 kb = victim.CurrentKnockback;
+		bool shoved = kb.LengthSquared() > 1f;          // a real club shove, not a stray nudge
+		bool flat = Mathf.IsZeroApprox(kb.Y);
+
+		GD.Print($"brute: team={brute.Team}, move={brute.MoveSpeed} (skel {skel.MoveSpeed}), hp={brute.MaxHealth} (skel {skel.MaxHealth}), clubKB={brute.ClubKnockback}");
+		GD.Print($"victim after {frames} frames: hp={victim.Health}/{startHp}, knockback={kb} len={kb.Length():0.00}");
+
+		bool pass = enemyTeam && slower && tankier && damaged && shoved && flat;
+		GD.Print(pass
+			? "PASS: orc brute is a slow, tanky Enemy whose club lands real flat knockback"
+			: $"FAIL: enemyTeam={enemyTeam}, slower={slower}, tankier={tankier}, damaged={damaged}, shoved={shoved}, flat={flat}");
 		return pass;
 	}
 
