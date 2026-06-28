@@ -1,0 +1,71 @@
+[gd_scene load_steps=12 format=3 uid="uid://dlegi0eggs0001"]
+
+[ext_resource type="Script" path="res://scripts/Legionary.cs" id="1_legion"]
+[ext_resource type="Script" path="res://scripts/EggMesh.cs" id="2_egg"]
+[ext_resource type="Shader" path="res://materials/toon.gdshader" id="3_toon"]
+
+[sub_resource type="ShaderMaterial" id="Mat_legion"]
+shader = ExtResource("3_toon")
+shader_parameter/base_color = Color(0.7, 0.18, 0.16, 1)
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_legion"]
+radius = 0.4
+height = 1.8
+
+[sub_resource type="BoxMesh" id="BoxMesh_shield"]
+size = Vector3(0.1, 1.05, 0.62)
+
+[sub_resource type="StandardMaterial3D" id="Mat_shield"]
+albedo_color = Color(0.66, 0.14, 0.12, 1)
+roughness = 0.85
+
+[sub_resource type="StandardMaterial3D" id="Mat_steel"]
+albedo_color = Color(0.74, 0.76, 0.8, 1)
+metallic = 0.7
+roughness = 0.32
+
+[sub_resource type="BoxMesh" id="BoxMesh_boss"]
+size = Vector3(0.13, 0.22, 0.22)
+
+[sub_resource type="BoxMesh" id="BoxMesh_gladius"]
+size = Vector3(0.07, 0.07, 0.55)
+
+[sub_resource type="BoxMesh" id="BoxMesh_helm"]
+size = Vector3(0.5, 0.16, 0.5)
+
+[node name="Legionary" type="CharacterBody3D"]
+script = ExtResource("1_legion")
+MoveSpeed = 3.0
+AttackRange = 1.6
+AttackDamage = 10.0
+AttackCooldown = 1.1
+MaxHealth = 130.0
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+material_override = SubResource("Mat_legion")
+script = ExtResource("2_egg")
+Width = 1.0
+Height = 1.7
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_legion")
+
+[node name="Helm" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.62, 0)
+mesh = SubResource("BoxMesh_helm")
+surface_material_override/0 = SubResource("Mat_steel")
+
+[node name="Shield" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.42, 0.0, -0.48)
+mesh = SubResource("BoxMesh_shield")
+surface_material_override/0 = SubResource("Mat_shield")
+
+[node name="ShieldBoss" type="MeshInstance3D" parent="Shield"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.08, 0.0, 0.0)
+mesh = SubResource("BoxMesh_boss")
+surface_material_override/0 = SubResource("Mat_steel")
+
+[node name="Gladius" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 0.1, -0.5)
+mesh = SubResource("BoxMesh_gladius")
+surface_material_override/0 = SubResource("Mat_steel")

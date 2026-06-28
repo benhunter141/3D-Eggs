@@ -394,7 +394,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       blade melee; tier-2 wave row added (`TestGoblin`). Chunk 87 done: `Slinger` (tier-3 ranged kiter) — a tan
       toon egg whirling a sling; holds an 8–12 m band and lobs a reused `Stone` (no knockback) on cooldown,
       fleeing when a foe closes inside `FleeRange`; ballistic arc when `Grounded`, flat skim otherwise.
-      Headless-verified (`TestSlinger`).
+      Headless-verified (`TestSlinger`). Chunk 88 done: `Legionary` (tier-3 shielded infantry) — a red+steel egg
+      with a scutum + gladius; its frontal scutum SOAKS damage (`TakeDamage` reduces any hit inside the 200° shield
+      arc by `ShieldReduction` 0.6 via `BlocksFrontal`, flank/rear hits land full), tanky-but-slow (MoveSpeed 3,
+      130 HP), and a Legion marches in as a tight `Formation.Block` (wave 5 = 8). Headless-verified (`TestLegionary`).
 - [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
@@ -681,10 +684,14 @@ club, many zombies, many dogs, a Roman Legion.
   skim otherwise), and FLEES straight away when a foe closes inside `FleeRange` (4 m). `Team = Enemy`; its slung
   stones deal damage with NO knockback. Headless-verified (`TestSlinger`): holds its band + lands a 9-dmg stone
   (no shove), and retreats when charged.
-- [ ] **Chunk 88 — Roman Legionary + Legion block (tier 3).** `Legionary.cs` + scene: shield-front **damage
-  reduction**, marches as a cohesive **block formation** (WaveManager `formation = block`: tight rows, shared
-  facing) instead of an even spread. *Look:* scutum + gladius, red/steel. Headless-test the damage-reduction
-  + block spawn.
+- [x] **Chunk 88 — Roman Legionary + Legion block (tier 3).** `Legionary.cs` (an `Enemy` subclass) + `Legionary.tscn`
+  — a red+steel egg with a scutum shield + gladius. Its frontal **scutum soaks damage**: `TakeDamage` reduces
+  any hit landing inside the shield's frontal arc (`ShieldArcDegrees` 200°, `ShieldReduction` 0.6) via
+  `BlocksFrontal(hitDirection)` (attacker direction = −hitDirection vs facing −Z; direction-less melee = treated
+  frontal), while flank/rear hits bite full — so a Legion must be FLANKED, not bulldozed. Tanky-but-slow stats
+  (`MoveSpeed` 3, `MaxHealth` 130). Marches as a cohesive **Block** (wave 5 = `Formation.Block` of 8 Legionaries
+  in `CardBrawl.BuildWaveTable`), not a spread. Headless-verified (`TestLegionary`): frontal hit reduced
+  (114 vs 90 HP), rear full, no knockback, and 8 spawn as a tight block (±3 m, vs the spread's ±17 m).
 - [ ] **Chunk 89 — Orc Brute (heavy club, tier 4).** Slow, high HP; melee hit routes **knockback** through
   `Unit.AddKnockback` (the only non-player foe that shoves). `OrcBrute.cs` + scene with a club mesh.
   Headless-test the knockback-on-hit.

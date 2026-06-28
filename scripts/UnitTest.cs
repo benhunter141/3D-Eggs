@@ -53,6 +53,7 @@ public partial class UnitTest : Node3D
 		bool goblin = await TestGoblin();
 		bool slime = await TestSlime();
 		bool slinger = await TestSlinger();
+		bool legionary = await TestLegionary();
 		bool squadGrid = TestSquadGrid();
 		bool mount = await TestMount();
 		bool chocobo = await TestChocobo();
@@ -79,7 +80,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -1674,6 +1675,69 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: slinger holds its band and slings stones (no knockback), and flees when charged"
 			: $"FAIL: enemyTeam={enemyTeam}, stayedInBand={stayedInBand}, slungAndHit={slungAndHit}, noKnockback={noKnockback}, retreated={retreated}");
+		return pass;
+	}
+
+	// Chunk 88 (M17): the Roman Legionary is a tier-3 shielded foe — its frontal scutum soaks part of a
+	// head-on blow (ShieldReduction) while flank/rear hits bite full, and a Legion spawns as a cohesive
+	// Block formation (not a loose Spread). Enemy-team, melee, no knockback (the base Enemy contract).
+	private async Task<bool> TestLegionary()
+	{
+		GD.Print("=== UnitTest: Roman Legionary shield + Legion block (M17, Chunk 88) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Two identical legionaries facing −Z (default): take equal raw damage, one FROM THE FRONT
+		// (attacker at −Z → hitDirection +Z) and one FROM THE REAR (attacker at +Z → hitDirection −Z).
+		var front = GD.Load<PackedScene>("res://scenes/Legionary.tscn").Instantiate<Legionary>();
+		AddChild(front);
+		var rear = GD.Load<PackedScene>("res://scenes/Legionary.tscn").Instantiate<Legionary>();
+		AddChild(rear);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool enemyTeam = front.Team == Unit.TeamId.Enemy;
+		bool blocksFront = front.BlocksFrontal(Vector3.Back);    // attacker in front → soaked
+		bool exposesRear = !front.BlocksFrontal(Vector3.Forward); // attacker behind → full bite
+
+		const float raw = 40f;
+		front.TakeDamage(raw, Vector3.Back);     // frontal: reduced by the scutum
+		rear.TakeDamage(raw, Vector3.Forward);   // rear: full
+		bool frontShielded = front.Health > rear.Health;
+		bool noKnockback = front.CurrentKnockback.LengthSquared() < 0.0001f
+			&& rear.CurrentKnockback.LengthSquared() < 0.0001f;
+		GD.Print($"shield: frontHP={front.Health}, rearHP={rear.Health} (reduction={front.ShieldReduction}), enemyTeam={enemyTeam}");
+
+		// Legion BLOCK spawn: a WaveManager row of 8 legionaries in Block formation spawns the full mix
+		// as Enemy-team Legionaries clustered tight (within the block grid), not a wide spread.
+		var wm = new WaveManager { BlockGap = 2.0f, PerRow = 4 };
+		AddChild(wm);
+		wm.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Block)
+			.Add(GD.Load<PackedScene>("res://scenes/Legionary.tscn"), 8));
+		var parent = new Node3D();
+		AddChild(parent);
+		int spawned = wm.SpawnWave(1, parent, Vector3.Zero);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		int legionaries = 0;
+		float maxAbsX = 0f;
+		foreach (Node n in parent.GetChildren())
+		{
+			if (n is Legionary l && l.Team == Unit.TeamId.Enemy)
+			{
+				legionaries++;
+				maxAbsX = Mathf.Max(maxAbsX, Mathf.Abs(l.GlobalPosition.X));
+			}
+		}
+		// 8 in a 4-wide Block at gap 2 spans ≈ ±3 m — far tighter than a Spread line's full SpawnSpread.
+		bool blockSpawn = spawned == 8 && legionaries == 8 && maxAbsX < wm.SpawnSpread * 0.5f;
+		GD.Print($"block: spawned={spawned}, legionaries={legionaries}, maxAbsX={maxAbsX:0.00} m (spread half {wm.SpawnSpread * 0.5f})");
+
+		bool pass = enemyTeam && blocksFront && exposesRear && frontShielded && noKnockback && blockSpawn;
+		GD.Print(pass
+			? "PASS: legionary soaks frontal hits, takes flank/rear in full, and a Legion spawns as a tight block"
+			: $"FAIL: enemyTeam={enemyTeam}, blocksFront={blocksFront}, exposesRear={exposesRear}, frontShielded={frontShielded}, noKnockback={noKnockback}, blockSpawn={blockSpawn}");
 		return pass;
 	}
 

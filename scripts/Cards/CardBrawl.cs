@@ -430,6 +430,7 @@ public partial class CardBrawl : Node3D
 		var dog = GD.Load<PackedScene>("res://scenes/Dog.tscn");
 		var skeleton = GD.Load<PackedScene>("res://scenes/Skeleton.tscn");
 		var goblin = GD.Load<PackedScene>("res://scenes/Goblin.tscn");
+		var legionary = GD.Load<PackedScene>("res://scenes/Legionary.tscn");
 
 		_waves.WaveTable.Clear();
 		// Wave 1 — a pure slow zombie horde: the gentle opener.
@@ -440,6 +441,9 @@ public partial class CardBrawl : Node3D
 		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(zombie, 6).Add(dog, 4).Add(skeleton, 3));
 		// Wave 4 — tier-2 arrives: darting Goblin Cutters with crude blades flank the horde, Skeletons anchoring.
 		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Spread).Add(goblin, 4).Add(skeleton, 4).Add(zombie, 4));
+		// Wave 5 — tier 3: a Roman LEGION marches in as a tight shield-block (Formation.Block). Their
+		// frontal scutums soak head-on blows, so they must be flanked, not bulldozed.
+		_waves.WaveTable.Add(new WaveManager.WaveComposition(WaveManager.Formation.Block).Add(legionary, 8));
 	}
 
 	private void SpawnPreviewWave()
