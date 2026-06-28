@@ -422,7 +422,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       finale via the clamp). Headless-verified (`TestBestiarySchedule`: no empty waves, solo boss on cadence,
       escalating pressure). **All M17 chunks (83–93) built; brawl balance + visual feel-check pending (needs a
       gamepad for P2).**
-- [ ] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
+- [~] **M18 — Weapon-specific attack motions ⭐ ACTIVE:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
       reads as a distinct move: **spear/pike = thrust** (keep today's poke), **sword = horizontal sweep arc**
@@ -432,7 +432,10 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       animates the weapon transform (pivot rotation + offset) AND shapes the active hitbox region (line vs arc)
       so sweeps actually hit multiple foes in their arc. Player-first; optionally extend the same style to
       ally/enemy weapon strikes. Keep it cheap (940MX) and headless-test the per-style hit logic (which foes a
-      sweep vs a thrust connects with). Builds on the M9 data-driven weapon plumbing (Chunks 94–98).
+      sweep vs a thrust connects with). Builds on the M9 data-driven weapon plumbing (Chunks 94–98). Chunk 94
+      done: `AttackStyle` enum + per-weapon table column (all `Thrust`/`Jab`, byte-identical) + the `AnimateSwing`
+      style dispatcher in `Player.UpdateSwing` (`AnimateThrust` = the old slide verbatim); headless-tested
+      (`TestAttackStyle`). Sweep/Chop/Swing land in 95–97; hitbox shaping in 98.
 - [x] **M19 — Co-op Phalanx level ⭐:** a *local 2-player* set-piece battle — each captain leads
       **two rows of 5 long-pikemen** (a pike's visual length = egg-unit height × 3) plus **2 archers beside the
       captain**, every subordinate holding formation on its captain (the CoopStand slot mechanism); the enemy
@@ -789,12 +792,16 @@ per-style hit logic (which foes connect for a sweep vs a thrust vs a chop).
   multi-hit with **strong knockback** — the crowd-clearer.
 - **Punch — Quick Jab:** a short, fast version of the thrust (the basic egg's weak unarmed poke).
 
-- [ ] **Chunk 94 — Attack-style framework.** Add an `AttackStyle` enum (`Thrust | Sweep | Chop | Swing | Jab`)
-  to `WeaponProfile` + one column in the weapon table (every existing weapon = `Thrust`/`Jab` so behaviour is
-  byte-identical at first). Refactor `UpdateSwing` from a hard-coded thrust into a **style dispatcher**: a
-  shared timed window (extend/retract `t`) feeds a per-style routine that sets the weapon pivot's transform
-  (translation + rotation) and the hitbox pose. Implement `Thrust`/`Jab` here as the current slide so spear +
-  punch are unchanged. Headless-test that a thrust still connects exactly as before.
+- [x] **Chunk 94 — Attack-style framework.** Added an `AttackStyle` enum (`Thrust | Sweep | Chop | Swing | Jab`)
+  as a per-weapon column on the `WeaponProfile` table (spear/sword/axe/mace = `Thrust`, punch = `Jab`, so every
+  weapon is byte-identical for now) + a `CurrentAttackStyle` view. Refactored `Player.UpdateSwing`'s hard-coded
+  thrust into an `AnimateSwing` **style dispatcher** (a per-style routine that poses the weapon pivot); the
+  shared hit-poll stays unchanged, and `AnimateThrust` lifts the old slide verbatim so spear + punch are
+  identical — the default arm keeps the not-yet-built Sweep/Chop/Swing on the thrust until their chunks flip
+  them. Headless-verified (`TestAttackStyle`): the style table resolves per weapon and an AI-driven captain's
+  dispatched thrust still connects on a dummy (the captain is re-pinned each frame so the two capsules can't
+  climb/stack). Also hardened the timing-flaky `TestOrcBrute` (reference skeleton parked far off; full HP
+  captured up front + shove grabbed on the exact strike frame) so the new test's ordering shift can't tip it.
 - [ ] **Chunk 95 — Sword horizontal sweep.** Drive the sword pivot through a left→right yaw arc over the
   swing window (instead of sliding out), with the hitbox swept across the front so it can register
   **multiple** enemies in the arc (each hit once per swing via `_hitThisSwing`). Sword = `Sweep`. Headless-test
