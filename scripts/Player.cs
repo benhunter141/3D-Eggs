@@ -233,6 +233,9 @@ public partial class Player : Unit, ICardPlayer
 	[Export] public float ThrustExtendFrac = 0.4f;   // fraction of the duration spent jabbing out (rest is the retract)
 	[Export] public float SwordReturnLerp = 12.0f;   // how fast the weapon eases back to rest if interrupted
 
+	// --- Sweep feel (M18, Chunk 95) ---
+	[Export] public float SweepArcDegrees = 140.0f;  // sword: total left→right arc the blade fans across the front
+
 	// Active profile values, set by ApplyWeapon — the swing code reads only these.
 	private WeaponType _weapon;
 	private float _damage;
@@ -309,10 +312,10 @@ public partial class Player : Unit, ICardPlayer
 		// (missing ones are fine — GetNodeOrNull keeps a weapon usable even without its mesh).
 		_profiles = new Dictionary<WeaponType, WeaponProfile>
 		{
-			// The Style column (M18, Chunk 94) starts every weapon on Thrust/Jab so the swing is byte-identical;
-			// later chunks flip Sword→Sweep, Axe→Chop, Mace→Swing as each style routine lands.
+			// The Style column (M18): spear/pike stay Thrust; Sword now SWEEPS (Chunk 95). Axe→Chop, Mace→Swing
+			// land in Chunks 96–97 (still Thrust until then); punch = Jab. Thrust/Jab keep the byte-identical slide.
 			[WeaponType.Spear] = new WeaponProfile(SpearDamage, SpearKnockback, SpearReach, SpearThrustDistance, SpearSwingDuration, SpearSwingCooldown, AttackStyle.Thrust),
-			[WeaponType.Sword] = new WeaponProfile(SwordDamage, SwordKnockback, SwordReach, SwordThrustDistance, SwordSwingDuration, SwordSwingCooldown, AttackStyle.Thrust),
+			[WeaponType.Sword] = new WeaponProfile(SwordDamage, SwordKnockback, SwordReach, SwordThrustDistance, SwordSwingDuration, SwordSwingCooldown, AttackStyle.Sweep),
 			[WeaponType.Axe]   = new WeaponProfile(AxeDamage,   AxeKnockback,   AxeReach,   AxeThrustDistance,   AxeSwingDuration,   AxeSwingCooldown,   AttackStyle.Thrust),
 			[WeaponType.Mace]  = new WeaponProfile(MaceDamage,  MaceKnockback,  MaceReach,  MaceThrustDistance,  MaceSwingDuration,  MaceSwingCooldown,  AttackStyle.Thrust),
 			[WeaponType.Punch] = new WeaponProfile(PunchDamage, PunchKnockback, PunchReach, PunchThrustDistance, PunchSwingDuration, PunchSwingCooldown, AttackStyle.Jab),
@@ -928,10 +931,13 @@ public partial class Player : Unit, ICardPlayer
 
 		if (!_swinging)
 		{
-			// Idle / post-thrust: ease the pike back to its rest (fully retracted) pose.
+			// Idle / post-swing: ease the weapon back to its rest pose — fully retracted AND yawed
+			// back to straight-ahead, so a swept style (sword) returns from its arc. For a thrust
+			// weapon the yaw is always 0, so easing it toward 0 is a no-op (byte-identical).
 			float currentOffset = -_swordPivot.Position.Z;
 			float t2 = 1f - Mathf.Exp(-SwordReturnLerp * dt);
 			SetThrustOffset(Mathf.Lerp(currentOffset, 0f, t2));
+			SetPivotYaw(Mathf.Lerp(_swordPivot.Rotation.Y, 0f, t2));
 			return;
 		}
 
@@ -954,7 +960,7 @@ public partial class Player : Unit, ICardPlayer
 				// Strength scales weapon attack power (Chunk 36); Enrage briefly doubles it on top (M15).
 				float dmg = EffectiveAttackDamage;
 				unit.TakeDamage(dmg, hitDir, _knockback);      // sword shoves; spear deals no knockback
-				GD.Print($"[{_weapon}] {Name} thrust {unit.Name} for {dmg:0.0} (knockback {_knockback})");
+				GD.Print($"[{_weapon}] {Name} {_style} hit {unit.Name} for {dmg:0.0} (knockback {_knockback})");
 			}
 		}
 
@@ -988,9 +994,22 @@ public partial class Player : Unit, ICardPlayer
 	{
 		switch (_style)
 		{
-			// Sweep / Chop / Swing land in Chunks 95–97; until then they fall through to the thrust.
-			default: AnimateThrust(t); break;   // Thrust + Jab (and any unimplemented style)
+			case AttackStyle.Sweep: AnimateSweep(t); break;   // sword (Chunk 95)
+			// Chop / Swing land in Chunks 96–97; until then they fall through to the thrust.
+			default: AnimateThrust(t); break;                 // Thrust + Jab (and any unimplemented style)
 		}
+	}
+
+	// Sweep (sword, M18, Chunk 95): instead of jabbing straight out, the blade ARCS across the front
+	// from one side to the other over the swing window. The pivot sits at the egg's centre (offset 0) and
+	// yaws from +half to -half, so the forward hitbox box sweeps a fan in front of the captain — a single
+	// swing can catch MULTIPLE foes standing in the arc (each struck once via _hitThisSwing in the shared
+	// hit-poll). Wider arc = more foes; SweepArcDegrees tunes it.
+	private void AnimateSweep(float t)
+	{
+		SetThrustOffset(0f);                       // pivot at centre — the blade fans around us, not out
+		float half = Mathf.DegToRad(SweepArcDegrees) * 0.5f;
+		SetPivotYaw(Mathf.Lerp(half, -half, t));   // left -> right across the front
 	}
 
 	// Thrust / Jab: jab the weapon straight out along -Z over the first ThrustExtendFrac of the
@@ -1011,6 +1030,15 @@ public partial class Player : Unit, ICardPlayer
 		Vector3 pos = _swordPivot.Position;
 		pos.Z = -offset;
 		_swordPivot.Position = pos;
+	}
+
+	// Yaw the whole weapon pivot (mesh + hitbox) about the egg's up axis; 0 = pointing straight ahead
+	// (-Z). Used by the swept styles (sword sweep, M18) so the forward hitbox fans across the front.
+	private void SetPivotYaw(float yaw)
+	{
+		Vector3 r = _swordPivot.Rotation;
+		r.Y = yaw;
+		_swordPivot.Rotation = r;
 	}
 
 	private void SetHitboxActive(bool active)

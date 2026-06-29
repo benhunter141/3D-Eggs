@@ -435,7 +435,13 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       sweep vs a thrust connects with). Builds on the M9 data-driven weapon plumbing (Chunks 94–98). Chunk 94
       done: `AttackStyle` enum + per-weapon table column (all `Thrust`/`Jab`, byte-identical) + the `AnimateSwing`
       style dispatcher in `Player.UpdateSwing` (`AnimateThrust` = the old slide verbatim); headless-tested
-      (`TestAttackStyle`). Sweep/Chop/Swing land in 95–97; hitbox shaping in 98.
+      (`TestAttackStyle`). Chunk 95 done: Sword flipped to `AttackStyle.Sweep` — `AnimateSweep` sits the pivot at
+      the egg centre (offset 0) and yaws it from +half to −half (`SweepArcDegrees` 140) over the swing window via
+      a new `SetPivotYaw`, so the forward hitbox fans across the front and a single swing catches MULTIPLE foes in
+      the arc (each struck once via `_hitThisSwing`); the idle branch eases the yaw back to straight (no-op for
+      Thrust weapons, so spear/pike/punch stay byte-identical). Headless-tested (`TestSwordSweep`: both flankers
+      hit by one sweep; a straight thrust at a centre-aimed dummy leaves them untouched). Chop/Swing land in
+      96–97; hitbox shaping in 98.
 - [x] **M19 — Co-op Phalanx level ⭐:** a *local 2-player* set-piece battle — each captain leads
       **two rows of 5 long-pikemen** (a pike's visual length = egg-unit height × 3) plus **2 archers beside the
       captain**, every subordinate holding formation on its captain (the CoopStand slot mechanism); the enemy
@@ -802,7 +808,7 @@ per-style hit logic (which foes connect for a sweep vs a thrust vs a chop).
   dispatched thrust still connects on a dummy (the captain is re-pinned each frame so the two capsules can't
   climb/stack). Also hardened the timing-flaky `TestOrcBrute` (reference skeleton parked far off; full HP
   captured up front + shove grabbed on the exact strike frame) so the new test's ordering shift can't tip it.
-- [ ] **Chunk 95 — Sword horizontal sweep.** Drive the sword pivot through a left→right yaw arc over the
+- [x] **Chunk 95 — Sword horizontal sweep.** Drive the sword pivot through a left→right yaw arc over the
   swing window (instead of sliding out), with the hitbox swept across the front so it can register
   **multiple** enemies in the arc (each hit once per swing via `_hitThisSwing`). Sword = `Sweep`. Headless-test
   that two foes flanking the front both take one hit from a single sweep.

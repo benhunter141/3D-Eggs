@@ -41,6 +41,7 @@ public partial class UnitTest : Node3D
 		bool weaponSwap = await TestWeaponSwap();
 		bool archetypes = await TestWeaponArchetypes();
 		bool attackStyle = await TestAttackStyle();
+		bool swordSweep = await TestSwordSweep();
 		bool basicEgg = await TestBasicEgg();
 		bool fireball = await TestFireballAbility();
 		bool abilityBar = await TestAbilityBar();
@@ -86,7 +87,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && attackStyle && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && attackStyle && swordSweep && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -995,7 +996,7 @@ public partial class UnitTest : Node3D
 		var wantStyle = new System.Collections.Generic.Dictionary<Player.WeaponType, Player.AttackStyle>
 		{
 			[Player.WeaponType.Spear] = Player.AttackStyle.Thrust,
-			[Player.WeaponType.Sword] = Player.AttackStyle.Thrust,
+			[Player.WeaponType.Sword] = Player.AttackStyle.Sweep,   // flipped to Sweep in Chunk 95
 			[Player.WeaponType.Axe]   = Player.AttackStyle.Thrust,
 			[Player.WeaponType.Mace]  = Player.AttackStyle.Thrust,
 			[Player.WeaponType.Punch] = Player.AttackStyle.Jab,
@@ -1050,6 +1051,81 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: style table resolves per weapon and a dispatched thrust still connects"
 			: $"FAIL: stylesOk={stylesOk}, connected={connected}");
+		return pass;
+	}
+
+	// Chunk 95 (M18): the sword's horizontal SWEEP. Two foes stand flanking the captain's front — far
+	// enough off-axis that a straight Thrust's narrow forward box misses BOTH. With the Sword (Sweep) the
+	// blade arcs across the front, so a single swing connects on both. We verify: (a) the Sword resolves to
+	// AttackStyle.Sweep; (b) a Spear (Thrust) leaves both flankers untouched; (c) the Sword sweep damages both.
+	private async Task<bool> TestSwordSweep()
+	{
+		GD.Print("=== UnitTest: sword horizontal sweep (M18, Chunk 95) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		cap.Control = Player.ControlScheme.Ai;   // synthetic move/aim/attack drives real swings
+		cap.Speed = 0f;                           // pinned — it aims + swings but can't walk
+		AddChild(cap);
+		cap.GlobalPosition = Vector3.Zero;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// Two dummies flanking the front (-Z), ~1.3 m out at ±~45°, well outside the 0.7-wide forward
+		// hitbox box (centred on -Z): a straight thrust pointed ahead can't reach them; the sweep's arc can.
+		Vector3 leftPos  = new Vector3(-0.9f, 0f, -0.9f);
+		Vector3 rightPos = new Vector3( 0.9f, 0f, -0.9f);
+
+		// --- (a) Spear THRUST: a CLOSER centre dummy holds the AI's aim straight ahead (it always targets
+		// the nearest foe), so the thrust pokes down -Z and the off-axis flankers fall outside the box. ---
+		cap.SetWeapon(Player.WeaponType.Spear);
+		Vector3 centrePos = new Vector3(0f, 0f, -0.8f);   // nearest -> the AI faces it (straight -Z)
+		var tc = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		var tl = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		var tr = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(tc); AddChild(tl); AddChild(tr);
+		tc.GlobalPosition = centrePos; tc.SetPhysicsProcess(false);
+		tl.GlobalPosition = leftPos;   tl.SetPhysicsProcess(false);
+		tr.GlobalPosition = rightPos;  tr.SetPhysicsProcess(false);
+		float tlHp0 = tl.MaxHealth, trHp0 = tr.MaxHealth;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		for (int i = 0; i < 60; i++)
+		{
+			cap.GlobalPosition = Vector3.Zero; cap.Rotation = Vector3.Zero;
+			tc.GlobalPosition = centrePos; tl.GlobalPosition = leftPos; tr.GlobalPosition = rightPos;
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		}
+		bool thrustMissedFlanks = tl.Health >= tlHp0 && tr.Health >= trHp0;
+		GD.Print($"  spear thrust (centre dummy aims it straight): L HP={tl.Health}/{tlHp0}, R HP={tr.Health}/{trHp0}, centre HP={tc.Health} (flanks untouched={thrustMissedFlanks})");
+		tc.QueueFree(); tl.QueueFree(); tr.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// --- (b) Sword SWEEP: the blade arcs across the front -> BOTH flankers take a hit. ---
+		cap.SetWeapon(Player.WeaponType.Sword);
+		bool swordIsSweep = cap.CurrentAttackStyle == Player.AttackStyle.Sweep;
+		var sl = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		var sr = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(sl); AddChild(sr);
+		sl.GlobalPosition = leftPos;  sl.SetPhysicsProcess(false);
+		sr.GlobalPosition = rightPos; sr.SetPhysicsProcess(false);
+		float slHp0 = sl.MaxHealth, srHp0 = sr.MaxHealth;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+		for (int i = 0; i < 90 && (sl.Health >= slHp0 || sr.Health >= srHp0); i++)
+		{
+			cap.GlobalPosition = Vector3.Zero; cap.Rotation = Vector3.Zero;
+			sl.GlobalPosition = leftPos; sr.GlobalPosition = rightPos;
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		}
+		bool sweptLeft = sl.Health < slHp0;
+		bool sweptRight = sr.Health < srHp0;
+		GD.Print($"  sword sweep: style={cap.CurrentAttackStyle}, L HP={sl.Health}/{slHp0} (hit={sweptLeft}), R HP={sr.Health}/{srHp0} (hit={sweptRight})");
+
+		bool pass = swordIsSweep && thrustMissedFlanks && sweptLeft && sweptRight;
+		GD.Print(pass
+			? "PASS: sword sweeps across the front and hits both flankers; the thrust misses them"
+			: $"FAIL: swordIsSweep={swordIsSweep}, thrustMissedFlanks={thrustMissedFlanks}, sweptLeft={sweptLeft}, sweptRight={sweptRight}");
 		return pass;
 	}
 
