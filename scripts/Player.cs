@@ -236,6 +236,11 @@ public partial class Player : Unit, ICardPlayer
 	// --- Sweep feel (M18, Chunk 95) ---
 	[Export] public float SweepArcDegrees = 140.0f;  // sword: total left→right arc the blade fans across the front
 
+	// --- Chop feel (M18, Chunk 96) ---
+	[Export] public float ChopRaiseFrac = 0.45f;     // axe: fraction of the window spent raising the axe overhead (rest = the chop down)
+	[Export] public float ChopRaiseDegrees = 75.0f;  // how far the axe head tilts UP/back at the top of the raise
+	[Export] public float ChopDipDegrees = 15.0f;    // how far past horizontal the chop follows through (down) at the end
+
 	// Active profile values, set by ApplyWeapon — the swing code reads only these.
 	private WeaponType _weapon;
 	private float _damage;
@@ -312,11 +317,11 @@ public partial class Player : Unit, ICardPlayer
 		// (missing ones are fine — GetNodeOrNull keeps a weapon usable even without its mesh).
 		_profiles = new Dictionary<WeaponType, WeaponProfile>
 		{
-			// The Style column (M18): spear/pike stay Thrust; Sword now SWEEPS (Chunk 95). Axe→Chop, Mace→Swing
-			// land in Chunks 96–97 (still Thrust until then); punch = Jab. Thrust/Jab keep the byte-identical slide.
+			// The Style column (M18): spear/pike stay Thrust; Sword SWEEPS (Chunk 95); Axe now CHOPS (Chunk 96).
+			// Mace→Swing lands in Chunk 97 (still Thrust until then); punch = Jab. Thrust/Jab keep the byte-identical slide.
 			[WeaponType.Spear] = new WeaponProfile(SpearDamage, SpearKnockback, SpearReach, SpearThrustDistance, SpearSwingDuration, SpearSwingCooldown, AttackStyle.Thrust),
 			[WeaponType.Sword] = new WeaponProfile(SwordDamage, SwordKnockback, SwordReach, SwordThrustDistance, SwordSwingDuration, SwordSwingCooldown, AttackStyle.Sweep),
-			[WeaponType.Axe]   = new WeaponProfile(AxeDamage,   AxeKnockback,   AxeReach,   AxeThrustDistance,   AxeSwingDuration,   AxeSwingCooldown,   AttackStyle.Thrust),
+			[WeaponType.Axe]   = new WeaponProfile(AxeDamage,   AxeKnockback,   AxeReach,   AxeThrustDistance,   AxeSwingDuration,   AxeSwingCooldown,   AttackStyle.Chop),
 			[WeaponType.Mace]  = new WeaponProfile(MaceDamage,  MaceKnockback,  MaceReach,  MaceThrustDistance,  MaceSwingDuration,  MaceSwingCooldown,  AttackStyle.Thrust),
 			[WeaponType.Punch] = new WeaponProfile(PunchDamage, PunchKnockback, PunchReach, PunchThrustDistance, PunchSwingDuration, PunchSwingCooldown, AttackStyle.Jab),
 		};
@@ -931,13 +936,15 @@ public partial class Player : Unit, ICardPlayer
 
 		if (!_swinging)
 		{
-			// Idle / post-swing: ease the weapon back to its rest pose — fully retracted AND yawed
-			// back to straight-ahead, so a swept style (sword) returns from its arc. For a thrust
-			// weapon the yaw is always 0, so easing it toward 0 is a no-op (byte-identical).
+			// Idle / post-swing: ease the weapon back to its rest pose — fully retracted AND rotated
+			// back to straight-ahead (yaw for a swept sword, pitch for a chopped axe), so any style
+			// returns from its arc. For a thrust weapon yaw + pitch are always 0, so easing them toward
+			// 0 is a no-op (byte-identical).
 			float currentOffset = -_swordPivot.Position.Z;
 			float t2 = 1f - Mathf.Exp(-SwordReturnLerp * dt);
 			SetThrustOffset(Mathf.Lerp(currentOffset, 0f, t2));
 			SetPivotYaw(Mathf.Lerp(_swordPivot.Rotation.Y, 0f, t2));
+			SetPivotPitch(Mathf.Lerp(_swordPivot.Rotation.X, 0f, t2));
 			return;
 		}
 
@@ -995,7 +1002,8 @@ public partial class Player : Unit, ICardPlayer
 		switch (_style)
 		{
 			case AttackStyle.Sweep: AnimateSweep(t); break;   // sword (Chunk 95)
-			// Chop / Swing land in Chunks 96–97; until then they fall through to the thrust.
+			case AttackStyle.Chop:  AnimateChop(t); break;    // axe (Chunk 96)
+			// Swing lands in Chunk 97; until then it falls through to the thrust.
 			default: AnimateThrust(t); break;                 // Thrust + Jab (and any unimplemented style)
 		}
 	}
@@ -1010,6 +1018,26 @@ public partial class Player : Unit, ICardPlayer
 		SetThrustOffset(0f);                       // pivot at centre — the blade fans around us, not out
 		float half = Mathf.DegToRad(SweepArcDegrees) * 0.5f;
 		SetPivotYaw(Mathf.Lerp(half, -half, t));   // left -> right across the front
+	}
+
+	// Chop (axe, M18, Chunk 96): a slow, heavy OVERHEAD swing. The pivot stays at the egg centre
+	// (offset 0) and PITCHES about the egg's right axis — raise the axe head up/back over the first
+	// ChopRaiseFrac of the window, then chop it down through horizontal (and a touch past, ChopDip) over
+	// the rest. The forward hitbox box rides the pitch, so it only overlaps a foe on the DOWNSTROKE as it
+	// sweeps through horizontal — and because the box is never widened sideways (unlike the sweep), the
+	// chop stays NARROW: a single committed hit straight ahead, not a fan. The axe's long SwingCooldown
+	// (the heavy-weapon tax) is preserved by its profile. (Thrust weapons never pitch, so SetPivotPitch is
+	// only ever non-zero for the axe.)
+	private void AnimateChop(float t)
+	{
+		SetThrustOffset(0f);                       // pivot at centre — the axe swings about us, not out
+		float raiseFrac = Mathf.Clamp(ChopRaiseFrac, 0.05f, 0.95f);
+		float raise = Mathf.DegToRad(ChopRaiseDegrees);
+		float dip = Mathf.DegToRad(ChopDipDegrees);
+		float pitch = t < raiseFrac
+			? Mathf.Lerp(0f, raise, t / raiseFrac)              // raise the head up/back
+			: Mathf.Lerp(raise, -dip, (t - raiseFrac) / (1f - raiseFrac)); // chop down through horizontal
+		SetPivotPitch(pitch);
 	}
 
 	// Thrust / Jab: jab the weapon straight out along -Z over the first ThrustExtendFrac of the
@@ -1038,6 +1066,16 @@ public partial class Player : Unit, ICardPlayer
 	{
 		Vector3 r = _swordPivot.Rotation;
 		r.Y = yaw;
+		_swordPivot.Rotation = r;
+	}
+
+	// Pitch the whole weapon pivot (mesh + hitbox) about the egg's right axis; 0 = level (pointing
+	// straight ahead, -Z), positive = head raised up/back. Used by the chop style (axe, M18) so the
+	// forward hitbox swings down through horizontal on the downstroke.
+	private void SetPivotPitch(float pitch)
+	{
+		Vector3 r = _swordPivot.Rotation;
+		r.X = pitch;
 		_swordPivot.Rotation = r;
 	}
 

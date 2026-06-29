@@ -42,6 +42,7 @@ public partial class UnitTest : Node3D
 		bool archetypes = await TestWeaponArchetypes();
 		bool attackStyle = await TestAttackStyle();
 		bool swordSweep = await TestSwordSweep();
+		bool axeChop = await TestAxeChop();
 		bool basicEgg = await TestBasicEgg();
 		bool fireball = await TestFireballAbility();
 		bool abilityBar = await TestAbilityBar();
@@ -87,7 +88,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && attackStyle && swordSweep && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && attackStyle && swordSweep && axeChop && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -997,7 +998,7 @@ public partial class UnitTest : Node3D
 		{
 			[Player.WeaponType.Spear] = Player.AttackStyle.Thrust,
 			[Player.WeaponType.Sword] = Player.AttackStyle.Sweep,   // flipped to Sweep in Chunk 95
-			[Player.WeaponType.Axe]   = Player.AttackStyle.Thrust,
+			[Player.WeaponType.Axe]   = Player.AttackStyle.Chop,    // flipped to Chop in Chunk 96
 			[Player.WeaponType.Mace]  = Player.AttackStyle.Thrust,
 			[Player.WeaponType.Punch] = Player.AttackStyle.Jab,
 		};
@@ -1126,6 +1127,63 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: sword sweeps across the front and hits both flankers; the thrust misses them"
 			: $"FAIL: swordIsSweep={swordIsSweep}, thrustMissedFlanks={thrustMissedFlanks}, sweptLeft={sweptLeft}, sweptRight={sweptRight}");
+		return pass;
+	}
+
+	// Chunk 96 (M18): the axe's overhead CHOP. The chop is a heavy top-down swing that should land a
+	// single committed hit straight ahead and stay NARROW — unlike the sword sweep, off-axis flankers
+	// must NOT be caught. We verify: (a) the Axe resolves to AttackStyle.Chop; (b) a chop damages a foe
+	// directly in front; (c) the same two flankers the sweep hits are left untouched by the chop.
+	private async Task<bool> TestAxeChop()
+	{
+		GD.Print("=== UnitTest: axe overhead chop (M18, Chunk 96) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		cap.Control = Player.ControlScheme.Ai;   // synthetic move/aim/attack drives real swings
+		cap.Speed = 0f;                           // pinned — it aims + chops but can't walk
+		AddChild(cap);
+		cap.GlobalPosition = Vector3.Zero;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		cap.SetWeapon(Player.WeaponType.Axe);
+		bool axeIsChop = cap.CurrentAttackStyle == Player.AttackStyle.Chop;
+
+		// A centre dummy directly ahead (-Z) holds the AI's aim straight, plus the two ±0.9 flankers the
+		// sweep catches. The chop's narrow forward box should hit the centre and MISS both flankers.
+		Vector3 centrePos = new Vector3(0f, 0f, -0.8f);
+		Vector3 leftPos   = new Vector3(-0.9f, 0f, -0.9f);
+		Vector3 rightPos  = new Vector3( 0.9f, 0f, -0.9f);
+		var tc = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		var tl = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		var tr = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(tc); AddChild(tl); AddChild(tr);
+		tc.GlobalPosition = centrePos; tc.SetPhysicsProcess(false);
+		tl.GlobalPosition = leftPos;   tl.SetPhysicsProcess(false);
+		tr.GlobalPosition = rightPos;  tr.SetPhysicsProcess(false);
+		float tcHp0 = tc.MaxHealth, tlHp0 = tl.MaxHealth, trHp0 = tr.MaxHealth;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		// ~1.5 s of physics: several chop windows (the axe's long cooldown means few, but enough to land).
+		// Hard-pin the captain on-axis each frame so the chop comes down on the centre dummy head-on.
+		for (int i = 0; i < 90 && tc.Health >= tcHp0; i++)
+		{
+			cap.GlobalPosition = Vector3.Zero; cap.Rotation = Vector3.Zero;
+			tc.GlobalPosition = centrePos; tl.GlobalPosition = leftPos; tr.GlobalPosition = rightPos;
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		}
+
+		bool choppedCentre = tc.Health < tcHp0;
+		bool flanksUntouched = tl.Health >= tlHp0 && tr.Health >= trHp0;
+		GD.Print($"  axe chop: style={cap.CurrentAttackStyle}, centre HP={tc.Health}/{tcHp0} (hit={choppedCentre}), L HP={tl.Health}/{tlHp0}, R HP={tr.Health}/{trHp0} (flanks untouched={flanksUntouched})");
+
+		bool pass = axeIsChop && choppedCentre && flanksUntouched;
+		GD.Print(pass
+			? "PASS: the axe chops the foe ahead with a narrow single hit; the flankers are spared"
+			: $"FAIL: axeIsChop={axeIsChop}, choppedCentre={choppedCentre}, flanksUntouched={flanksUntouched}");
 		return pass;
 	}
 

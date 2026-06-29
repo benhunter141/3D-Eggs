@@ -440,8 +440,14 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       a new `SetPivotYaw`, so the forward hitbox fans across the front and a single swing catches MULTIPLE foes in
       the arc (each struck once via `_hitThisSwing`); the idle branch eases the yaw back to straight (no-op for
       Thrust weapons, so spear/pike/punch stay byte-identical). Headless-tested (`TestSwordSweep`: both flankers
-      hit by one sweep; a straight thrust at a centre-aimed dummy leaves them untouched). Chop/Swing land in
-      96–97; hitbox shaping in 98.
+      hit by one sweep; a straight thrust at a centre-aimed dummy leaves them untouched). Chunk 96 done: Axe
+      flipped to `AttackStyle.Chop` — `AnimateChop` keeps the pivot at the egg centre (offset 0) and PITCHES it
+      via a new `SetPivotPitch` (raise the head up/back to `ChopRaiseDegrees` 75° over `ChopRaiseFrac` 0.45, then
+      chop down through horizontal and a touch past, `ChopDipDegrees` 15°), so the forward hitbox only connects on
+      the DOWNSTROKE; the box is never widened, so the chop stays NARROW (one heavy committed hit) and the axe's
+      long cooldown is preserved. The idle branch eases pitch back to 0 too (no-op for thrust weapons). Headless-
+      tested (`TestAxeChop`: chops a dead-ahead foe for one big hit; the two flankers the sword sweep catches stay
+      untouched). Mace Swing lands in 97; hitbox shaping in 98.
 - [x] **M19 — Co-op Phalanx level ⭐:** a *local 2-player* set-piece battle — each captain leads
       **two rows of 5 long-pikemen** (a pike's visual length = egg-unit height × 3) plus **2 archers beside the
       captain**, every subordinate holding formation on its captain (the CoopStand slot mechanism); the enemy
@@ -812,9 +818,15 @@ per-style hit logic (which foes connect for a sweep vs a thrust vs a chop).
   swing window (instead of sliding out), with the hitbox swept across the front so it can register
   **multiple** enemies in the arc (each hit once per swing via `_hitThisSwing`). Sword = `Sweep`. Headless-test
   that two foes flanking the front both take one hit from a single sweep.
-- [ ] **Chunk 96 — Axe overhead chop.** Drive the axe pivot through a top-down pitch arc (raise → chop) over
-  a slower window; single heavy hit in a narrow forward zone, long cooldown preserved. Axe = `Chop`.
-  Headless-test the chop damage + that it stays single-target/narrow.
+- [x] **Chunk 96 — Axe overhead chop.** Axe flipped to `AttackStyle.Chop` — `AnimateChop` keeps the pivot at
+  the egg centre (offset 0) and PITCHES it about the egg's right axis via a new `SetPivotPitch`: raise the head
+  up/back over `ChopRaiseFrac` (0.45) of the window to `ChopRaiseDegrees` (75°), then chop down through
+  horizontal (and a touch past, `ChopDipDegrees` 15°) over the rest, so the forward hitbox only overlaps a foe
+  on the DOWNSTROKE. The box is never widened sideways (unlike the sweep), so the chop stays NARROW — one heavy
+  committed hit straight ahead — and the axe's long `SwingCooldown` (heavy-weapon tax) is preserved by its
+  profile. The idle branch now eases pitch back to 0 too (no-op for thrust weapons, which never pitch).
+  Headless-tested (`TestAxeChop`): the axe chops a foe dead-ahead for one big hit while the two ±0.9 flankers
+  the sword sweep catches are left untouched.
 - [ ] **Chunk 97 — Mace wide circular swing.** A broad round-house yaw arc (wider than the sword), multi-hit
   with the mace's strong knockback applied along each victim's hit direction. Mace = `Swing`. Headless-test
   that a clustered group all get shoved by one mace swing.
