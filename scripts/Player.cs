@@ -33,7 +33,7 @@ public partial class Player : Unit, ICardPlayer
 	//   • Thrust — straight jab out and back (spear/pike): today's poke.
 	//   • Sweep  — horizontal left→right arc across the front (sword): multi-hit.   [Chunk 95]
 	//   • Chop   — slow overhead top-down swing (axe): one big committed hit.         [Chunk 96]
-	//   • Swing  — wide circular round-house (mace): broad multi-hit + strong shove.  [Chunk 97]
+	//   • Swing  — wide circular round-house (mace): broad multi-hit + strong shove.  [Chunk 97 — done]
 	//   • Jab    — short fast thrust (unarmed punch): the basic egg's weak poke.
 	public enum AttackStyle { Thrust, Sweep, Chop, Swing, Jab }
 
@@ -236,6 +236,18 @@ public partial class Player : Unit, ICardPlayer
 	// --- Sweep feel (M18, Chunk 95) ---
 	[Export] public float SweepArcDegrees = 140.0f;  // sword: total left→right arc the blade fans across the front
 
+	// --- Swing feel (M18, Chunk 97) ---
+	[Export] public float SwingArcDegrees = 250.0f;  // mace: total round-house arc — WIDER than the sword sweep, sweeping nearly all the way around
+
+	// --- Hitbox shaping (M18, Chunk 98) ---
+	// The active hitbox region should match the attack STYLE, not be one fixed box for every weapon. A
+	// thrust/chop is a narrow forward LINE (you poke/chop straight ahead); a sweep/swing is a broad swept
+	// ARC, so its box is widened to a fan that covers the cluster the blade arcs through — so multi-hit
+	// reads fairly instead of slipping between the per-frame angular steps. The box's forward length still
+	// follows weapon reach; only its WIDTH (the egg's X) is shaped here, set in ApplyWeapon from the style.
+	[Export] public float ThrustHitboxWidth = 0.7f;  // narrow forward line for Thrust / Chop / Jab (the scene's base width)
+	[Export] public float SweptHitboxWidth  = 1.8f;   // wide fan for Sweep / Swing so the arc connects across a cluster
+
 	// --- Chop feel (M18, Chunk 96) ---
 	[Export] public float ChopRaiseFrac = 0.45f;     // axe: fraction of the window spent raising the axe overhead (rest = the chop down)
 	[Export] public float ChopRaiseDegrees = 75.0f;  // how far the axe head tilts UP/back at the top of the raise
@@ -266,6 +278,10 @@ public partial class Player : Unit, ICardPlayer
 	public AttackStyle CurrentAttackStyle => _style;                    // how the active weapon swings (M18)
 	public float EffectiveReach => _reach + _thrustDistance;            // how far the tip lands at full lunge
 	public float HitboxLength => _hitboxShape?.Shape is BoxShape3D b ? b.Size.Z : 0f;
+	public float HitboxWidth => _hitboxShape?.Shape is BoxShape3D b ? b.Size.X : 0f;   // shaped per style (M18, Chunk 98)
+	// A swept style (sword sweep / mace round-house) arcs the box across the front, so it gets the WIDE fan
+	// hitbox; a thrust/chop/jab pokes straight ahead, so it keeps the narrow forward line.
+	public static bool IsSweptStyle(AttackStyle s) => s == AttackStyle.Sweep || s == AttackStyle.Swing;
 	public static int WeaponCount => System.Enum.GetValues<WeaponType>().Length;
 	// How many weapons the Q-swap cycles through — every WeaponType EXCEPT the unarmed Punch (the
 	// basic-egg loadout, M15), which is the LAST enum value and only ever set via EquipWeapon/StartUnarmed.
@@ -317,12 +333,12 @@ public partial class Player : Unit, ICardPlayer
 		// (missing ones are fine — GetNodeOrNull keeps a weapon usable even without its mesh).
 		_profiles = new Dictionary<WeaponType, WeaponProfile>
 		{
-			// The Style column (M18): spear/pike stay Thrust; Sword SWEEPS (Chunk 95); Axe now CHOPS (Chunk 96).
-			// Mace→Swing lands in Chunk 97 (still Thrust until then); punch = Jab. Thrust/Jab keep the byte-identical slide.
+			// The Style column (M18): spear/pike stay Thrust; Sword SWEEPS (Chunk 95); Axe CHOPS (Chunk 96);
+			// Mace now SWINGS a wide round-house (Chunk 97); punch = Jab. Thrust/Jab keep the byte-identical slide.
 			[WeaponType.Spear] = new WeaponProfile(SpearDamage, SpearKnockback, SpearReach, SpearThrustDistance, SpearSwingDuration, SpearSwingCooldown, AttackStyle.Thrust),
 			[WeaponType.Sword] = new WeaponProfile(SwordDamage, SwordKnockback, SwordReach, SwordThrustDistance, SwordSwingDuration, SwordSwingCooldown, AttackStyle.Sweep),
 			[WeaponType.Axe]   = new WeaponProfile(AxeDamage,   AxeKnockback,   AxeReach,   AxeThrustDistance,   AxeSwingDuration,   AxeSwingCooldown,   AttackStyle.Chop),
-			[WeaponType.Mace]  = new WeaponProfile(MaceDamage,  MaceKnockback,  MaceReach,  MaceThrustDistance,  MaceSwingDuration,  MaceSwingCooldown,  AttackStyle.Thrust),
+			[WeaponType.Mace]  = new WeaponProfile(MaceDamage,  MaceKnockback,  MaceReach,  MaceThrustDistance,  MaceSwingDuration,  MaceSwingCooldown,  AttackStyle.Swing),
 			[WeaponType.Punch] = new WeaponProfile(PunchDamage, PunchKnockback, PunchReach, PunchThrustDistance, PunchSwingDuration, PunchSwingCooldown, AttackStyle.Jab),
 		};
 		_weaponMeshes = new Dictionary<WeaponType, Node3D>
@@ -834,11 +850,15 @@ public partial class Player : Unit, ICardPlayer
 			if (mesh != null)
 				mesh.Visible = type == weapon;
 
-		// Box spans 0..-_reach along the pivot's forward axis, so position it at -_reach/2.
+		// Shape the hitbox to the weapon (M18, Chunk 98): the box spans 0..-_reach along the pivot's forward
+		// axis (positioned at -_reach/2), and its WIDTH matches the style — a wide fan for a swept sword/mace
+		// so the arc connects across a cluster, a narrow forward line for a thrust/chop/jab poking straight
+		// ahead. The pivot's yaw (sweep/swing) then arcs this box across the front.
 		if (_hitboxShape?.Shape is BoxShape3D box)
 		{
 			Vector3 size = box.Size;
 			size.Z = _reach;
+			size.X = IsSweptStyle(_style) ? SweptHitboxWidth : ThrustHitboxWidth;
 			box.Size = size;
 
 			Vector3 pos = _hitboxShape.Position;
@@ -1001,10 +1021,10 @@ public partial class Player : Unit, ICardPlayer
 	{
 		switch (_style)
 		{
-			case AttackStyle.Sweep: AnimateSweep(t); break;   // sword (Chunk 95)
-			case AttackStyle.Chop:  AnimateChop(t); break;    // axe (Chunk 96)
-			// Swing lands in Chunk 97; until then it falls through to the thrust.
-			default: AnimateThrust(t); break;                 // Thrust + Jab (and any unimplemented style)
+			case AttackStyle.Sweep: AnimateSweep(t); break;       // sword (Chunk 95)
+			case AttackStyle.Chop:  AnimateChop(t); break;        // axe (Chunk 96)
+			case AttackStyle.Swing: AnimateWideSwing(t); break;   // mace (Chunk 97)
+			default: AnimateThrust(t); break;                     // Thrust + Jab
 		}
 	}
 
@@ -1018,6 +1038,19 @@ public partial class Player : Unit, ICardPlayer
 		SetThrustOffset(0f);                       // pivot at centre — the blade fans around us, not out
 		float half = Mathf.DegToRad(SweepArcDegrees) * 0.5f;
 		SetPivotYaw(Mathf.Lerp(half, -half, t));   // left -> right across the front
+	}
+
+	// Swing (mace, M18, Chunk 97): a wide circular ROUND-HOUSE. Like the sword sweep the pivot sits at the
+	// egg centre (offset 0) and yaws across the front, but the arc is much WIDER (SwingArcDegrees, ~250° vs
+	// the sword's 140°) so the mace sweeps nearly all the way around — a crowd-clearer that catches a whole
+	// cluster of foes in one swing, each shoved hard along its own hit direction (the mace's strong knockback,
+	// applied per-victim in the shared hit-poll). The Chunk-98 hitbox shaping widens the swept box so the
+	// broad arc connects fairly across the cluster.
+	private void AnimateWideSwing(float t)
+	{
+		SetThrustOffset(0f);                       // pivot at centre — the mace whirls around us, not out
+		float half = Mathf.DegToRad(SwingArcDegrees) * 0.5f;
+		SetPivotYaw(Mathf.Lerp(half, -half, t));   // sweep the broad arc across the front, left -> right
 	}
 
 	// Chop (axe, M18, Chunk 96): a slow, heavy OVERHEAD swing. The pivot stays at the egg centre

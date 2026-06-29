@@ -422,7 +422,7 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       finale via the clamp). Headless-verified (`TestBestiarySchedule`: no empty waves, solo boss on cadence,
       escalating pressure). **All M17 chunks (83–93) built; brawl balance + visual feel-check pending (needs a
       gamepad for P2).**
-- [~] **M18 — Weapon-specific attack motions ⭐ ACTIVE:** today **every** weapon attacks with the SAME motion — a
+- [~] **M18 — Weapon-specific attack motions ⭐:** today **every** weapon attacks with the SAME motion — a
       straight thrust (`Player.UpdateSwing` → `SetThrustOffset` slides the weapon out along -Z and back);
       only the numbers (reach/damage/knockback/timing) differ. Give each weapon its own **attack style** so it
       reads as a distinct move: **spear/pike = thrust** (keep today's poke), **sword = horizontal sweep arc**
@@ -447,7 +447,16 @@ M1–M5 feel great** — networking many physics bodies is the hardest part.
       the DOWNSTROKE; the box is never widened, so the chop stays NARROW (one heavy committed hit) and the axe's
       long cooldown is preserved. The idle branch eases pitch back to 0 too (no-op for thrust weapons). Headless-
       tested (`TestAxeChop`: chops a dead-ahead foe for one big hit; the two flankers the sword sweep catches stay
-      untouched). Mace Swing lands in 97; hitbox shaping in 98.
+      untouched). Chunk 97 done: Mace flipped to `AttackStyle.Swing` — `AnimateWideSwing` yaws the centred pivot
+      across the front like the sweep but through a much WIDER arc (`SwingArcDegrees` 250° vs 140°), a broad
+      round-house that catches a whole CLUSTER in one swing, each shoved hard by the mace's knockback (per-victim
+      in the shared hit-poll). Chunk 98 done: the active hitbox now matches the STYLE — `ApplyWeapon` shapes the
+      box WIDTH (narrow forward LINE `ThrustHitboxWidth` 0.7 for thrust/chop/jab; WIDE fan `SweptHitboxWidth` 1.8
+      for the swept sword/mace) while length still tracks reach; added `HitboxWidth`/`IsSweptStyle` views and the
+      `Hud` weapon line now shows the motion (`WEAPON: Mace (Swing)`). Headless-tested (`TestMaceSwing`,
+      `TestHitboxShaping`). **All M18 chunks (94–98) built; all five weapons attack distinctly (spear=Thrust,
+      sword=Sweep, axe=Chop, mace=Swing, punch=Jab). Feel-check by playing a level (e.g. Co-op Phalanx, P1
+      keyboard+mouse) and cycling weapons with Q.**
 - [x] **M19 — Co-op Phalanx level ⭐:** a *local 2-player* set-piece battle — each captain leads
       **two rows of 5 long-pikemen** (a pike's visual length = egg-unit height × 3) plus **2 archers beside the
       captain**, every subordinate holding formation on its captain (the CoopStand slot mechanism); the enemy
@@ -827,14 +836,20 @@ per-style hit logic (which foes connect for a sweep vs a thrust vs a chop).
   profile. The idle branch now eases pitch back to 0 too (no-op for thrust weapons, which never pitch).
   Headless-tested (`TestAxeChop`): the axe chops a foe dead-ahead for one big hit while the two ±0.9 flankers
   the sword sweep catches are left untouched.
-- [ ] **Chunk 97 — Mace wide circular swing.** A broad round-house yaw arc (wider than the sword), multi-hit
-  with the mace's strong knockback applied along each victim's hit direction. Mace = `Swing`. Headless-test
-  that a clustered group all get shoved by one mace swing.
-- [ ] **Chunk 98 — Hitbox shaping + polish.** Make the active hitbox region match each style (a forward line
-  for thrust/chop vs a swept arc for sweep/swing) rather than reusing the single thrust capsule, so hits read
-  fairly; tune per-style timing/arc widths and add the weapon-trail/transform read-outs the HUD shows. Confirm
-  all five weapons feel distinct and every headless hit test stays green. Feel-check by playing a level and
-  cycling weapons with Q.
+- [x] **Chunk 97 — Mace wide circular swing.** Mace flipped to `AttackStyle.Swing` — `AnimateWideSwing` sits the
+  pivot at the egg centre (offset 0) and yaws it across the front like the sword sweep but through a much WIDER
+  arc (`SwingArcDegrees` 250° vs the sword's 140°), so the mace whirls a broad round-house that catches a whole
+  CLUSTER of foes in one swing, each shoved hard along its own hit direction (the mace's strong knockback,
+  applied per-victim in the shared hit-poll). Headless-tested (`TestMaceSwing`: one swing damages all three
+  fanned foes AND knocks them back; the wide-fan hitbox is wider than the thrust box).
+- [x] **Chunk 98 — Hitbox shaping + polish.** The active hitbox now matches the attack STYLE rather than reusing
+  one fixed box: `ApplyWeapon` shapes the box WIDTH per style — a narrow forward LINE (`ThrustHitboxWidth` 0.7)
+  for thrust/chop/jab (poke straight ahead), a WIDE fan (`SweptHitboxWidth` 1.8) for the swept sword/mace so the
+  arc connects fairly across a cluster — while its forward length still tracks weapon reach. Added `HitboxWidth`
+  + `IsSweptStyle` views, and the `Hud` weapon line now shows the attack motion (`WEAPON: Mace (Swing)`) so a
+  swap reads as a new move. Headless-tested (`TestHitboxShaping`: thrust/chop narrow, sweep/swing wide, length
+  tracks reach). All five weapons now attack distinctly (spear=Thrust, sword=Sweep, axe=Chop, mace=Swing,
+  punch=Jab); every M18 hit test stays green. Feel-check by playing a level and cycling weapons with Q.
 
 **Build order 94 → 98. Chunk 94 (the style dispatcher) is load-bearing — every later chunk just adds one
 style routine + flips its weapon's `AttackStyle`. Keep `Thrust`/`Jab` byte-identical so spear/pike/punch are

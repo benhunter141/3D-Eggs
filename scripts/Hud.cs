@@ -33,7 +33,8 @@ public partial class Hud : CanvasLayer
 		{
 			_lastWeapon = w;
 			_haveWeapon = true;
-			_weaponLabel.Text = $"WEAPON:  {w}";
+			// Show the weapon AND its attack motion (M18) so a swap reads as a new move, not just a new name.
+			_weaponLabel.Text = $"WEAPON:  {w}  ({_player.CurrentAttackStyle})";
 		}
 	}
 }

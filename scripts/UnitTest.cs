@@ -43,6 +43,8 @@ public partial class UnitTest : Node3D
 		bool attackStyle = await TestAttackStyle();
 		bool swordSweep = await TestSwordSweep();
 		bool axeChop = await TestAxeChop();
+		bool maceSwing = await TestMaceSwing();
+		bool hitboxShaping = await TestHitboxShaping();
 		bool basicEgg = await TestBasicEgg();
 		bool fireball = await TestFireballAbility();
 		bool abilityBar = await TestAbilityBar();
@@ -88,7 +90,7 @@ public partial class UnitTest : Node3D
 		bool ballistic = await TestBallisticProjectiles();
 		bool terrainCamera = TestTerrainCamera();
 
-		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && attackStyle && swordSweep && axeChop && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
+		GD.Print(death && knock && hook && zoom && chase && formation && allyCombat && stones && pike && swordman && bowman && registry && bounce && bumper && weaponSwap && archetypes && attackStyle && swordSweep && axeChop && maceSwing && hitboxShaping && basicEgg && fireball && abilityBar && brawlBuffs && brawlHand && brawlWaves && brawlPreview && waveBestiary && zombie && warDog && goblin && slime && slinger && legionary && orcBrute && necromancer && centurion && troll && bestiarySchedule && squadGrid && mount && chocobo && capturePoint && cardDeck && cardPlay && roundLoop && unitStats && cardEnergy && runMap && relicsPotions && endzone && march && deckTuning && stickAim && squadOwnership && coopCamera && coopLose && allyCommands && squadCommands && terrainCollision && groundedMovement && spawnFormationHeight && ballistic && terrainCamera
 			? "=== ALL PASS ===" : "=== FAIL ===");
 		GetTree().Quit();
 	}
@@ -999,7 +1001,7 @@ public partial class UnitTest : Node3D
 			[Player.WeaponType.Spear] = Player.AttackStyle.Thrust,
 			[Player.WeaponType.Sword] = Player.AttackStyle.Sweep,   // flipped to Sweep in Chunk 95
 			[Player.WeaponType.Axe]   = Player.AttackStyle.Chop,    // flipped to Chop in Chunk 96
-			[Player.WeaponType.Mace]  = Player.AttackStyle.Thrust,
+			[Player.WeaponType.Mace]  = Player.AttackStyle.Swing,   // flipped to Swing in Chunk 97
 			[Player.WeaponType.Punch] = Player.AttackStyle.Jab,
 		};
 		bool stylesOk = true;
@@ -1184,6 +1186,105 @@ public partial class UnitTest : Node3D
 		GD.Print(pass
 			? "PASS: the axe chops the foe ahead with a narrow single hit; the flankers are spared"
 			: $"FAIL: axeIsChop={axeIsChop}, choppedCentre={choppedCentre}, flanksUntouched={flanksUntouched}");
+		return pass;
+	}
+
+	// Chunk 97 (M18): the mace's wide circular SWING. Three foes stand fanned across the captain's front
+	// (wider apart than the sword sweep's flankers). With the Mace (Swing) the round-house arcs a BROAD fan
+	// (~250° vs the sword's 140°) and SHOVES the whole cluster in one swing (the mace's strong knockback). We
+	// verify: (a) the Mace resolves to AttackStyle.Swing and gets the wide-fan hitbox; (b) one swing damages
+	// all three; (c) the hit foes are knocked back (only the mace, of the multi-hit styles, flings hard).
+	private async Task<bool> TestMaceSwing()
+	{
+		GD.Print("=== UnitTest: mace wide circular swing (M18, Chunk 97) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		cap.Control = Player.ControlScheme.Ai;   // synthetic move/aim/attack drives real swings
+		cap.Speed = 0f;                           // pinned — it aims + swings but can't walk
+		AddChild(cap);
+		cap.GlobalPosition = Vector3.Zero;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		cap.SetWeapon(Player.WeaponType.Mace);
+		bool maceIsSwing = cap.CurrentAttackStyle == Player.AttackStyle.Swing;
+		bool wideHitbox = cap.HitboxWidth > cap.ThrustHitboxWidth;   // swept style widens the box (Chunk 98)
+
+		// Three foes fanned across the front (-Z): a centre dummy (nearest -> holds the AI's aim straight)
+		// plus two flankers ~1 m out to either side. The broad 250° arc + wide fan box catches all three.
+		Vector3 centrePos = new Vector3(0f, 0f, -0.9f);
+		Vector3 leftPos   = new Vector3(-1.0f, 0f, -0.7f);
+		Vector3 rightPos  = new Vector3( 1.0f, 0f, -0.7f);
+		var mc = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		var ml = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		var mr = GD.Load<PackedScene>("res://scenes/Skeleton.tscn").Instantiate<Enemy>();
+		AddChild(mc); AddChild(ml); AddChild(mr);
+		mc.GlobalPosition = centrePos; mc.SetPhysicsProcess(false);
+		ml.GlobalPosition = leftPos;   ml.SetPhysicsProcess(false);
+		mr.GlobalPosition = rightPos;  mr.SetPhysicsProcess(false);
+		float mcHp0 = mc.MaxHealth, mlHp0 = ml.MaxHealth, mrHp0 = mr.MaxHealth;
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		for (int i = 0; i < 90 && (mc.Health >= mcHp0 || ml.Health >= mlHp0 || mr.Health >= mrHp0); i++)
+		{
+			cap.GlobalPosition = Vector3.Zero; cap.Rotation = Vector3.Zero;
+			mc.GlobalPosition = centrePos; ml.GlobalPosition = leftPos; mr.GlobalPosition = rightPos;
+			await ToSignal(GetTree(), SceneTree.SignalName.PhysicsFrame);
+		}
+
+		bool allHit = mc.Health < mcHp0 && ml.Health < mlHp0 && mr.Health < mrHp0;
+		// At least one hit foe carries a live shove (physics frozen on the dummies, so it doesn't decay).
+		bool shoved = mc.CurrentKnockback.Length() > 0.1f || ml.CurrentKnockback.Length() > 0.1f || mr.CurrentKnockback.Length() > 0.1f;
+		GD.Print($"  mace swing: style={cap.CurrentAttackStyle}, hitboxW={cap.HitboxWidth:0.00} (narrow {cap.ThrustHitboxWidth:0.00}), " +
+			$"C HP={mc.Health}/{mcHp0}, L HP={ml.Health}/{mlHp0}, R HP={mr.Health}/{mrHp0} (allHit={allHit}, shoved={shoved})");
+
+		bool pass = maceIsSwing && wideHitbox && allHit && shoved;
+		GD.Print(pass
+			? "PASS: the mace round-house arcs wide, hits the whole cluster, and shoves them"
+			: $"FAIL: maceIsSwing={maceIsSwing}, wideHitbox={wideHitbox}, allHit={allHit}, shoved={shoved}");
+		return pass;
+	}
+
+	// Chunk 98 (M18): per-style hitbox SHAPING. The active hitbox region should match the attack style — a
+	// narrow forward LINE for a thrust/chop/jab (poke straight ahead), a WIDE fan for a swept sword/mace
+	// (arc across a cluster) — while its forward length still follows weapon reach. We verify the box width
+	// resolves narrow vs wide per style, and that the length still tracks reach.
+	private async Task<bool> TestHitboxShaping()
+	{
+		GD.Print("=== UnitTest: per-style hitbox shaping (M18, Chunk 98) ===");
+
+		foreach (Node c in GetChildren())
+			c.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		var cap = GD.Load<PackedScene>("res://scenes/Captain.tscn").Instantiate<Player>();
+		AddChild(cap);
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		cap.SetWeapon(Player.WeaponType.Spear); float spearW = cap.HitboxWidth;  // Thrust -> narrow
+		cap.SetWeapon(Player.WeaponType.Axe);   float axeW   = cap.HitboxWidth;  // Chop   -> narrow
+		cap.SetWeapon(Player.WeaponType.Sword); float swordW = cap.HitboxWidth;  // Sweep  -> wide
+		cap.SetWeapon(Player.WeaponType.Mace);  float maceW  = cap.HitboxWidth;  // Swing  -> wide
+		float maceLen = cap.HitboxLength;
+
+		bool thrustNarrow = Mathf.IsEqualApprox(spearW, cap.ThrustHitboxWidth, 0.01f);
+		bool chopNarrow   = Mathf.IsEqualApprox(axeW,   cap.ThrustHitboxWidth, 0.01f);
+		bool sweepWide    = Mathf.IsEqualApprox(swordW, cap.SweptHitboxWidth, 0.01f);
+		bool swingWide    = Mathf.IsEqualApprox(maceW,  cap.SweptHitboxWidth, 0.01f);
+		bool widerThanNarrow = swordW > spearW && maceW > axeW;
+		bool lenFollowsReach = Mathf.IsEqualApprox(maceLen, cap.MaceReach, 0.01f);
+		GD.Print($"  widths: spear(Thrust)={spearW:0.00}, axe(Chop)={axeW:0.00}, sword(Sweep)={swordW:0.00}, mace(Swing)={maceW:0.00}; maceLen={maceLen:0.00} (reach {cap.MaceReach:0.00})");
+
+		cap.QueueFree();
+		await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+
+		bool pass = thrustNarrow && chopNarrow && sweepWide && swingWide && widerThanNarrow && lenFollowsReach;
+		GD.Print(pass
+			? "PASS: thrust/chop keep the narrow line, sweep/swing get the wide fan, length tracks reach"
+			: $"FAIL: thrustNarrow={thrustNarrow}, chopNarrow={chopNarrow}, sweepWide={sweepWide}, swingWide={swingWide}, widerThanNarrow={widerThanNarrow}, lenFollowsReach={lenFollowsReach}");
 		return pass;
 	}
 
